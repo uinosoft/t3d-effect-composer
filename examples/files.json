@@ -1,0 +1,28 @@
+{
+	"effect": [
+		"effect_features",
+		"effect_transparent"
+	],
+	"layer": [
+		"layer_all",
+		"layer_glows",
+		"layer_outlines"
+	],
+	"scene": [
+		"scene_factory",
+		"scene_city",
+		"scene_school"
+	],
+	"advanced": [
+		"advanced_stencil",
+		"advanced_wireframe",
+		"advanced_decal",
+		"advanced_sketch",
+		"advanced_lut",
+		"advanced_lensflare",
+		"advanced_overlay"
+	],
+	"debugger": [
+		"debugger_uv"
+	]
+}

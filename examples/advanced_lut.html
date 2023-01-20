@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>t3d-effect-composer</title>
+	<metaname="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"/>
+	<link type="text/css" rel="stylesheet" href="main.css" />
+	<style>
+		.top-left-corner {
+			left: 15px;
+		}
+	</style>
+</head>
+
+<body>
+	<div id="container"></div>
+	<div id="info">Lut Effect, press 'i' to show Inspector</div>
+</body>
+
+<!-- Import maps polyfill -->
+<!-- Remove this when import maps will be widely supported -->
+<script async src="./libs/es-module-shims.js"></script>
+
+<script type="importmap">
+    {
+        "imports": {
+            "t3d": "./libs/t3d/build/t3d.module.js",
+            "t3d/examples/jsm/": "./libs/t3d/examples/jsm/",
+            "t3d-effect-composer": "../build/t3d.effectcomposer.module.js"
+        }
+    }
+</script>
+
+<script type="module">
+	import * as t3d from 't3d';
+	import { OrbitControls } from 't3d/examples/jsm/controls/OrbitControls.js';
+	import { SkyBox } from 't3d/examples/jsm/objects/SkyBox.js';
+	import { PMREM } from 't3d/examples/jsm/PMREM.js';
+	import { GLTFLoader } from 't3d/examples/jsm/loaders/glTF/GLTFLoader.js';
+	import { RGBELoader } from 't3d/examples/jsm/loaders/RGBELoader.js';
+
+	import { DefaultEffectComposer } from 't3d-effect-composer';
+	import { LutEffect } from './jsm/lut/LutEffect.js';
+	import { LUTCubeLoader } from './jsm/lut/LUTCubeLoader.js';
+	import { LUT3dlLoader } from './jsm/lut/LUT3dlLoader.js';
+	import { Inspector } from './jsm/Inspector.js';
+
+	import { GUI } from './libs/lil-gui.esm.min.js';
+	import Stats from './libs/stats.module.js';
+
+	let width = window.innerWidth || 2;
+	let height = window.innerHeight || 2;
+
+	const canvas = document.createElement("canvas");
+	canvas.width = width;
+	canvas.height = height;
+	document.body.appendChild(canvas);
+
+	const params = {
+		active: true,
+		lut: "Bourbon 64.CUBE",
+		use2DLut: false,
+	};
+
+	const lutMap = {
+		"Bourbon 64.CUBE": null,
+		"Chemical 168.CUBE": null,
+		"Clayton 33.CUBE": null,
+		"Cubicle 99.CUBE": null,
+		"Remy 24.CUBE": null,
+		"Presetpro-Cinematic.3dl": null,
+	};
+
+	let mapCount = 0;
+	let lut = null;
+
+	const contextParams = { antialias: true, alpha: false, stencil: true };
+	const gl =
+		canvas.getContext("webgl2", contextParams) ||
+		canvas.getContext("webgl", contextParams);
+	const renderer = new t3d.Renderer(gl);
+	const backRenderTarget = new t3d.RenderTargetBack(canvas);
+
+	const effectComposer = new DefaultEffectComposer(width, height, {
+		samplerNumber: Math.min(renderer.renderPass.capabilities.maxSamples, 5),
+		webgl2: renderer.renderPass.capabilities.version > 1,
+		floatColorBuffer: !!renderer.renderPass.capabilities.getExtension(
+			"EXT_color_buffer_float"
+		),
+	});
+
+	const scene = new t3d.Scene();
+
+	const file = "resources/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf";
+	const loadingManager = new t3d.LoadingManager();
+
+	new RGBELoader().load("resources/sky_hdr/royal_esplanade_1k.hdr", function(textureData) {
+		let texture = new t3d.Texture2D();
+		texture.image = { data: textureData.data, width: textureData.width, height: textureData.height };
+		texture.type = textureData.type;
+		if (textureData.generateMipmaps !== undefined) {
+			texture.generateMipmaps = textureData.generateMipmaps;
+		}
+		if (textureData.minFilter !== undefined) {
+			texture.minFilter = textureData.minFilter;
+		}
+		if (textureData.magFilter !== undefined) {
+			texture.magFilter = textureData.magFilter;
+		}
+		texture.version++;
+
+		texture = PMREM.prefilterEnvironmentMap(renderer, texture, {
+			sampleSize: 1024,
+		});
+
+		scene.background = texture;
+		scene.environment = texture;
+
+		const loader = new GLTFLoader(loadingManager);
+
+		loader
+			.load(file)
+			.then(function (result) {
+				const object = result.root.children[0];
+
+				scene.add(object);
+			})
+			.catch((e) => console.error(e));
+
+		const sky_box = new SkyBox(texture);
+		sky_box.gamma = true;
+		camera.add(sky_box);
+	});
+
+	Object.keys(lutMap).forEach((name) => {
+		if (/\.CUBE$/i.test(name)) {
+			new LUTCubeLoader().load("./resources/luts/" + name, function (result) {
+				lutMap[name] = result;
+				mapCount++;
+				if (mapCount === 6) {
+					lut = lutMap[params.lut];
+					lutEffect.lut = params.use2DLut ? lut.texture : lut.texture3D;
+				}
+			});
+		} else {
+			new LUT3dlLoader().load("./resources/luts/" + name, function (result) {
+				lutMap[name] = result;
+				mapCount++;
+				if (mapCount === 6) {
+					lut = lutMap[params.lut];
+					lutEffect.lut = params.use2DLut ? lut.texture : lut.texture3D;
+				}
+			});
+		}
+	});
+
+	const ambientLight = new t3d.AmbientLight(0xffffff, 0.2);
+	scene.add(ambientLight);
+
+	const directionalLight = new t3d.DirectionalLight(0xffffff, 0.5);
+	directionalLight.position.set(-40, 40, 0);
+	directionalLight.lookAt(new t3d.Vector3(), new t3d.Vector3(0, 1, 0));
+	scene.add(directionalLight);
+
+	const camera = new t3d.Camera();
+	camera.position.set(-1.8, 0.6, 2.7);
+	camera.setPerspective(45, width / height, 0.25, 20);
+	scene.add(camera);
+	camera.gammaFactor = 2.2;
+	camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.GAMMA;
+	effectComposer
+		.getBuffer("SceneBuffer")
+		.setOutputEncoding(t3d.TEXEL_ENCODING_TYPE.GAMMA);
+
+	const lutEffect = new LutEffect();
+	effectComposer.addEffect("lut", lutEffect, 1.5);
+
+	const gui = new GUI();
+	gui.add(params, "active");
+	gui.add(params, "lut", Object.keys(lutMap)).onChange(() => {
+		lut = lutMap[params.lut];
+		lutEffect.lut = params.use2DLut ? lut.texture : lut.texture3D;
+	});
+	gui.add(lutEffect, "intensity").min(0).max(1);
+	if (renderer.renderPass.capabilities.version === 2) {
+		gui.add(params, "use2DLut").onChange((value) => {
+			lutEffect.lut = value ? lut.texture : lut.texture3D;
+		});
+	} else {
+		params.use2DLut = true;
+	}
+
+	effectComposer.sceneMSAA = true;
+
+	const stats = new Stats();
+	stats.dom.style.cssText = "position:fixed;bottom:0;left:0;cursor:pointer;opacity:0.9;z-index:10000";
+	stats.showPanel(0);
+	document.body.appendChild(stats.dom);
+
+	let inspector;
+	document.addEventListener("keydown", (e) => {
+		if (e.keyCode === 73) {
+			if (!inspector) {
+				inspector = new Inspector(effectComposer, GUI);
+				inspector.gui.domElement.classList.add("top-left-corner");
+			} else {
+				inspector.destroy();
+				inspector = null;
+			}
+		}
+	});
+
+	const controller = new OrbitControls(camera, canvas);
+	controller.minDistance = 2;
+	controller.maxDistance = 10;
+	controller.target.set(0, 0, -0.2);
+	controller.update();
+
+	function loop(count) {
+		requestAnimationFrame(loop);
+
+		stats.begin();
+
+		controller.update();
+
+		scene.updateMatrix();
+		scene.updateRenderStates(camera);
+		scene.updateRenderQueue(camera).getLayer(0);
+
+		lutEffect.active = mapCount === 6 && params.active;
+
+		renderer.renderPass.setClearColor(0, 0, 0, 1);
+		effectComposer.render(renderer, scene, camera, backRenderTarget);
+
+		stats.end();
+	}
+	requestAnimationFrame(loop);
+
+	function onWindowResize() {
+		width = window.innerWidth || 2;
+		height = window.innerHeight || 2;
+
+		camera.setPerspective((60 / 180) * Math.PI, width / height, 0.1, 1000);
+
+		backRenderTarget.resize(width, height);
+		effectComposer.resize(width, height);
+	}
+	window.addEventListener("resize", onWindowResize, false);
+</script>
+</html>

@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>t3d-effect-composer</title>
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <link type="text/css" rel="stylesheet" href="main.css">
+    <style>
+        .top-left-corner {
+            left: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="container" ></div>
+    <div id="info" class="dark">
+        t3d store house <br>
+        press 'i' to show Inspector
+    </div>
+</body>
+
+<!-- Import maps polyfill -->
+<!-- Remove this when import maps will be widely supported -->
+<script async src="./libs/es-module-shims.js"></script>
+
+<script type="importmap">
+    {
+        "imports": {
+            "t3d": "./libs/t3d/build/t3d.module.js",
+            "t3d/examples/jsm/": "./libs/t3d/examples/jsm/",
+            "t3d-effect-composer": "../build/t3d.effectcomposer.module.js"
+        }
+    }
+</script>
+
+<script src="./libs/nanobar.min.js"></script>
+
+<script type="module">
+    import * as t3d from 't3d';
+    import { OrbitControls } from 't3d/examples/jsm/controls/OrbitControls.js';
+    import { GLTFLoader } from 't3d/examples/jsm/loaders/glTF/GLTFLoader.js';
+    import { TextureCubeLoader } from 't3d/examples/jsm/loaders/TextureCubeLoader.js';
+    import { SkyBox } from 't3d/examples/jsm/objects/SkyBox.js';
+
+    import { DefaultEffectComposer } from 't3d-effect-composer';
+    import { Inspector } from './jsm/Inspector.js';
+
+    import { GUI } from './libs/lil-gui.esm.min.js';
+    import Stats from './libs/stats.module.js';
+
+    function isPC() {
+    	const userAgentInfo = navigator.userAgent;
+    	const Agents = ["Android", "iPhone",
+    		"SymbianOS", "Windows Phone",
+    		"iPad", "iPod"];
+    	let flag = true;
+    	for (let v = 0; v < Agents.length; v++) {
+    		if (userAgentInfo.indexOf(Agents[v]) > 0) {
+    			flag = false;
+    			break;
+    		}
+    	}
+    	return flag;
+    }
+
+    let width = window.innerWidth || 2;
+    let height = window.innerHeight || 2;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width * window.devicePixelRatio;
+    canvas.height = height * window.devicePixelRatio;
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+    document.body.appendChild(canvas);
+
+    const contextParams = { antialias: true, alpha: false, stencil: true };
+    const gl = canvas.getContext("webgl2", contextParams) || canvas.getContext("webgl", contextParams);
+    const renderer = new t3d.Renderer(gl);
+    const backRenderTarget = new t3d.RenderTargetBack(canvas);
+
+    const shadowMapPass = new t3d.ShadowMapPass();
+
+    const effectComposer = new DefaultEffectComposer(width * window.devicePixelRatio, height * window.devicePixelRatio, {
+    	samplerNumber: Math.min(renderer.renderPass.capabilities.maxSamples, 5),
+    	webgl2: renderer.renderPass.capabilities.version > 1,
+    	floatColorBuffer: !!renderer.renderPass.capabilities.getExtension("EXT_color_buffer_float")
+    });
+
+    const scene = new t3d.Scene();
+    scene.environmentLightIntensity = 1;
+
+    const cube_texture = new TextureCubeLoader().load([
+    	"./resources/cube/BlueSky/posx.jpg",
+    	"./resources/cube/BlueSky/negx.jpg",
+    	"./resources/cube/BlueSky/posy.jpg",
+    	"./resources/cube/BlueSky/negy.jpg",
+    	"./resources/cube/BlueSky/posz.jpg",
+    	"./resources/cube/BlueSky/negz.jpg"
+    ]);
+    scene.environment = cube_texture;
+
+    const sky_box = new SkyBox(cube_texture);
+
+    const nanobar = new Nanobar();
+    nanobar.el.style.background = "gray";
+
+    const loadingManager = new t3d.LoadingManager(function() {
+    	nanobar.go(100);
+    	nanobar.el.style.background = "transparent";
+    }, function(url, itemsLoaded, itemsTotal) {
+    	if (itemsLoaded < itemsTotal) {
+    		nanobar.go(itemsLoaded / itemsTotal * 100);
+    	}
+    });
+
+    const loader = new GLTFLoader(loadingManager);
+    console.time('GLTFLoader');
+
+    const modelUrl = './resources/gltf/lowpoly.glb';
+    loader.load(modelUrl).then(function(result) {
+    	console.timeEnd('GLTFLoader');
+
+    	let object = result.root;
+
+    	object.traverse(node => {
+    		if (node.material) {
+    			node.castShadow = true;
+    			node.receiveShadow = true;
+    		}
+    	});
+
+    	scene.add(object);
+    });
+
+    const ambientLight = new t3d.AmbientLight(0xffffff, 0.1);
+    scene.add(ambientLight);
+
+    const directionalLight = new t3d.DirectionalLight(0xffffff, 0.5);
+    directionalLight.position.set(-80, 80, -80);
+    directionalLight.lookAt(new t3d.Vector3(), new t3d.Vector3(0, 1, 0));
+    directionalLight.shadow.windowSize = 50;
+    directionalLight.shadow.bias = -0.003;
+    directionalLight.shadow.camera.near = 1;
+    directionalLight.shadow.camera.far = 30;
+    directionalLight.shadow.mapSize.set(1024, 1024);
+    directionalLight.castShadow = true;
+    scene.add(directionalLight);
+
+    const camera = new t3d.Camera();
+    camera.position.set(-15, 8, 15);
+    camera.lookAt(new t3d.Vector3(0, 0, 0), new t3d.Vector3(0, 1, 0));
+    camera.setPerspective(60 / 180 * Math.PI, width / height, 1, 800);
+    camera.add(sky_box);
+    scene.add(camera);
+
+    camera.gammaFactor = 2.0;
+    camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.GAMMA;
+    effectComposer.getBuffer('SceneBuffer').setOutputEncoding(t3d.TEXEL_ENCODING_TYPE.GAMMA);
+
+    function setRenderQuality(quality) {
+    	effectComposer.sceneMSAA = (quality !== 'Low');
+
+    	const fxaaEffect = effectComposer.getEffect('FXAA');
+    	fxaaEffect.active = (quality === 'Low');
+
+    	// const colorCorrectionEffect = effectComposer.getEffect('ColorCorrection');
+    	// colorCorrectionEffect.active = true;
+    	// colorCorrectionEffect.gamma = 1;
+
+    	const ssaoEffect = effectComposer.getEffect('SSAO');
+    	ssaoEffect.active = (quality === 'High');
+    	ssaoEffect.radius = 0.68;
+    	ssaoEffect.intensity = 0.5;
+    	ssaoEffect.quality = quality;
+
+    	const ssrEffect = effectComposer.getEffect('SSR');
+    	ssrEffect.active = (quality !== 'Low');
+    	ssrEffect.minGlossiness = 0.42;
+
+    	const blurEdgeEffect = effectComposer.getEffect('BlurEdge');
+    	blurEdgeEffect.active = (quality !== 'Low');
+    	blurEdgeEffect.offset = 0.8;
+
+    	const chromaticAberrationEffect = effectComposer.getEffect('ChromaticAberration');
+    	chromaticAberrationEffect.active = (quality !== 'Low');
+    	chromaticAberrationEffect.chromaFactor = 0.0045;
+
+    	const mapSize = ({ 'High': 2048, 'Medium': 1024, 'Low': 512 })[quality];
+    	directionalLight.shadow.mapSize.set(mapSize, mapSize);
+    }
+    setRenderQuality(isPC() ? 'High' : 'Low');
+
+    const gui = new GUI();
+    gui.add(scene, "environmentLightIntensity", 0, 1, 0.01);
+    gui.add(ambientLight, "intensity", 0, 1, 0.01);
+    gui.add({ quality: (isPC() ? 'High' : 'Low') }, 'quality', ['Low', 'Medium', 'High']).onChange(setRenderQuality);
+
+    // console.log(scene, camera);
+    let inspector;
+    document.addEventListener('keydown', e => {
+    	if (e.keyCode === 73) {
+    		if (!inspector) {
+    			inspector = new Inspector(effectComposer, GUI);
+    			inspector.gui.domElement.classList.add('top-left-corner');
+    		} else {
+    			inspector.destroy();
+    			inspector = null;
+    		}
+    	}
+    });
+    
+    const stats = new Stats();
+    stats.showPanel(0);
+    // document.body.appendChild(stats.dom);
+
+    const controller = new OrbitControls(camera, canvas);
+
+    function loop(count) {
+    	requestAnimationFrame(loop);
+
+    	stats.begin();
+
+    	controller.update();
+
+    	scene.updateMatrix();
+    	scene.updateRenderStates(camera);
+    	scene.updateRenderQueue(camera);
+
+    	shadowMapPass.render(renderer, scene);
+
+    	renderer.renderPass.setClearColor(0, 0, 0, 1);
+    	effectComposer.render(renderer, scene, camera, backRenderTarget);
+
+    	stats.end();
+    }
+    requestAnimationFrame(loop);
+
+    function onWindowResize() {
+    	width = window.innerWidth || 2;
+    	height = window.innerHeight || 2;
+
+    	canvas.style.width = width + 'px';
+    	canvas.style.height = height + 'px';
+
+    	camera.setPerspective(60 / 180 * Math.PI, width / height, 1, 800);
+
+    	backRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+    	effectComposer.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+    }
+    window.addEventListener("resize", onWindowResize, false);
+</script>
+
+</html>
