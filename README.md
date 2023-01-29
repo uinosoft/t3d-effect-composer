@@ -1,36 +1,18 @@
 t3d-effect-composer
 ===================
 
-EffectComposer for t3d.js.
+Post Effects extension for [t3d.js](https://github.com/UINOSOFT/t3d.js).
 
-### Dependencies
-
-[t3d.js](https://git.uino.com/thingjs_base/t3d/t3d.js)
+[Examples](https://uinosoft.github.io/t3d-effect-composer/examples/) &mdash;
+Documents<[English](./docs/doc-en.md)/[中文](./docs/doc-zh.md)>
 
 ### Features
 
-* SSAO
-* SSR
-* ColorCorrection
-* DOF
-* Bloom
-* FXAA
-* ChromaticAberration
-* Vignetting
-* BlurEdge
-* Film
-
-* InnerGlow
-* Glow
-* SoftGlow
-* Tailing
-* RadialTailing
-* Ghosting
-* Outline
+* Post-processing effect: SSAO, SSR, ColorCorrection, DOF, Bloom, FXAA, ChromaticAberration, Vignetting, BlurEdge, Film.
+* Mesh effects: InnerGlow, Glow, SoftGlow, Tailing, RadialTailing, Ghosting, Outline.
+* Extended rendering features: Decal, lensflare, lut, overlay, sketch, uv debug ...
 
 ### Usage
-
-Documents: [English](./docs/doc-en.md) | [中文](./docs/doc-zh.md)
 
 Getting started：
 
@@ -43,7 +25,7 @@ canvas.width = width;
 canvas.height = height;
 document.body.appendChild(canvas);
 
-const gl = canvas.getContext("webgl2", {
+const gl = canvas.getContext('webgl2', {
     antialias: true,
     alpha: false,
     stencil: true
@@ -56,7 +38,7 @@ const effectComposer = new t3d.DefaultEffectComposer(width, height, {});
 
 const scene = new t3d.Scene();
 
-const geometry = new t3d.CubeGeometry(8, 8, 8);
+const geometry = new t3d.BoxGeometry(8, 8, 8);
 const material = new t3d.PBRMaterial();
 const mesh = new t3d.Mesh(geometry, material);
 scene.add(mesh);

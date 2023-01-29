@@ -1,6 +1,6 @@
 {
   "name": "t3d-effect-composer",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "EffectComposer for t3d.js",
   "main": "build/t3d.effectcomposer.js",
   "jsnext:main": "build/t3d.effectcomposer.module.js",
