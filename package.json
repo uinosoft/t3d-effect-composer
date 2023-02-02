@@ -2,9 +2,32 @@
   "name": "t3d-effect-composer",
   "version": "0.0.7",
   "description": "EffectComposer for t3d.js",
-  "main": "build/t3d.effectcomposer.js",
-  "jsnext:main": "build/t3d.effectcomposer.module.js",
-  "module": "build/t3d.effectcomposer.module.js",
+  "main": "./build/t3d.effectcomposer.js",
+  "module": "./build/t3d.effectcomposer.module.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/UINOSOFT/t3d-effect-composer"
+  },
+  "files": [
+    "build/t3d.effectcomposer.js",
+    "build/t3d.effectcomposer.min.js",
+    "build/t3d.effectcomposer.module.js",
+    "examples/jsm",
+    "LICENSE",
+    "package.json",
+    "README.md",
+    "src"
+  ],
+  "keywords": [
+    "postprocessing",
+    "t3d",
+    "javascript",
+    "3d",
+    "webgl",
+    "webgl2",
+    "canvas",
+    "html5"
+  ],
   "directories": {
     "example": "examples"
   },
@@ -17,11 +40,6 @@
       "html"
     ]
   },
-  "scripts": {
-    "build": "rollup -c",
-    "eslint": "eslint src",
-    "eslint-fix": "eslint src --fix"
-  },
   "author": "uino",
   "license": "BSD-3-Clause",
   "devDependencies": {
@@ -32,5 +50,13 @@
     "eslint-plugin-html": "^7.1.0",
     "rollup": "^2.78.0",
     "rollup-plugin-terser": "^7.0.2"
+  },
+  "peerDependencies": {
+    "t3d": "^0.1.1"
+  },
+  "scripts": {
+    "build": "rollup -c",
+    "eslint": "eslint src",
+    "eslint-fix": "eslint src --fix"
   }
 }

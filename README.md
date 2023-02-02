@@ -1,6 +1,8 @@
 t3d-effect-composer
 ===================
 
+[![NPM Package][npm]][npm-url]
+
 Post Effects extension for [t3d.js](https://github.com/UINOSOFT/t3d.js).
 
 [Examples](https://uinosoft.github.io/t3d-effect-composer/examples/) &mdash;
@@ -81,3 +83,6 @@ function onWindowResize() {
 }
 window.addEventListener("resize", onWindowResize, false);
 ````
+
+[npm]: https://img.shields.io/npm/v/t3d-effect-composer
+[npm-url]: https://www.npmjs.com/package/t3d-effect-composer
