@@ -1,7 +1,7 @@
 import SSREffect from '../effects/SSREffect.js';
 import Debugger from './Debugger.js';
 
-export default class SSAODebugger extends Debugger {
+export default class SSRDebugger extends Debugger {
 
 	constructor() {
 		super();

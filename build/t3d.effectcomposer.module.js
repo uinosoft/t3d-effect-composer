@@ -6091,7 +6091,7 @@ class NonDepthMarkBufferDebugger extends Debugger {
 
 }
 
-class SSAODebugger$1 extends Debugger {
+class SSAODebugger extends Debugger {
 
 	constructor() {
 		super();
@@ -6115,7 +6115,7 @@ class SSAODebugger$1 extends Debugger {
 
 }
 
-class SSAODebugger extends Debugger {
+class SSRDebugger extends Debugger {
 
 	constructor() {
 		super();
@@ -6162,4 +6162,4 @@ Object.defineProperties(EffectComposer.prototype, {
 	}
 });
 
-export { BloomEffect, BlurEdgeEffect, Buffer, ChromaticAberrationEffect, ColorCorrectionEffect, ColorMarkBufferDebugger, DOFEffect, Debugger, DefaultEffectComposer, Effect, EffectComposer, FXAAEffect, FilmEffect, GBufferDebugger, GhostingEffect, GlowEffect, InnerGlowEffect, MarkBufferDebugger, NonDepthMarkBufferDebugger, OutlineEffect, RadialTailingEffect, RenderLayer, RenderListMask, SSAODebugger$1 as SSAODebugger, SSAOEffect, SSAODebugger as SSRDebugger, SSREffect, SoftGlowEffect, TailingEffect, VignettingEffect, additiveShader, blurShader, channelShader, copyShader, defaultVertexShader, highlightShader, horizontalBlurShader, isDepthStencilAttachment, maskShader, multiplyShader, seperableBlurShader, verticalBlurShader };
+export { BloomEffect, BlurEdgeEffect, Buffer, ChromaticAberrationEffect, ColorCorrectionEffect, ColorMarkBufferDebugger, DOFEffect, Debugger, DefaultEffectComposer, Effect, EffectComposer, FXAAEffect, FilmEffect, GBufferDebugger, GhostingEffect, GlowEffect, InnerGlowEffect, MarkBufferDebugger, NonDepthMarkBufferDebugger, OutlineEffect, RadialTailingEffect, RenderLayer, RenderListMask, SSAODebugger, SSAOEffect, SSRDebugger, SSREffect, SoftGlowEffect, TailingEffect, VignettingEffect, additiveShader, blurShader, channelShader, copyShader, defaultVertexShader, highlightShader, horizontalBlurShader, isDepthStencilAttachment, maskShader, multiplyShader, seperableBlurShader, verticalBlurShader };

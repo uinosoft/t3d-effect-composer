@@ -3428,7 +3428,7 @@
 		return NonDepthMarkBufferDebugger;
 	}(Debugger);
 
-	var SSAODebugger$1 = /*#__PURE__*/function (_Debugger) {
+	var SSAODebugger = /*#__PURE__*/function (_Debugger) {
 		_inheritsLoose(SSAODebugger, _Debugger);
 		function SSAODebugger() {
 			var _this;
@@ -3451,16 +3451,16 @@
 		return SSAODebugger;
 	}(Debugger);
 
-	var SSAODebugger = /*#__PURE__*/function (_Debugger) {
-		_inheritsLoose(SSAODebugger, _Debugger);
-		function SSAODebugger() {
+	var SSRDebugger = /*#__PURE__*/function (_Debugger) {
+		_inheritsLoose(SSRDebugger, _Debugger);
+		function SSRDebugger() {
 			var _this;
 			_this = _Debugger.call(this) || this;
 			_this.bufferDependencies = ['SceneBuffer', 'GBuffer'];
 			_this.defaultEffect = new SSREffect();
 			return _this;
 		}
-		var _proto = SSAODebugger.prototype;
+		var _proto = SSRDebugger.prototype;
 		_proto.render = function render(renderer, composer, outputRenderTarget) {
 			var ssrEffect = composer.getEffect('SSR') || this.defaultEffect;
 			ssrEffect.render(renderer, composer, null, outputRenderTarget);
@@ -3471,7 +3471,7 @@
 		_proto.dispose = function dispose() {
 			this.defaultEffect.dispose();
 		};
-		return SSAODebugger;
+		return SSRDebugger;
 	}(Debugger);
 
 	var RenderLayer = {
@@ -3518,9 +3518,9 @@
 	exports.RadialTailingEffect = RadialTailingEffect;
 	exports.RenderLayer = RenderLayer;
 	exports.RenderListMask = RenderListMask;
-	exports.SSAODebugger = SSAODebugger$1;
+	exports.SSAODebugger = SSAODebugger;
 	exports.SSAOEffect = SSAOEffect;
-	exports.SSRDebugger = SSAODebugger;
+	exports.SSRDebugger = SSRDebugger;
 	exports.SSREffect = SSREffect;
 	exports.SoftGlowEffect = SoftGlowEffect;
 	exports.TailingEffect = TailingEffect;
@@ -3537,7 +3537,5 @@
 	exports.multiplyShader = multiplyShader;
 	exports.seperableBlurShader = seperableBlurShader;
 	exports.verticalBlurShader = verticalBlurShader;
-
-	Object.defineProperty(exports, '__esModule', { value: true });
 
 }));
