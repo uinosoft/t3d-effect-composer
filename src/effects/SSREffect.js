@@ -137,6 +137,12 @@ export default class SSREffect extends Effect {
 		composer._renderTargetCache.release(tempRT2, 0);
 	}
 
+	dispose() {
+		this._ssrPass.dispose();
+		this._blurPass.dispose();
+		this._blendPass.dispose();
+	}
+
 }
 
 const projection = new Matrix4();

@@ -146,6 +146,14 @@ export default class SoftGlowEffect extends Effect {
 		this._tempRTList2.forEach((rt, i) => composer._renderTargetCache.release(rt, i));
 	}
 
+	dispose() {
+		this._maskPass.dispose();
+		this._downSamplerPass.dispose();
+		this._hBlurPass.dispose();
+		this._vBlurPass.dispose();
+		this._blendPass.dispose();
+	}
+
 }
 
 const downSampleShader = {

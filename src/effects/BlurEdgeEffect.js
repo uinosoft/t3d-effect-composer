@@ -64,6 +64,12 @@ export default class BlurEdgeEffect extends Effect {
 		composer._renderTargetCache.release(tempRT2, 1);
 	}
 
+	dispose() {
+		this._hBlurPass.dispose();
+		this._vBlurPass.dispose();
+		this._blendPass.dispose();
+	}
+
 }
 
 const blurBlendShader = {

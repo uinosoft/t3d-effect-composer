@@ -331,6 +331,11 @@
 			composer._renderTargetCache.release(tempRT2, 1);
 			composer._renderTargetCache.release(tempRT3, 1);
 		};
+		_proto.dispose = function dispose() {
+			this._highlightPass.dispose();
+			this._blurPass.dispose();
+			this._blendPass.dispose();
+		};
 		return BloomEffect;
 	}(Effect);
 
@@ -369,6 +374,9 @@
 				mainPass.material.transparent = false;
 				mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
 			}
+		};
+		_proto.dispose = function dispose() {
+			this._mainPass.dispose();
 		};
 		return ChromaticAberrationEffect;
 	}(Effect);
@@ -426,6 +434,9 @@
 				mainPass.material.transparent = false;
 				mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
 			}
+		};
+		_proto.dispose = function dispose() {
+			this._mainPass.dispose();
 		};
 		return ColorCorrectionEffect;
 	}(Effect);
@@ -511,6 +522,9 @@
 				this._mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
 			}
 		};
+		_proto.dispose = function dispose() {
+			this._mainPass.dispose();
+		};
 		return DOFEffect;
 	}(Effect);
 	function _isPerspectiveMatrix(m) {
@@ -582,6 +596,9 @@
 				mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
 			}
 		};
+		_proto.dispose = function dispose() {
+			this._mainPass.dispose();
+		};
 		return FilmEffect;
 	}(Effect);
 	var shader$2 = {
@@ -631,6 +648,9 @@
 				this._mainPass.material.transparent = false;
 				this._mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
 			}
+		};
+		_proto.dispose = function dispose() {
+			this._mainPass.dispose();
 		};
 		return FXAAEffect;
 	}(Effect);
@@ -756,6 +776,11 @@
 			}
 			composer._renderTargetCache.release(tempRT1, 0);
 			composer._renderTargetCache.release(tempRT2, 0);
+		};
+		_proto.dispose = function dispose() {
+			this._ssaoPass.dispose();
+			this._blurPass.dispose();
+			this._blendPass.dispose();
 		};
 		_proto._setKernelSize = function _setKernelSize(size, offset) {
 			if (offset === void 0) {
@@ -1010,6 +1035,11 @@
 			composer._renderTargetCache.release(tempRT1, 0);
 			composer._renderTargetCache.release(tempRT2, 0);
 		};
+		_proto.dispose = function dispose() {
+			this._ssrPass.dispose();
+			this._blurPass.dispose();
+			this._blendPass.dispose();
+		};
 		return SSREffect;
 	}(Effect);
 	var projection = new t3d.Matrix4();
@@ -1075,6 +1105,9 @@
 				vignettingPass.material.transparent = false;
 				vignettingPass.renderStates.camera.rect.set(0, 0, 1, 1);
 			}
+		};
+		_proto.dispose = function dispose() {
+			this._vignettingPass.dispose();
 		};
 		return VignettingEffect;
 	}(Effect);
@@ -1146,6 +1179,11 @@
 			}
 			composer._renderTargetCache.release(tempRT1, 1);
 			composer._renderTargetCache.release(tempRT2, 1);
+		};
+		_proto.dispose = function dispose() {
+			this._hBlurPass.dispose();
+			this._vBlurPass.dispose();
+			this._blendPass.dispose();
 		};
 		return BlurEdgeEffect;
 	}(Effect);
@@ -1244,6 +1282,12 @@
 			}
 			composer._renderTargetCache.release(tempRT1, 1);
 			composer._renderTargetCache.release(tempRT2, 1);
+		};
+		_proto.dispose = function dispose() {
+			this._downsamplerPass.dispose();
+			this._edgeDetectionPass.dispose();
+			this._blurPass.dispose();
+			this._blendPass.dispose();
 		};
 		return OutlineEffect;
 	}(Effect);
@@ -1354,6 +1398,12 @@
 			composer._renderTargetCache.release(tempRT1, 0);
 			composer._renderTargetCache.release(tempRT2, 0);
 			composer._renderTargetCache.release(tempRT3, 0);
+		};
+		_proto.dispose = function dispose() {
+			this._channelPass.dispose();
+			this._blurXPass.dispose();
+			this._blurYPass.dispose();
+			this._blendPass.dispose();
 		};
 		return InnerGlowEffect;
 	}(Effect);
@@ -1523,6 +1573,13 @@
 				return composer._renderTargetCache.release(rt, i + 1);
 			});
 		};
+		_proto.dispose = function dispose() {
+			this._maskPass.dispose();
+			this._highlightPass.dispose();
+			this._blurPass.dispose();
+			this._compositePass.dispose();
+			this._blendPass.dispose();
+		};
 		return GlowEffect;
 	}(Effect);
 	var kernelSizeArray = [3, 5, 7, 9, 11];
@@ -1688,6 +1745,13 @@
 				return composer._renderTargetCache.release(rt, i);
 			});
 		};
+		_proto.dispose = function dispose() {
+			this._maskPass.dispose();
+			this._downSamplerPass.dispose();
+			this._hBlurPass.dispose();
+			this._vBlurPass.dispose();
+			this._blendPass.dispose();
+		};
 		return SoftGlowEffect;
 	}(Effect);
 	var downSampleShader = {
@@ -1791,6 +1855,11 @@
 			}
 			composer._renderTargetCache.release(tempRT1, 0);
 			composer._renderTargetCache.release(tempRT2, 0);
+		};
+		_proto.dispose = function dispose() {
+			this._maskPass.dispose();
+			this._tailingPass.dispose();
+			this._blendPass.dispose();
 		};
 		return TailingEffect;
 	}(Effect);
@@ -1896,6 +1965,11 @@
 			composer._renderTargetCache.release(tempRT1, 0);
 			composer._renderTargetCache.release(tempRT2, 0);
 		};
+		_proto.dispose = function dispose() {
+			this._maskPass.dispose();
+			this._radialTailingPass.dispose();
+			this._blendPass.dispose();
+		};
 		return RadialTailingEffect;
 	}(Effect);
 	var radialTailingShader = {
@@ -1998,6 +2072,11 @@
 			}
 			composer._renderTargetCache.release(tempRT1, 0);
 			composer._renderTargetCache.release(tempRT2, 0);
+		};
+		_proto.dispose = function dispose() {
+			this._maskPass.dispose();
+			this._ghostingPass.dispose();
+			this._blendPass.dispose();
 		};
 		return GhostingEffect;
 	}(Effect);
@@ -3494,6 +3573,17 @@
 			}
 		}
 	});
+
+	// Compatible with versions prior to t3d.js-v0.1.3
+	if (!t3d.ShaderPostPass.prototype.dispose) {
+		t3d.ShaderPostPass.prototype.dispose = function () {
+			var renderItem = this.renderQueueLayer.opaque[0];
+			if (renderItem) {
+				renderItem.geometry.dispose();
+				renderItem.material.dispose();
+			}
+		};
+	}
 
 	exports.BloomEffect = BloomEffect;
 	exports.BlurEdgeEffect = BlurEdgeEffect;

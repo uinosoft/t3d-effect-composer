@@ -140,6 +140,12 @@ export default class SSAOEffect extends Effect {
 		composer._renderTargetCache.release(tempRT2, 0);
 	}
 
+	dispose() {
+		this._ssaoPass.dispose();
+		this._blurPass.dispose();
+		this._blendPass.dispose();
+	}
+
 	_setKernelSize(size, offset = 0) {
 		const code = size + '_' + offset;
 

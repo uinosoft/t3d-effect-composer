@@ -92,6 +92,12 @@ export default class GhostingEffect extends Effect {
 		composer._renderTargetCache.release(tempRT2, 0);
 	}
 
+	dispose() {
+		this._maskPass.dispose();
+		this._ghostingPass.dispose();
+		this._blendPass.dispose();
+	}
+
 }
 
 const ghostingShader = {

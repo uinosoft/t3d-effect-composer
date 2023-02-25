@@ -49,6 +49,10 @@ export default class FilmEffect extends Effect {
 		}
 	}
 
+	dispose() {
+		this._mainPass.dispose();
+	}
+
 }
 
 const shader = {

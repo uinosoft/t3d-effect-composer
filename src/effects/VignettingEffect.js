@@ -39,6 +39,10 @@ export default class VignettingEffect extends Effect {
 		}
 	}
 
+	dispose() {
+		this._vignettingPass.dispose();
+	}
+
 }
 
 const vignettingShader = {

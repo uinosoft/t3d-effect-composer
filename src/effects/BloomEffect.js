@@ -80,4 +80,10 @@ export default class BloomEffect extends Effect {
 		composer._renderTargetCache.release(tempRT3, 1);
 	}
 
+	dispose() {
+		this._highlightPass.dispose();
+		this._blurPass.dispose();
+		this._blendPass.dispose();
+	}
+
 }

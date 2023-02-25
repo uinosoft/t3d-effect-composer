@@ -1,3 +1,4 @@
+import { ShaderPostPass } from 't3d';
 import EffectComposer from './EffectComposer.js';
 
 export const RenderLayer = {
@@ -22,3 +23,14 @@ Object.defineProperties(EffectComposer.prototype, {
 		}
 	}
 })
+
+// Compatible with versions prior to t3d.js-v0.1.3
+if (!ShaderPostPass.prototype.dispose) {
+	ShaderPostPass.prototype.dispose = function() {
+		const renderItem = this.renderQueueLayer.opaque[0];
+		if (renderItem) {
+			renderItem.geometry.dispose();
+			renderItem.material.dispose();
+		}
+	}
+}

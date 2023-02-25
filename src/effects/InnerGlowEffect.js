@@ -1,6 +1,6 @@
 import { ShaderPostPass, Color3, ATTACHMENT } from 't3d';
 import Effect from './Effect.js';
-import { channelShader, additiveShader, defaultVertexShader } from '../Utils.js';
+import { channelShader, defaultVertexShader } from '../Utils.js';
 
 export default class InnerGlowEffect extends Effect {
 
@@ -93,6 +93,13 @@ export default class InnerGlowEffect extends Effect {
 		composer._renderTargetCache.release(tempRT1, 0);
 		composer._renderTargetCache.release(tempRT2, 0);
 		composer._renderTargetCache.release(tempRT3, 0);
+	}
+
+	dispose() {
+		this._channelPass.dispose();
+		this._blurXPass.dispose();
+		this._blurYPass.dispose();
+		this._blendPass.dispose();
 	}
 
 }

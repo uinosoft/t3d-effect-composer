@@ -41,6 +41,10 @@ export default class ChromaticAberrationEffect extends Effect {
 		}
 	}
 
+	dispose() {
+		this._mainPass.dispose();
+	}
+
 }
 
 const shader = {

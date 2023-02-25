@@ -96,6 +96,13 @@ export default class OutlineEffect extends Effect {
 		composer._renderTargetCache.release(tempRT2, 1);
 	}
 
+	dispose() {
+		this._downsamplerPass.dispose();
+		this._edgeDetectionPass.dispose();
+		this._blurPass.dispose();
+		this._blendPass.dispose();
+	}
+
 }
 
 const edgeDetectionShader = {

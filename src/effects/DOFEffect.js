@@ -76,6 +76,10 @@ export default class DOFEffect extends Effect {
 		}
 	}
 
+	dispose() {
+		this._mainPass.dispose();
+	}
+
 }
 
 function _isPerspectiveMatrix(m) {

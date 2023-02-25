@@ -141,6 +141,14 @@ export default class GlowEffect extends Effect {
 		this._tempRTList.forEach((rt, i) => composer._renderTargetCache.release(rt, i + 1));
 	}
 
+	dispose() {
+		this._maskPass.dispose();
+		this._highlightPass.dispose();
+		this._blurPass.dispose();
+		this._compositePass.dispose();
+		this._blendPass.dispose();
+	}
+
 }
 
 const kernelSizeArray = [3, 5, 7, 9, 11];

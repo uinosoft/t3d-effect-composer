@@ -519,6 +519,12 @@ class BloomEffect extends Effect {
 		composer._renderTargetCache.release(tempRT3, 1);
 	}
 
+	dispose() {
+		this._highlightPass.dispose();
+		this._blurPass.dispose();
+		this._blendPass.dispose();
+	}
+
 }
 
 class ChromaticAberrationEffect extends Effect {
@@ -558,6 +564,10 @@ class ChromaticAberrationEffect extends Effect {
 			mainPass.material.transparent = false;
 			mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
 		}
+	}
+
+	dispose() {
+		this._mainPass.dispose();
 	}
 
 }
@@ -636,6 +646,10 @@ class ColorCorrectionEffect extends Effect {
 			mainPass.material.transparent = false;
 			mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
 		}
+	}
+
+	dispose() {
+		this._mainPass.dispose();
 	}
 
 }
@@ -754,6 +768,10 @@ class DOFEffect extends Effect {
 			this._mainPass.material.transparent = false;
 			this._mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
 		}
+	}
+
+	dispose() {
+		this._mainPass.dispose();
 	}
 
 }
@@ -940,6 +958,10 @@ class FilmEffect extends Effect {
 		}
 	}
 
+	dispose() {
+		this._mainPass.dispose();
+	}
+
 }
 
 const shader$2 = {
@@ -1019,6 +1041,10 @@ class FXAAEffect extends Effect {
 			this._mainPass.material.transparent = false;
 			this._mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
 		}
+	}
+
+	dispose() {
+		this._mainPass.dispose();
 	}
 
 }
@@ -2249,6 +2275,12 @@ class SSAOEffect extends Effect {
 		composer._renderTargetCache.release(tempRT2, 0);
 	}
 
+	dispose() {
+		this._ssaoPass.dispose();
+		this._blurPass.dispose();
+		this._blendPass.dispose();
+	}
+
 	_setKernelSize(size, offset = 0) {
 		const code = size + '_' + offset;
 
@@ -2650,6 +2682,12 @@ class SSREffect extends Effect {
 		composer._renderTargetCache.release(tempRT2, 0);
 	}
 
+	dispose() {
+		this._ssrPass.dispose();
+		this._blurPass.dispose();
+		this._blendPass.dispose();
+	}
+
 }
 
 const projection = new Matrix4();
@@ -3005,6 +3043,10 @@ class VignettingEffect extends Effect {
 		}
 	}
 
+	dispose() {
+		this._vignettingPass.dispose();
+	}
+
 }
 
 const vignettingShader = {
@@ -3092,6 +3134,12 @@ class BlurEdgeEffect extends Effect {
 
 		composer._renderTargetCache.release(tempRT1, 1);
 		composer._renderTargetCache.release(tempRT2, 1);
+	}
+
+	dispose() {
+		this._hBlurPass.dispose();
+		this._vBlurPass.dispose();
+		this._blendPass.dispose();
 	}
 
 }
@@ -3217,6 +3265,13 @@ class OutlineEffect extends Effect {
 
 		composer._renderTargetCache.release(tempRT1, 1);
 		composer._renderTargetCache.release(tempRT2, 1);
+	}
+
+	dispose() {
+		this._downsamplerPass.dispose();
+		this._edgeDetectionPass.dispose();
+		this._blurPass.dispose();
+		this._blendPass.dispose();
 	}
 
 }
@@ -3384,6 +3439,13 @@ class InnerGlowEffect extends Effect {
 		composer._renderTargetCache.release(tempRT1, 0);
 		composer._renderTargetCache.release(tempRT2, 0);
 		composer._renderTargetCache.release(tempRT3, 0);
+	}
+
+	dispose() {
+		this._channelPass.dispose();
+		this._blurXPass.dispose();
+		this._blurYPass.dispose();
+		this._blendPass.dispose();
 	}
 
 }
@@ -3708,6 +3770,14 @@ class GlowEffect extends Effect {
 		this._tempRTList.forEach((rt, i) => composer._renderTargetCache.release(rt, i + 1));
 	}
 
+	dispose() {
+		this._maskPass.dispose();
+		this._highlightPass.dispose();
+		this._blurPass.dispose();
+		this._compositePass.dispose();
+		this._blendPass.dispose();
+	}
+
 }
 
 const kernelSizeArray = [3, 5, 7, 9, 11];
@@ -3903,6 +3973,14 @@ class SoftGlowEffect extends Effect {
 		this._tempRTList2.forEach((rt, i) => composer._renderTargetCache.release(rt, i));
 	}
 
+	dispose() {
+		this._maskPass.dispose();
+		this._downSamplerPass.dispose();
+		this._hBlurPass.dispose();
+		this._vBlurPass.dispose();
+		this._blendPass.dispose();
+	}
+
 }
 
 const downSampleShader = {
@@ -4024,6 +4102,12 @@ class TailingEffect extends Effect {
 
 		composer._renderTargetCache.release(tempRT1, 0);
 		composer._renderTargetCache.release(tempRT2, 0);
+	}
+
+	dispose() {
+		this._maskPass.dispose();
+		this._tailingPass.dispose();
+		this._blendPass.dispose();
 	}
 
 }
@@ -4174,6 +4258,12 @@ class RadialTailingEffect extends Effect {
 		composer._renderTargetCache.release(tempRT2, 0);
 	}
 
+	dispose() {
+		this._maskPass.dispose();
+		this._radialTailingPass.dispose();
+		this._blendPass.dispose();
+	}
+
 }
 
 const radialTailingShader = {
@@ -4318,6 +4408,12 @@ class GhostingEffect extends Effect {
 
 		composer._renderTargetCache.release(tempRT1, 0);
 		composer._renderTargetCache.release(tempRT2, 0);
+	}
+
+	dispose() {
+		this._maskPass.dispose();
+		this._ghostingPass.dispose();
+		this._blendPass.dispose();
 	}
 
 }
@@ -6161,5 +6257,16 @@ Object.defineProperties(EffectComposer.prototype, {
 		}
 	}
 });
+
+// Compatible with versions prior to t3d.js-v0.1.3
+if (!ShaderPostPass.prototype.dispose) {
+	ShaderPostPass.prototype.dispose = function() {
+		const renderItem = this.renderQueueLayer.opaque[0];
+		if (renderItem) {
+			renderItem.geometry.dispose();
+			renderItem.material.dispose();
+		}
+	};
+}
 
 export { BloomEffect, BlurEdgeEffect, Buffer, ChromaticAberrationEffect, ColorCorrectionEffect, ColorMarkBufferDebugger, DOFEffect, Debugger, DefaultEffectComposer, Effect, EffectComposer, FXAAEffect, FilmEffect, GBufferDebugger, GhostingEffect, GlowEffect, InnerGlowEffect, MarkBufferDebugger, NonDepthMarkBufferDebugger, OutlineEffect, RadialTailingEffect, RenderLayer, RenderListMask, SSAODebugger, SSAOEffect, SSRDebugger, SSREffect, SoftGlowEffect, TailingEffect, VignettingEffect, additiveShader, blurShader, channelShader, copyShader, defaultVertexShader, highlightShader, horizontalBlurShader, isDepthStencilAttachment, maskShader, multiplyShader, seperableBlurShader, verticalBlurShader };

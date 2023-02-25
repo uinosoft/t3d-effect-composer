@@ -92,6 +92,12 @@ export default class RadialTailingEffect extends Effect {
 		composer._renderTargetCache.release(tempRT2, 0);
 	}
 
+	dispose() {
+		this._maskPass.dispose();
+		this._radialTailingPass.dispose();
+		this._blendPass.dispose();
+	}
+
 }
 
 const radialTailingShader = {
