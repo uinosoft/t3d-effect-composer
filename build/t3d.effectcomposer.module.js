@@ -5607,6 +5607,9 @@ class EffectComposer {
 
 		//
 
+		this._copyPass = new ShaderPostPass(copyShader);
+		this._copyPass.material.premultipliedAlpha = true;
+
 		this._renderTargetCache = new RenderTargetCache(width, height);
 
 		this._effectList = [];
@@ -5886,6 +5889,19 @@ class EffectComposer {
 
 			this._renderTargetCache.release(inputRT);
 			this._renderTargetCache.release(outputRT);
+		} else if (!!this._externalColorAttachment && !!this._externalDepthAttachment) {
+			const sceneBuffer = this._bufferMap.get('SceneBuffer');
+			sceneBuffer.render(renderer, this, scene, camera);
+
+			renderer.renderPass.setRenderTarget(target);
+			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.renderPass.clear(this.clearColor, this.clearDepth, this.clearStencil);
+
+			const copyPass = this._copyPass;
+			copyPass.uniforms.tDiffuse = sceneBuffer.output().texture;
+			copyPass.material.transparent = this._tempClearColor[3] < 1 || !this.clearColor;
+			copyPass.renderStates.camera.rect.fromArray(this._tempViewport);
+			copyPass.render(renderer);
 		} else {
 			renderer.renderPass.setRenderTarget(target);
 			renderer.renderPass.setClearColor(...this._tempClearColor);
@@ -5937,6 +5953,8 @@ class EffectComposer {
 		this._renderTargetCache.dispose();
 
 		this._effectList.forEach(item => item.effect.dispose());
+
+		this._copyPass.dispose();
 	}
 
 	// Protected methods

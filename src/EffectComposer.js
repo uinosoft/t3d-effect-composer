@@ -1,11 +1,11 @@
-import { Vector2, Texture2D, RenderBuffer, PIXEL_FORMAT } from 't3d';
+import { Vector2, Texture2D, RenderBuffer, PIXEL_FORMAT, ShaderPostPass } from 't3d';
 import GBuffer from './buffers/GBuffer.js';
 import NonDepthMarkBuffer from './buffers/NonDepthMarkBuffer.js';
 import MarkBuffer from './buffers/MarkBuffer.js';
 import ColorMarkBuffer from './buffers/ColorMarkBuffer.js';
 import SceneBuffer from './buffers/SceneBuffer.js';
 import RenderTargetCache from './RenderTargetCache.js';
-import { isDepthStencilAttachment } from './Utils.js';
+import { copyShader, isDepthStencilAttachment } from './Utils.js';
 
 export default class EffectComposer {
 
@@ -69,6 +69,9 @@ export default class EffectComposer {
 		this._syncAttachments();
 
 		//
+
+		this._copyPass = new ShaderPostPass(copyShader);
+		this._copyPass.material.premultipliedAlpha = true;
 
 		this._renderTargetCache = new RenderTargetCache(width, height);
 
@@ -349,6 +352,19 @@ export default class EffectComposer {
 
 			this._renderTargetCache.release(inputRT);
 			this._renderTargetCache.release(outputRT);
+		} else if (!!this._externalColorAttachment && !!this._externalDepthAttachment) {
+			const sceneBuffer = this._bufferMap.get('SceneBuffer');
+			sceneBuffer.render(renderer, this, scene, camera);
+
+			renderer.renderPass.setRenderTarget(target);
+			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.renderPass.clear(this.clearColor, this.clearDepth, this.clearStencil);
+
+			const copyPass = this._copyPass;
+			copyPass.uniforms.tDiffuse = sceneBuffer.output().texture;
+			copyPass.material.transparent = this._tempClearColor[3] < 1 || !this.clearColor;
+			copyPass.renderStates.camera.rect.fromArray(this._tempViewport);
+			copyPass.render(renderer);
 		} else {
 			renderer.renderPass.setRenderTarget(target);
 			renderer.renderPass.setClearColor(...this._tempClearColor);
@@ -400,6 +416,8 @@ export default class EffectComposer {
 		this._renderTargetCache.dispose();
 
 		this._effectList.forEach(item => item.effect.dispose());
+
+		this._copyPass.dispose();
 	}
 
 	// Protected methods

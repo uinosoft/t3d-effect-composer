@@ -3006,6 +3006,8 @@
 
 			//
 
+			this._copyPass = new t3d.ShaderPostPass(copyShader);
+			this._copyPass.material.premultipliedAlpha = true;
 			this._renderTargetCache = new RenderTargetCache(width, height);
 			this._effectList = [];
 			this._tempClearColor = [0, 0, 0, 1];
@@ -3251,6 +3253,17 @@
 				});
 				this._renderTargetCache.release(inputRT);
 				this._renderTargetCache.release(outputRT);
+			} else if (!!this._externalColorAttachment && !!this._externalDepthAttachment) {
+				var sceneBuffer = this._bufferMap.get('SceneBuffer');
+				sceneBuffer.render(renderer, this, scene, camera);
+				renderer.renderPass.setRenderTarget(target);
+				renderer.renderPass.setClearColor(0, 0, 0, 0);
+				renderer.renderPass.clear(this.clearColor, this.clearDepth, this.clearStencil);
+				var copyPass = this._copyPass;
+				copyPass.uniforms.tDiffuse = sceneBuffer.output().texture;
+				copyPass.material.transparent = this._tempClearColor[3] < 1 || !this.clearColor;
+				copyPass.renderStates.camera.rect.fromArray(this._tempViewport);
+				copyPass.render(renderer);
 			} else {
 				var _renderer$renderPass2;
 				renderer.renderPass.setRenderTarget(target);
@@ -3258,8 +3271,8 @@
 				renderer.renderPass.clear(this.clearColor, this.clearDepth, this.clearStencil);
 				renderStates.camera.rect.fromArray(this._tempViewport);
 				var renderQueue = scene.getRenderQueue(camera);
-				var sceneBuffer = this._bufferMap.get('SceneBuffer');
-				sceneBuffer.$renderScene(renderer, renderQueue, renderStates);
+				var _sceneBuffer = this._bufferMap.get('SceneBuffer');
+				_sceneBuffer.$renderScene(renderer, renderQueue, renderStates);
 			}
 			(_renderer$renderPass3 = renderer.renderPass).setClearColor.apply(_renderer$renderPass3, this._tempClearColor); // restore clear color
 			camera.rect.fromArray(this._tempViewport);
@@ -3301,6 +3314,7 @@
 			this._effectList.forEach(function (item) {
 				return item.effect.dispose();
 			});
+			this._copyPass.dispose();
 		}
 
 		// Protected methods
