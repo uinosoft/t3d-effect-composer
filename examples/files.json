@@ -20,7 +20,9 @@
 		"advanced_sketch",
 		"advanced_lut",
 		"advanced_lensflare",
-		"advanced_overlay"
+		"advanced_overlay",
+		"advanced_snow",
+		"advanced_rain"
 	],
 	"debugger": [
 		"debugger_uv"
