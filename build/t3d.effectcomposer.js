@@ -931,20 +931,44 @@
 			}, {
 				key: 'GBuffer'
 			}];
-			_this._ssrPass = new t3d.ShaderPostPass(ssrShader);
+
+			// Single step distance, unit is pixel
+			_this.pixelStride = 8;
+			// Dichotomy search depends on precise collision point, maximum number of iterations
+			_this.maxIteration = 5;
+			// Number of steps
+			_this.maxSteps = 50;
+
+			// The farthest reflection distance limit, in meters
 			_this.maxRayDistance = 200;
-			_this.pixelStride = 16;
+
+			// Adjust the step pixel distance according to the depth,
+			// the step in and out becomes larger,
+			// and the step in the distance becomes smaller.
+			_this.enablePixelStrideZCutoff = true;
+			// ray origin Z at this distance will have a pixel stride of 1.0
 			_this.pixelStrideZCutoff = 50;
+
+			// distance to screen edge that ray hits will start to fade (0.0 -> 1.0)
 			_this.screenEdgeFadeStart = 0.9;
-			_this.eyeFadeStart = 0.4;
-			_this.eyeFadeEnd = 0.8;
+
+			// ray direction's Z that ray hits will start to fade (0.0 -> 1.0)
+			_this.eyeFadeStart = 0.99;
+			// ray direction's Z that ray hits will be cut (0.0 -> 1.0)
+			_this.eyeFadeEnd = 1;
+
+			// Object larger than minGlossiness will have ssr effect
 			_this.minGlossiness = 0.2;
+			_this.strength = 0.2;
+			_this.mixType = 0; // 0: Add, 1: Mix
+
+			_this.blurSize = 2;
+			_this.depthRange = 1;
+			_this._ssrPass = new t3d.ShaderPostPass(ssrShader);
 			_this._blurPass = new t3d.ShaderPostPass(blurShader);
 			_this._blurPass.material.defines.NORMALTEX_ENABLED = 1;
 			_this._blurPass.material.defines.DEPTHTEX_ENABLED = 1;
-			_this.blurSize = 2;
-			_this.depthRange = 1;
-			_this._blendPass = new t3d.ShaderPostPass(additiveShader);
+			_this._blendPass = new t3d.ShaderPostPass(mixSSRShader);
 			_this._blendPass.material.premultipliedAlpha = true;
 			return _this;
 		}
@@ -972,13 +996,20 @@
 			projection.toArray(this._ssrPass.uniforms.projection);
 			projectionInv.toArray(this._ssrPass.uniforms.projectionInv);
 			viewInverseTranspose.toArray(this._ssrPass.uniforms.viewInverseTranspose);
-			this._ssrPass.uniforms.maxRayDistance = this.maxRayDistance;
 			this._ssrPass.uniforms.pixelStride = this.pixelStride;
+			this._ssrPass.uniforms.maxRayDistance = this.maxRayDistance;
+			this._ssrPass.uniforms.enablePixelStrideZCutoff = this.enablePixelStrideZCutoff ? 1 : 0;
 			this._ssrPass.uniforms.pixelStrideZCutoff = this.pixelStrideZCutoff;
 			this._ssrPass.uniforms.screenEdgeFadeStart = this.screenEdgeFadeStart;
 			this._ssrPass.uniforms.eyeFadeStart = this.eyeFadeStart;
 			this._ssrPass.uniforms.eyeFadeEnd = this.eyeFadeEnd;
 			this._ssrPass.uniforms.minGlossiness = this.minGlossiness;
+			this._ssrPass.uniforms.nearZ = gBufferRenderStates.camera.near;
+			if (this._ssrPass.material.defines.MAX_ITERATION != this.maxSteps || this._ssrPass.material.defines.MAX_BINARY_SEARCH_ITERATION != this.maxIteration) {
+				this._ssrPass.material.needsUpdate = true;
+				this._ssrPass.material.defines.MAX_ITERATION = this.maxSteps;
+				this._ssrPass.material.defines.MAX_BINARY_SEARCH_ITERATION = this.maxIteration;
+			}
 			this._ssrPass.render(renderer);
 
 			// Step 2: blurX pass
@@ -1018,10 +1049,13 @@
 				}
 				this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 				this._blendPass.uniforms.texture2 = tempRT1.texture;
-				this._blendPass.uniforms.colorWeight1 = 1;
-				this._blendPass.uniforms.alphaWeight1 = 1;
-				this._blendPass.uniforms.colorWeight2 = 1;
-				this._blendPass.uniforms.alphaWeight2 = 0;
+				this._blendPass.uniforms.reflectivitySampler = gBuffer.output()._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
+				this._blendPass.uniforms.reflectivityThreshold = this.minGlossiness;
+				this._blendPass.uniforms.strength = this.strength;
+				if (this._blendPass.material.defines.MIX_TYPE !== this.mixType) {
+					this._blendPass.material.needsUpdate = true;
+					this._blendPass.material.defines.MIX_TYPE = this.mixType;
+				}
 				if (finish) {
 					this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
 					this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
@@ -1047,7 +1081,10 @@
 	var viewInverseTranspose = new t3d.Matrix4();
 	var ssrShader = {
 		name: 'ec_ssr',
-		defines: {},
+		defines: {
+			MAX_ITERATION: 50,
+			MAX_BINARY_SEARCH_ITERATION: 5
+		},
 		uniforms: {
 			colorTex: null,
 			gBufferTexture1: null,
@@ -1055,21 +1092,37 @@
 			projection: new Float32Array(16),
 			projectionInv: new Float32Array(16),
 			viewInverseTranspose: new Float32Array(16),
-			maxRayDistance: 4,
-			pixelStride: 16,
-			pixelStrideZCutoff: 10,
+			pixelStride: 8,
+			maxRayDistance: 200,
+			enablePixelStrideZCutoff: 1.0,
+			pixelStrideZCutoff: 50,
 			screenEdgeFadeStart: 0.9,
-			eyeFadeStart: 0.4,
-			eyeFadeEnd: 0.8,
+			eyeFadeStart: 0.99,
+			eyeFadeEnd: 1,
 			minGlossiness: 0.2,
+			nearZ: 0.1,
 			zThicknessThreshold: 0.1,
 			jitterOffset: 0,
-			nearZ: 0,
-			viewportSize: [512, 512],
-			maxMipmapLevel: 5
+			viewportSize: [512, 512]
 		},
 		vertexShader: defaultVertexShader,
-		fragmentShader: "\n\t\t#define MAX_ITERATION 20;\n\t\t#define MAX_BINARY_SEARCH_ITERATION 5;\n\n\t\tvarying vec2 v_Uv;\n\n\t\tuniform sampler2D colorTex;\n\t\tuniform sampler2D gBufferTexture1;\n\t\tuniform sampler2D gBufferTexture2;\n\n\t\tuniform mat4 projection;\n\t\tuniform mat4 projectionInv;\n\t\tuniform mat4 viewInverseTranspose;\n\n\t\tuniform float maxRayDistance;\n\n\t\tuniform float pixelStride;\n\t\t// ray origin Z at this distance will have a pixel stride of 1.0\n\t\tuniform float pixelStrideZCutoff;\n\n\t\t// distance to screen edge that ray hits will start to fade (0.0 -> 1.0)\n\t\tuniform float screenEdgeFadeStart;\n\n\t\t// ray direction's Z that ray hits will start to fade (0.0 -> 1.0)\n\t\tuniform float eyeFadeStart;\n\t\t// ray direction's Z that ray hits will be cut (0.0 -> 1.0)\n\t\tuniform float eyeFadeEnd;\n\n\t\t// Object larger than minGlossiness will have ssr effect\n\t\tuniform float minGlossiness;\n\t\tuniform float zThicknessThreshold;\n\t\tuniform float jitterOffset;\n\n\t\tuniform float nearZ;\n\t\tuniform vec2 viewportSize;\n\n\t\tuniform float maxMipmapLevel;\n\n\t\tfloat fetchDepth(sampler2D depthTexture, vec2 uv) {\n\t\t\tvec4 depthTexel = texture2D(depthTexture, uv);\n\t\t\treturn depthTexel.r * 2.0 - 1.0;\n\t\t}\n\n\t\tfloat linearDepth(float depth) {\n\t\t\treturn projection[3][2] / (depth * projection[2][3] - projection[2][2]);\n\t\t}\n\n\t\tbool rayIntersectDepth(float rayZNear, float rayZFar, vec2 hitPixel) {\n\t\t\t// Swap if bigger\n\t\t\tif (rayZFar > rayZNear) {\n\t\t\t\tfloat t = rayZFar; rayZFar = rayZNear; rayZNear = t;\n\t\t\t}\n\t\t\tfloat cameraZ = linearDepth(fetchDepth(gBufferTexture2, hitPixel));\n\t\t\t// float cameraBackZ = linearDepth(fetchDepth(backDepthTex, hitPixel));\n\t\t\t// Cross z\n\t\t\treturn rayZFar <= cameraZ && rayZNear >= cameraZ - zThicknessThreshold;\n\t\t}\n\n\t\t// Trace a ray in screenspace from rayOrigin (in camera space) pointing in rayDir (in camera space)\n\t\t//\n\t\t// With perspective correct interpolation\n\t\t//\n\t\t// Returns true if the ray hits a pixel in the depth buffer\n\t\t// and outputs the hitPixel (in UV space), the hitPoint (in camera space) and the number\n\t\t// of iterations it took to get there.\n\t\t//\n\t\t// Based on Morgan McGuire & Mike Mara's GLSL implementation:\n\t\t// http://casual-effects.blogspot.com/2014/08/screen-space-ray-tracing.html\n\t\tbool traceScreenSpaceRay(vec3 rayOrigin, vec3 rayDir, float jitter, out vec2 hitPixel, out vec3 hitPoint, out float iterationCount) {\n\t\t\t// Clip to the near plane\n\t\t\tfloat rayLength = ((rayOrigin.z + rayDir.z * maxRayDistance) > -nearZ) ? (-nearZ - rayOrigin.z) / rayDir.z : maxRayDistance;\n\n\t\t\tvec3 rayEnd = rayOrigin + rayDir * rayLength;\n\n\t\t\t// Project into homogeneous clip space\n\t\t\tvec4 H0 = projection * vec4(rayOrigin, 1.0);\n\t\t\tvec4 H1 = projection * vec4(rayEnd, 1.0);\n\n\t\t\tfloat k0 = 1.0 / H0.w, k1 = 1.0 / H1.w;\n\n\t\t\t// The interpolated homogeneous version of the camera space points\n\t\t\tvec3 Q0 = rayOrigin * k0, Q1 = rayEnd * k1;\n\n\t\t\t// Screen space endpoints\n\t\t\t// PENDING viewportSize ?\n\t\t\tvec2 P0 = (H0.xy * k0 * 0.5 + 0.5) * viewportSize;\n\t\t\tvec2 P1 = (H1.xy * k1 * 0.5 + 0.5) * viewportSize;\n\n\t\t\t// If the line is degenerate, make it cover at least one pixel to avoid handling\n\t\t\t// zero-pixel extent as a special case later\n\t\t\tP1 += dot(P1 - P0, P1 - P0) < 0.0001 ? 0.01 : 0.0;\n\t\t\tvec2 delta = P1 - P0;\n\n\t\t\t// Permute so that the primary iteration is in x to collapse\n\t\t\t// all quadrant-specific DDA case later\n\t\t\tbool permute = false;\n\t\t\tif (abs(delta.x) < abs(delta.y)) {\n\t\t\t\t// More vertical line\n\t\t\t\tpermute = true;\n\t\t\t\tdelta = delta.yx;\n\t\t\t\tP0 = P0.yx;\n\t\t\t\tP1 = P1.yx;\n\t\t\t}\n\t\t\tfloat stepDir = sign(delta.x);\n\t\t\tfloat invdx = stepDir / delta.x;\n\n\t\t\t// Track the derivatives of Q and K\n\t\t\tvec3 dQ = (Q1 - Q0) * invdx;\n\t\t\tfloat dk = (k1 - k0) * invdx;\n\n\t\t\tvec2 dP = vec2(stepDir, delta.y * invdx);\n\n\t\t\t// Calculate pixel stride based on distance of ray origin from camera.\n\t\t\t// Since perspective means distant objects will be smaller in screen space\n\t\t\t// we can use this to have higher quality reflections for far away objects\n\t\t\t// while still using a large pixel stride for near objects (and increase performance)\n\t\t\t// this also helps mitigate artifacts on distant reflections when we use a large\n\t\t\t// pixel stride.\n\t\t\tfloat strideScaler = 1.0 - min(1.0, -rayOrigin.z / pixelStrideZCutoff);\n\t\t\tfloat pixStride = 1.0 + strideScaler * pixelStride;\n\n\t\t\t// Scale derivatives by the desired pixel stride and the offset the starting values by the jitter fraction\n\t\t\tdP *= pixStride; dQ *= pixStride; dk *= pixStride;\n\n\t\t\t// Track ray step and derivatives in a vec4 to parallelize\n\t\t\tvec4 pqk = vec4(P0, Q0.z, k0);\n\t\t\tvec4 dPQK = vec4(dP, dQ.z, dk);\n\n\t\t\tpqk += dPQK * jitter;\n\t\t\tfloat rayZFar = (dPQK.z * 0.5 + pqk.z) / (dPQK.w * 0.5 + pqk.w);\n\t\t\tfloat rayZNear;\n\n\t\t\tbool intersect = false;\n\n\t\t\tvec2 texelSize = 1.0 / viewportSize;\n\n\t\t\titerationCount = 0.0;\n\n\t\t\tfor (int i = 0; i < 20; i++) {\n\t\t\t\tpqk += dPQK;\n\n\t\t\t\trayZNear = rayZFar;\n\t\t\t\trayZFar = (dPQK.z * 0.5 + pqk.z) / (dPQK.w * 0.5 + pqk.w);\n\n\t\t\t\thitPixel = permute ? pqk.yx : pqk.xy;\n\t\t\t\thitPixel *= texelSize;\n\n\t\t\t\tintersect = rayIntersectDepth(rayZNear, rayZFar, hitPixel);\n\n\t\t\t\titerationCount += 1.0;\n\n\t\t\t\t// PENDING Right on all platforms?\n\t\t\t\tif (intersect) {\n\t\t\t\t\tbreak;\n\t\t\t\t}\n\t\t\t}\n\n\t\t\t// Binary search refinement\n\t\t\t// FIXME If intersect in first iteration binary search may easily lead to the pixel of reflect object it self\n\t\t\tif (pixStride > 1.0 && intersect && iterationCount > 1.0) {\n\t\t\t\t// Roll back\n\t\t\t\tpqk -= dPQK;\n\t\t\t\tdPQK /= pixStride;\n\n\t\t\t\tfloat originalStride = pixStride * 0.5;\n\t\t\t\tfloat stride = originalStride;\n\n\t\t\t\trayZNear = pqk.z / pqk.w;\n\t\t\t\trayZFar = rayZNear;\n\n\t\t\t\tfor (int j = 0; j < 5; j++) {\n\t\t\t\t\tpqk += dPQK * stride;\n\t\t\t\t\trayZNear = rayZFar;\n\t\t\t\t\trayZFar = (dPQK.z * -0.5 + pqk.z) / (dPQK.w * -0.5 + pqk.w);\n\t\t\t\t\thitPixel = permute ? pqk.yx : pqk.xy;\n\t\t\t\t\thitPixel *= texelSize;\n\n\t\t\t\t\toriginalStride *= 0.5;\n\t\t\t\t\tstride = rayIntersectDepth(rayZNear, rayZFar, hitPixel) ? -originalStride : originalStride;\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tQ0.xy += dQ.xy * iterationCount;\n\t\t\tQ0.z = pqk.z;\n\t\t\thitPoint = Q0 / pqk.w;\n\n\t\t\treturn intersect;\n\t\t}\n\n\t\tfloat calculateAlpha(float iterationCount, float reflectivity, vec2 hitPixel, vec3 hitPoint, float dist, vec3 rayDir) {\n\t\t\tfloat alpha = clamp(reflectivity, 0.0, 1.0);\n\t\t\t// Fade ray hits that approach the maximum iterations\n\t\t\talpha *= 1.0 - (iterationCount / float(20));\n\t\t\t// Fade ray hits that approach the screen edge\n\t\t\tvec2 hitPixelNDC = hitPixel * 2.0 - 1.0;\n\t\t\tfloat maxDimension = min(1.0, max(abs(hitPixelNDC.x), abs(hitPixelNDC.y)));\n\t\t\talpha *= 1.0 - max(0.0, maxDimension - screenEdgeFadeStart) / (1.0 - screenEdgeFadeStart);\n\n\t\t\t// Fade ray hits base on how much they face the camera\n\t\t\tfloat _eyeFadeStart = eyeFadeStart;\n\t\t\tfloat _eyeFadeEnd = eyeFadeEnd;\n\t\t\tif (_eyeFadeStart > _eyeFadeEnd) {\n\t\t\t\tfloat tmp = _eyeFadeEnd;\n\t\t\t\t_eyeFadeEnd = _eyeFadeStart;\n\t\t\t\t_eyeFadeStart = tmp;\n\t\t\t}\n\n\t\t\tfloat eyeDir = clamp(rayDir.z, _eyeFadeStart, _eyeFadeEnd);\n\t\t\talpha *= 1.0 - (eyeDir - _eyeFadeStart) / (_eyeFadeEnd - _eyeFadeStart);\n\n\t\t\t// Fade ray hits based on distance from ray origin\n\t\t\talpha *= 1.0 - clamp(dist / maxRayDistance, 0.0, 1.0);\n\n\t\t\treturn alpha;\n\t\t}\n\n\t\tvoid main() {\n\t\t\tvec4 normalAndGloss = texture2D(gBufferTexture1, v_Uv);\n\n\t\t\t// Is empty\n\t\t\tif (dot(normalAndGloss.rgb, vec3(1.0)) == 0.0) {\n\t\t\t\tdiscard;\n\t\t\t}\n\n\t\t\tfloat g = normalAndGloss.a;\n\t\t\tif (g <= minGlossiness) {\n\t\t\t\tdiscard;\n\t\t\t}\n\n\t\t\tfloat reflectivity = (g - minGlossiness) / (1.0 - minGlossiness);\n\n\t\t\tvec3 N = normalAndGloss.rgb * 2.0 - 1.0;\n\t\t\tN = normalize((viewInverseTranspose * vec4(N, 0.0)).xyz);\n\n\t\t\t// Position in view\n\t\t\tvec4 projectedPos = vec4(v_Uv * 2.0 - 1.0, fetchDepth(gBufferTexture2, v_Uv), 1.0);\n\t\t\tvec4 pos = projectionInv * projectedPos;\n\t\t\tvec3 rayOrigin = pos.xyz / pos.w;\n\n\t\t\tvec3 rayDir = normalize(reflect(normalize(rayOrigin), N));\n\t\t\tvec2 hitPixel;\n\t\t\tvec3 hitPoint;\n\t\t\tfloat iterationCount;\n\n\t\t\t// Get jitter\n\t\t\tvec2 uv2 = v_Uv * viewportSize;\n\t\t\tfloat jitter = fract((uv2.x + uv2.y) * 0.25);\n\n\t\t\tbool intersect = traceScreenSpaceRay(rayOrigin, rayDir, jitter, hitPixel, hitPoint, iterationCount);\n\n\t\t\tfloat dist = distance(rayOrigin, hitPoint);\n\n\t\t\tfloat alpha = calculateAlpha(iterationCount, reflectivity, hitPixel, hitPoint, dist, rayDir) * float(intersect);\n\n\t\t\tvec3 hitNormal = texture2D(gBufferTexture1, hitPixel).rgb * 2.0 - 1.0;\n\t\t\thitNormal = normalize((viewInverseTranspose * vec4(hitNormal, 0.0)).xyz);\n\n\t\t\t// Ignore the pixel not face the ray\n\t\t\t// TODO fadeout ?\n\t\t\t// PENDING Can be configured?\n\t\t\tif (dot(hitNormal, rayDir) >= 0.0) {\n\t\t\t\tdiscard;\n\t\t\t}\n\n\t\t\t// vec4 color = decodeHDR(texture2DLodEXT(colorTex, hitPixel, clamp(dist / maxRayDistance, 0.0, 1.0) * maxMipmapLevel));\n\n\t\t\tif (!intersect) {\n\t\t\t\tdiscard;\n\t\t\t}\n\n\t\t\tvec4 color = texture2D(colorTex, hitPixel);\n\t\t\tgl_FragColor = vec4(color.rgb * alpha, color.a);\n\n\t\t\t// gl_FragColor = vec4(vec3(iterationCount / 2.0), 1.0);\n\n\t\t}\n		"
+		fragmentShader: "\n\t\tvarying vec2 v_Uv;\n\n\t\tuniform sampler2D colorTex;\n\t\tuniform sampler2D gBufferTexture1;\n\t\tuniform sampler2D gBufferTexture2;\n\n\t\tuniform mat4 projection;\n\t\tuniform mat4 projectionInv;\n\t\tuniform mat4 viewInverseTranspose;\n\n\t\tuniform float pixelStride;\n\n\t\tuniform float maxRayDistance;\n\n\t\tuniform float screenEdgeFadeStart;\n\t\n\t\tuniform float enablePixelStrideZCutoff;\n\t\tuniform float pixelStrideZCutoff;\n\n\t\tuniform float eyeFadeStart;\n\t\tuniform float eyeFadeEnd;\n\t\t\n\t\tuniform float minGlossiness;\n\t\tuniform float zThicknessThreshold;\n\t\tuniform float jitterOffset;\n\n\t\tuniform float nearZ;\n\t\tuniform vec2 viewportSize;\n\n\t\tfloat fetchDepth(sampler2D depthTexture, vec2 uv) {\n\t\t\tvec4 depthTexel = texture2D(depthTexture, uv);\n\t\t\treturn depthTexel.r * 2.0 - 1.0;\n\t\t}\n\n\t\tfloat linearDepth(float depth) {\n\t\t\treturn projection[3][2] / (depth * projection[2][3] - projection[2][2]);\n\t\t}\n\n\t\tbool rayIntersectDepth(float rayZNear, float rayZFar, vec2 hitPixel) {\n\t\t\t// Swap if bigger\n\t\t\tif (rayZFar > rayZNear) {\n\t\t\t\tfloat t = rayZFar; rayZFar = rayZNear; rayZNear = t;\n\t\t\t}\n\t\t\tfloat cameraZ = linearDepth(fetchDepth(gBufferTexture2, hitPixel));\n\t\t\t// float cameraBackZ = linearDepth(fetchDepth(backDepthTex, hitPixel));\n\t\t\t// Cross z\n\t\t\treturn rayZFar <= cameraZ && rayZNear >= cameraZ - zThicknessThreshold;\n\t\t}\n\n\t\t// Trace a ray in screenspace from rayOrigin (in camera space) pointing in rayDir (in camera space)\n\t\t//\n\t\t// With perspective correct interpolation\n\t\t//\n\t\t// Returns true if the ray hits a pixel in the depth buffer\n\t\t// and outputs the hitPixel (in UV space), the hitPoint (in camera space) and the number\n\t\t// of iterations it took to get there.\n\t\t//\n\t\t// Based on Morgan McGuire & Mike Mara's GLSL implementation:\n\t\t// http://casual-effects.blogspot.com/2014/08/screen-space-ray-tracing.html\n\t\tbool traceScreenSpaceRay(vec3 rayOrigin, vec3 rayDir, float jitter, out vec2 hitPixel, out vec3 hitPoint, out float iterationCount) {\n\t\t\t// Clip to the near plane\n\t\t\tfloat rayLength = ((rayOrigin.z + rayDir.z * maxRayDistance) > -nearZ) ? (-nearZ - rayOrigin.z) / rayDir.z : maxRayDistance;\n\n\t\t\tvec3 rayEnd = rayOrigin + rayDir * rayLength;\n\n\t\t\t// Project into homogeneous clip space\n\t\t\tvec4 H0 = projection * vec4(rayOrigin, 1.0);\n\t\t\tvec4 H1 = projection * vec4(rayEnd, 1.0);\n\n\t\t\tfloat k0 = 1.0 / H0.w, k1 = 1.0 / H1.w;\n\n\t\t\t// The interpolated homogeneous version of the camera space points\n\t\t\tvec3 Q0 = rayOrigin * k0, Q1 = rayEnd * k1;\n\n\t\t\t// Screen space endpoints\n\t\t\t// PENDING viewportSize ?\n\t\t\tvec2 P0 = (H0.xy * k0 * 0.5 + 0.5) * viewportSize;\n\t\t\tvec2 P1 = (H1.xy * k1 * 0.5 + 0.5) * viewportSize;\n\n\t\t\t// If the line is degenerate, make it cover at least one pixel to avoid handling\n\t\t\t// zero-pixel extent as a special case later\n\t\t\tP1 += dot(P1 - P0, P1 - P0) < 0.0001 ? 0.01 : 0.0;\n\t\t\tvec2 delta = P1 - P0;\n\n\t\t\t// Permute so that the primary iteration is in x to collapse\n\t\t\t// all quadrant-specific DDA case later\n\t\t\tbool permute = false;\n\t\t\tif (abs(delta.x) < abs(delta.y)) {\n\t\t\t\t// More vertical line\n\t\t\t\tpermute = true;\n\t\t\t\tdelta = delta.yx;\n\t\t\t\tP0 = P0.yx;\n\t\t\t\tP1 = P1.yx;\n\t\t\t}\n\t\t\tfloat stepDir = sign(delta.x);\n\t\t\tfloat invdx = stepDir / delta.x;\n\n\t\t\t// Track the derivatives of Q and K\n\t\t\tvec3 dQ = (Q1 - Q0) * invdx;\n\t\t\tfloat dk = (k1 - k0) * invdx;\n\n\t\t\tvec2 dP = vec2(stepDir, delta.y * invdx);\n\n\t\t\t// Calculate pixel stride based on distance of ray origin from camera.\n\t\t\t// Since perspective means distant objects will be smaller in screen space\n\t\t\t// we can use this to have higher quality reflections for far away objects\n\t\t\t// while still using a large pixel stride for near objects (and increase performance)\n\t\t\t// this also helps mitigate artifacts on distant reflections when we use a large\n\t\t\t// pixel stride.\n\t\t\tfloat strideScaler = 1.0 - min(1.0, -rayOrigin.z / pixelStrideZCutoff);\n\t\t\tfloat pixStride = mix(pixelStride, 1.0 + strideScaler * pixelStride, enablePixelStrideZCutoff);\n\n\t\t\t// Scale derivatives by the desired pixel stride and the offset the starting values by the jitter fraction\n\t\t\tdP *= pixStride; dQ *= pixStride; dk *= pixStride;\n\n\t\t\t// Track ray step and derivatives in a vec4 to parallelize\n\t\t\tvec4 pqk = vec4(P0, Q0.z, k0);\n\t\t\tvec4 dPQK = vec4(dP, dQ.z, dk);\n\n\t\t\tpqk += dPQK * jitter;\n\t\t\tfloat rayZFar = (dPQK.z * 0.5 + pqk.z) / (dPQK.w * 0.5 + pqk.w);\n\t\t\tfloat rayZNear;\n\n\t\t\tbool intersect = false;\n\n\t\t\tvec2 texelSize = 1.0 / viewportSize;\n\n\t\t\titerationCount = 0.0;\n\t\t\tfloat end = P1.x * stepDir;\n\t\t\tfor (int i = 0; i < MAX_ITERATION; i++) {\n\t\t\t\tpqk += dPQK;\n\t\t\t\tif ((pqk.x * stepDir) >= end) {\n\t\t\t\t\tbreak;\n\t\t\t\t}\n\n\t\t\t\trayZNear = rayZFar;\n\t\t\t\trayZFar = (dPQK.z * 0.5 + pqk.z) / (dPQK.w * 0.5 + pqk.w);\n\n\t\t\t\thitPixel = permute ? pqk.yx : pqk.xy;\n\t\t\t\thitPixel *= texelSize;\n\n\t\t\t\tintersect = rayIntersectDepth(rayZNear, rayZFar, hitPixel);\n\n\t\t\t\titerationCount += 1.0;\n\n\t\t\t\t// PENDING Right on all platforms?\n\t\t\t\tif (intersect) {\n\t\t\t\t\tbreak;\n\t\t\t\t}\n\t\t\t}\n\n\t\t\t// Binary search refinement\n\t\t\t// FIXME If intersect in first iteration binary search may easily lead to the pixel of reflect object it self\n\t\t\tif (pixStride > 1.0 && intersect && iterationCount > 1.0) {\n\t\t\t\t// Roll back\n\t\t\t\tpqk -= dPQK;\n\t\t\t\tdPQK /= pixStride;\n\n\t\t\t\tfloat originalStride = pixStride * 0.5;\n\t\t\t\tfloat stride = originalStride;\n\n\t\t\t\trayZNear = pqk.z / pqk.w;\n\t\t\t\trayZFar = rayZNear;\n\n\t\t\t\tfor (int j = 0; j < MAX_BINARY_SEARCH_ITERATION; j++) {\n\t\t\t\t\tpqk += dPQK * stride;\n\t\t\t\t\trayZNear = rayZFar;\n\t\t\t\t\trayZFar = (dPQK.z * -0.5 + pqk.z) / (dPQK.w * -0.5 + pqk.w);\n\t\t\t\t\thitPixel = permute ? pqk.yx : pqk.xy;\n\t\t\t\t\thitPixel *= texelSize;\n\n\t\t\t\t\toriginalStride *= 0.5;\n\t\t\t\t\tstride = rayIntersectDepth(rayZNear, rayZFar, hitPixel) ? -originalStride : originalStride;\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tQ0.xy += dQ.xy * iterationCount;\n\t\t\tQ0.z = pqk.z;\n\t\t\thitPoint = Q0 / pqk.w;\n\n\t\t\treturn intersect;\n\t\t}\n\n\t\tfloat calculateAlpha(float iterationCount, float reflectivity, vec2 hitPixel, vec3 hitPoint, float dist, vec3 rayDir) {\n\t\t\tfloat alpha = clamp(reflectivity, 0.0, 1.0);\n\n\t\t\t// Fade ray hits that approach the maximum iterations\n\t\t\talpha *= 1.0 - (iterationCount / float(MAX_ITERATION));\n\n\t\t\t// Fade ray hits that approach the screen edge\n\t\t\tvec2 hitPixelNDC = hitPixel * 2.0 - 1.0;\n\t\t\tfloat maxDimension = min(1.0, max(abs(hitPixelNDC.x), abs(hitPixelNDC.y)));\n\t\t\talpha *= 1.0 - max(0.0, maxDimension - screenEdgeFadeStart) / (1.0 - screenEdgeFadeStart);\n\n\t\t\t// Fade ray hits base on how much they face the camera\n\t\t\tfloat _eyeFadeStart = eyeFadeStart;\n\t\t\tfloat _eyeFadeEnd = eyeFadeEnd;\n\t\t\tif (_eyeFadeStart > _eyeFadeEnd) {\n\t\t\t\tfloat tmp = _eyeFadeEnd;\n\t\t\t\t_eyeFadeEnd = _eyeFadeStart;\n\t\t\t\t_eyeFadeStart = tmp;\n\t\t\t}\n\t\t\tfloat eyeDir = clamp(rayDir.z, _eyeFadeStart, _eyeFadeEnd);\n\t\t\talpha *= 1.0 - (eyeDir - _eyeFadeStart) / (_eyeFadeEnd - _eyeFadeStart);\n\n\t\t\t// Fade ray hits based on distance from ray origin\n\t\t\talpha *= 1.0 - clamp(dist / maxRayDistance, 0.0, 1.0);\n\n\t\t\treturn alpha;\n\t\t}\n\t\tvoid main() {\n\t\t\tvec4 normalAndGloss = texture2D(gBufferTexture1, v_Uv);\n\n\t\t\tif (dot(normalAndGloss.rgb, vec3(1.0)) == 0.0) {\n\t\t\t\tdiscard;\n\t\t\t}\n\n\t\t\tfloat g = normalAndGloss.a;\n\t\t\tif (g <= minGlossiness) {\n\t\t\t\tdiscard;\n\t\t\t}\n\n\t\t\tfloat reflectivity = g;\n\n\t\t\tvec3 N = normalAndGloss.rgb * 2.0 - 1.0;\n\t\t\tN = normalize((viewInverseTranspose * vec4(N, 0.0)).xyz);\n\n\t\t\t// Position in view\n\t\t\tvec4 projectedPos = vec4(v_Uv * 2.0 - 1.0, fetchDepth(gBufferTexture2, v_Uv), 1.0);\n\t\t\tvec4 pos = projectionInv * projectedPos;\n\t\t\tvec3 rayOrigin = pos.xyz / pos.w;\n\n\t\t\tvec3 rayDir = normalize(reflect(normalize(rayOrigin), N));\n\t\t\tvec2 hitPixel;\n\t\t\tvec3 hitPoint;\n\t\t\tfloat iterationCount;\n\n\t\t\t// Get jitter\n\t\t\tvec2 uv2 = v_Uv * viewportSize;\n\t\t\tfloat jitter = fract((uv2.x + uv2.y) * 0.25);\n\n\t\t\tbool intersect = traceScreenSpaceRay(rayOrigin, rayDir, jitter, hitPixel, hitPoint, iterationCount);\n\t\t\t// Is empty\n\t\t\tif (!intersect) {\n\t\t\t\tdiscard;\n\t\t\t}\n\t\t\tfloat dist = distance(rayOrigin, hitPoint);\n\n\t\t\tfloat alpha = calculateAlpha(iterationCount, reflectivity, hitPixel, hitPoint, dist, rayDir) * float(intersect);\n\n\t\t\tvec3 hitNormal = texture2D(gBufferTexture1, hitPixel).rgb * 2.0 - 1.0;\n\t\t\thitNormal = normalize((viewInverseTranspose * vec4(hitNormal, 0.0)).xyz);\n\n\t\t\t// Ignore the pixel not face the ray\n\t\t\t// TODO fadeout ?\n\t\t\t// PENDING Can be configured?\n\t\t\tif (dot(hitNormal, rayDir) >= 0.0) {\n\t\t\t\tdiscard;\n\t\t\t}\n\n\t\t\tvec4 color = texture2D(colorTex, hitPixel);\n\t\t\tgl_FragColor = vec4(color.rgb * alpha, color.a);\n\t\t}\n		"
+	};
+	var mixSSRShader = {
+		name: 'ec_ssr_mix',
+		defines: {
+			MIX_TYPE: 0
+		},
+		uniforms: {
+			texture1: null,
+			texture2: null,
+			reflectivitySampler: null,
+			strength: 0.15,
+			reflectivityThreshold: 0.6,
+			type: 1.0
+		},
+		vertexShader: defaultVertexShader,
+		fragmentShader: "\n				uniform sampler2D texture1;\n				uniform sampler2D texture2;\n\t\tuniform sampler2D reflectivitySampler;\n\t\tuniform float reflectivityThreshold;\n\t\tuniform float strength;\n				varying vec2 v_Uv;\n				void main() {\n\t\t\t#if MIX_TYPE == 0\n\t\t\t\tvec4 texel1 = texture2D(texture1, v_Uv);\n\t\t\t\tvec4 texel2 = texture2D(texture2, v_Uv);\n\t\t\t\tvec3 color = texel1.rgb * 1.0 + texel2.rgb * 1.0 * strength;\n\t\t\t\tgl_FragColor = vec4(color, texel1.a);\n\t\t\t#else\n\t\t\t\tvec4 color = texture2D(texture1, v_Uv);\n\t\t\t\tvec4 SSR = texture2D(texture2, v_Uv);\n\t\t\t\tfloat reflectivity = texture(reflectivitySampler, v_Uv).a;\n\t\t\t\tif (reflectivity <= reflectivityThreshold) {\n\t\t\t\t\tgl_FragColor = color;\n\t\t\t\t\treturn;\n\t\t\t\t}\n\t\t\t\tvec3 reflectionMultiplier = vec3(reflectivity * strength);\n\t\t\t\tvec3 colorMultiplier = 1.0-reflectionMultiplier;\n\t\t\t\tvec3 finalColor = (color.rgb*colorMultiplier)+(SSR.rgb*reflectionMultiplier);\n\t\t\t\tgl_FragColor =vec4(finalColor,color.a);\n\t\t\t#endif\n				}\n		"
 	};
 
 	var VignettingEffect = /*#__PURE__*/function (_Effect) {

@@ -30,13 +30,18 @@ class Inspector {
 			const ssrFolder = postEffectFolder.addFolder("SSR");
 			ssrFolder.close();
 			ssrFolder.add(ssrEffect, "active");
-			ssrFolder.add(ssrEffect, "maxRayDistance", 1, 1000, 1);
 			ssrFolder.add(ssrEffect, "pixelStride", 1, 100, 1);
+			ssrFolder.add(ssrEffect, "maxIteration", 1, 10, 1);
+			ssrFolder.add(ssrEffect, "maxSteps", 20, 200, 1);
+			ssrFolder.add(ssrEffect, "maxRayDistance", 1, 1000, 0.01);
+			ssrFolder.add(ssrEffect, "enablePixelStrideZCutoff");
 			ssrFolder.add(ssrEffect, "pixelStrideZCutoff", 1, 300, 1);
 			ssrFolder.add(ssrEffect, "screenEdgeFadeStart", 0, 1, 0.01);
 			ssrFolder.add(ssrEffect, "eyeFadeStart", 0, 1, 0.01);
 			ssrFolder.add(ssrEffect, "eyeFadeEnd", 0, 1, 0.01);
 			ssrFolder.add(ssrEffect, "minGlossiness", 0, 1, 0.01);
+			ssrFolder.add(ssrEffect, "strength", 0, 1, 0.01);
+			ssrFolder.add(ssrEffect, "mixType", [0, 1]);
 
 			const colorCorrectionEffect = effectComposer.getEffect('ColorCorrection');
 			const colorCorrectionFolder = postEffectFolder.addFolder("ColorCorrection");

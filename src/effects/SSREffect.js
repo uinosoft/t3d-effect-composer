@@ -1,6 +1,6 @@
 import { ShaderPostPass, ATTACHMENT, Matrix4 } from 't3d';
 import Effect from './Effect.js';
-import { defaultVertexShader, blurShader, additiveShader } from '../Utils.js';
+import { defaultVertexShader, blurShader } from '../Utils.js';
 
 export default class SSREffect extends Effect {
 
@@ -12,24 +12,47 @@ export default class SSREffect extends Effect {
 			{ key: 'GBuffer' }
 		];
 
-		this._ssrPass = new ShaderPostPass(ssrShader);
+		// Single step distance, unit is pixel
+		this.pixelStride = 8;
+		// Dichotomy search depends on precise collision point, maximum number of iterations
+		this.maxIteration = 5;
+		// Number of steps
+		this.maxSteps = 50;
 
+		// The farthest reflection distance limit, in meters
 		this.maxRayDistance = 200;
-		this.pixelStride = 16;
+
+		// Adjust the step pixel distance according to the depth,
+		// the step in and out becomes larger,
+		// and the step in the distance becomes smaller.
+		this.enablePixelStrideZCutoff = true;
+		// ray origin Z at this distance will have a pixel stride of 1.0
 		this.pixelStrideZCutoff = 50;
+
+		// distance to screen edge that ray hits will start to fade (0.0 -> 1.0)
 		this.screenEdgeFadeStart = 0.9;
-		this.eyeFadeStart = 0.4;
-		this.eyeFadeEnd = 0.8;
+
+		// ray direction's Z that ray hits will start to fade (0.0 -> 1.0)
+		this.eyeFadeStart = 0.99;
+		// ray direction's Z that ray hits will be cut (0.0 -> 1.0)
+		this.eyeFadeEnd = 1;
+
+		// Object larger than minGlossiness will have ssr effect
 		this.minGlossiness = 0.2;
+
+		this.strength = 0.2;
+		this.mixType = 0; // 0: Add, 1: Mix
+
+		this.blurSize = 2;
+		this.depthRange = 1;
+
+		this._ssrPass = new ShaderPostPass(ssrShader);
 
 		this._blurPass = new ShaderPostPass(blurShader);
 		this._blurPass.material.defines.NORMALTEX_ENABLED = 1;
 		this._blurPass.material.defines.DEPTHTEX_ENABLED = 1;
 
-		this.blurSize = 2;
-		this.depthRange = 1;
-
-		this._blendPass = new ShaderPostPass(additiveShader);
+		this._blendPass = new ShaderPostPass(mixSSRShader);
 		this._blendPass.material.premultipliedAlpha = true;
 	}
 
@@ -62,13 +85,21 @@ export default class SSREffect extends Effect {
 		projectionInv.toArray(this._ssrPass.uniforms.projectionInv);
 		viewInverseTranspose.toArray(this._ssrPass.uniforms.viewInverseTranspose);
 
-		this._ssrPass.uniforms.maxRayDistance = this.maxRayDistance;
 		this._ssrPass.uniforms.pixelStride = this.pixelStride;
+		this._ssrPass.uniforms.maxRayDistance = this.maxRayDistance;
+		this._ssrPass.uniforms.enablePixelStrideZCutoff = this.enablePixelStrideZCutoff ? 1 : 0;
 		this._ssrPass.uniforms.pixelStrideZCutoff = this.pixelStrideZCutoff;
 		this._ssrPass.uniforms.screenEdgeFadeStart = this.screenEdgeFadeStart;
 		this._ssrPass.uniforms.eyeFadeStart = this.eyeFadeStart;
 		this._ssrPass.uniforms.eyeFadeEnd = this.eyeFadeEnd;
 		this._ssrPass.uniforms.minGlossiness = this.minGlossiness;
+		this._ssrPass.uniforms.nearZ = gBufferRenderStates.camera.near;
+
+		if (this._ssrPass.material.defines.MAX_ITERATION != this.maxSteps || this._ssrPass.material.defines.MAX_BINARY_SEARCH_ITERATION != this.maxIteration) {
+			this._ssrPass.material.needsUpdate = true;
+			this._ssrPass.material.defines.MAX_ITERATION = this.maxSteps;
+			this._ssrPass.material.defines.MAX_BINARY_SEARCH_ITERATION = this.maxIteration;
+		}
 
 		this._ssrPass.render(renderer);
 
@@ -117,10 +148,13 @@ export default class SSREffect extends Effect {
 
 			this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 			this._blendPass.uniforms.texture2 = tempRT1.texture;
-			this._blendPass.uniforms.colorWeight1 = 1;
-			this._blendPass.uniforms.alphaWeight1 = 1;
-			this._blendPass.uniforms.colorWeight2 = 1;
-			this._blendPass.uniforms.alphaWeight2 = 0;
+			this._blendPass.uniforms.reflectivitySampler = gBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
+			this._blendPass.uniforms.reflectivityThreshold = this.minGlossiness;
+			this._blendPass.uniforms.strength = this.strength;
+			if (this._blendPass.material.defines.MIX_TYPE !== this.mixType) {
+				this._blendPass.material.needsUpdate = true;
+				this._blendPass.material.defines.MIX_TYPE = this.mixType;
+			}
 
 			if (finish) {
 				this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
@@ -152,6 +186,8 @@ const viewInverseTranspose = new Matrix4();
 const ssrShader = {
 	name: 'ec_ssr',
 	defines: {
+		MAX_ITERATION: 50,
+		MAX_BINARY_SEARCH_ITERATION: 5
 	},
 	uniforms: {
 		colorTex: null,
@@ -162,30 +198,26 @@ const ssrShader = {
 		projectionInv: new Float32Array(16),
 		viewInverseTranspose: new Float32Array(16),
 
-		maxRayDistance: 4,
+		pixelStride: 8,
+		maxRayDistance: 200,
 
-		pixelStride: 16,
-		pixelStrideZCutoff: 10,
+		enablePixelStrideZCutoff: 1.0,
+		pixelStrideZCutoff: 50,
 
 		screenEdgeFadeStart: 0.9,
 
-		eyeFadeStart: 0.4,
-		eyeFadeEnd: 0.8,
+		eyeFadeStart: 0.99,
+		eyeFadeEnd: 1,
 
 		minGlossiness: 0.2,
+		nearZ: 0.1,
+
 		zThicknessThreshold: 0.1,
 		jitterOffset: 0,
-
-		nearZ: 0,
-		viewportSize: [512, 512],
-
-		maxMipmapLevel: 5,
+		viewportSize: [512, 512]
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
-		#define MAX_ITERATION 20;
-		#define MAX_BINARY_SEARCH_ITERATION 5;
-
 		varying vec2 v_Uv;
 
 		uniform sampler2D colorTex;
@@ -196,29 +228,24 @@ const ssrShader = {
 		uniform mat4 projectionInv;
 		uniform mat4 viewInverseTranspose;
 
+		uniform float pixelStride;
+
 		uniform float maxRayDistance;
 
-		uniform float pixelStride;
-		// ray origin Z at this distance will have a pixel stride of 1.0
+		uniform float screenEdgeFadeStart;
+	
+		uniform float enablePixelStrideZCutoff;
 		uniform float pixelStrideZCutoff;
 
-		// distance to screen edge that ray hits will start to fade (0.0 -> 1.0)
-		uniform float screenEdgeFadeStart;
-
-		// ray direction's Z that ray hits will start to fade (0.0 -> 1.0)
 		uniform float eyeFadeStart;
-		// ray direction's Z that ray hits will be cut (0.0 -> 1.0)
 		uniform float eyeFadeEnd;
-
-		// Object larger than minGlossiness will have ssr effect
+		
 		uniform float minGlossiness;
 		uniform float zThicknessThreshold;
 		uniform float jitterOffset;
 
 		uniform float nearZ;
 		uniform vec2 viewportSize;
-
-		uniform float maxMipmapLevel;
 
 		float fetchDepth(sampler2D depthTexture, vec2 uv) {
 			vec4 depthTexel = texture2D(depthTexture, uv);
@@ -301,7 +328,7 @@ const ssrShader = {
 			// this also helps mitigate artifacts on distant reflections when we use a large
 			// pixel stride.
 			float strideScaler = 1.0 - min(1.0, -rayOrigin.z / pixelStrideZCutoff);
-			float pixStride = 1.0 + strideScaler * pixelStride;
+			float pixStride = mix(pixelStride, 1.0 + strideScaler * pixelStride, enablePixelStrideZCutoff);
 
 			// Scale derivatives by the desired pixel stride and the offset the starting values by the jitter fraction
 			dP *= pixStride; dQ *= pixStride; dk *= pixStride;
@@ -319,9 +346,12 @@ const ssrShader = {
 			vec2 texelSize = 1.0 / viewportSize;
 
 			iterationCount = 0.0;
-
-			for (int i = 0; i < 20; i++) {
+			float end = P1.x * stepDir;
+			for (int i = 0; i < MAX_ITERATION; i++) {
 				pqk += dPQK;
+				if ((pqk.x * stepDir) >= end) {
+					break;
+				}
 
 				rayZNear = rayZFar;
 				rayZFar = (dPQK.z * 0.5 + pqk.z) / (dPQK.w * 0.5 + pqk.w);
@@ -352,7 +382,7 @@ const ssrShader = {
 				rayZNear = pqk.z / pqk.w;
 				rayZFar = rayZNear;
 
-				for (int j = 0; j < 5; j++) {
+				for (int j = 0; j < MAX_BINARY_SEARCH_ITERATION; j++) {
 					pqk += dPQK * stride;
 					rayZNear = rayZFar;
 					rayZFar = (dPQK.z * -0.5 + pqk.z) / (dPQK.w * -0.5 + pqk.w);
@@ -373,8 +403,10 @@ const ssrShader = {
 
 		float calculateAlpha(float iterationCount, float reflectivity, vec2 hitPixel, vec3 hitPoint, float dist, vec3 rayDir) {
 			float alpha = clamp(reflectivity, 0.0, 1.0);
+
 			// Fade ray hits that approach the maximum iterations
-			alpha *= 1.0 - (iterationCount / float(20));
+			alpha *= 1.0 - (iterationCount / float(MAX_ITERATION));
+
 			// Fade ray hits that approach the screen edge
 			vec2 hitPixelNDC = hitPixel * 2.0 - 1.0;
 			float maxDimension = min(1.0, max(abs(hitPixelNDC.x), abs(hitPixelNDC.y)));
@@ -388,7 +420,6 @@ const ssrShader = {
 				_eyeFadeEnd = _eyeFadeStart;
 				_eyeFadeStart = tmp;
 			}
-
 			float eyeDir = clamp(rayDir.z, _eyeFadeStart, _eyeFadeEnd);
 			alpha *= 1.0 - (eyeDir - _eyeFadeStart) / (_eyeFadeEnd - _eyeFadeStart);
 
@@ -397,11 +428,9 @@ const ssrShader = {
 
 			return alpha;
 		}
-
 		void main() {
 			vec4 normalAndGloss = texture2D(gBufferTexture1, v_Uv);
 
-			// Is empty
 			if (dot(normalAndGloss.rgb, vec3(1.0)) == 0.0) {
 				discard;
 			}
@@ -411,7 +440,7 @@ const ssrShader = {
 				discard;
 			}
 
-			float reflectivity = (g - minGlossiness) / (1.0 - minGlossiness);
+			float reflectivity = g;
 
 			vec3 N = normalAndGloss.rgb * 2.0 - 1.0;
 			N = normalize((viewInverseTranspose * vec4(N, 0.0)).xyz);
@@ -431,7 +460,10 @@ const ssrShader = {
 			float jitter = fract((uv2.x + uv2.y) * 0.25);
 
 			bool intersect = traceScreenSpaceRay(rayOrigin, rayDir, jitter, hitPixel, hitPoint, iterationCount);
-
+			// Is empty
+			if (!intersect) {
+				discard;
+			}
 			float dist = distance(rayOrigin, hitPoint);
 
 			float alpha = calculateAlpha(iterationCount, reflectivity, hitPixel, hitPoint, dist, rayDir) * float(intersect);
@@ -446,17 +478,55 @@ const ssrShader = {
 				discard;
 			}
 
-			// vec4 color = decodeHDR(texture2DLodEXT(colorTex, hitPixel, clamp(dist / maxRayDistance, 0.0, 1.0) * maxMipmapLevel));
-
-			if (!intersect) {
-				discard;
-			}
-
 			vec4 color = texture2D(colorTex, hitPixel);
 			gl_FragColor = vec4(color.rgb * alpha, color.a);
-
-			// gl_FragColor = vec4(vec3(iterationCount / 2.0), 1.0);
-
 		}
+    `
+};
+const mixSSRShader = {
+	name: 'ec_ssr_mix',
+
+	defines: {
+		MIX_TYPE: 0
+	},
+
+	uniforms: {
+		texture1: null,
+		texture2: null,
+		reflectivitySampler: null,
+		strength: 0.15,
+		reflectivityThreshold: 0.6,
+		type: 1.0
+	},
+
+	vertexShader: defaultVertexShader,
+
+	fragmentShader: `
+        uniform sampler2D texture1;
+        uniform sampler2D texture2;
+		uniform sampler2D reflectivitySampler;
+		uniform float reflectivityThreshold;
+		uniform float strength;
+        varying vec2 v_Uv;
+        void main() {
+			#if MIX_TYPE == 0
+				vec4 texel1 = texture2D(texture1, v_Uv);
+				vec4 texel2 = texture2D(texture2, v_Uv);
+				vec3 color = texel1.rgb * 1.0 + texel2.rgb * 1.0 * strength;
+				gl_FragColor = vec4(color, texel1.a);
+			#else
+				vec4 color = texture2D(texture1, v_Uv);
+				vec4 SSR = texture2D(texture2, v_Uv);
+				float reflectivity = texture(reflectivitySampler, v_Uv).a;
+				if (reflectivity <= reflectivityThreshold) {
+					gl_FragColor = color;
+					return;
+				}
+				vec3 reflectionMultiplier = vec3(reflectivity * strength);
+				vec3 colorMultiplier = 1.0-reflectionMultiplier;
+				vec3 finalColor = (color.rgb*colorMultiplier)+(SSR.rgb*reflectionMultiplier);
+				gl_FragColor =vec4(finalColor,color.a);
+			#endif
+        }
     `
 };
