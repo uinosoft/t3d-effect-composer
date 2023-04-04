@@ -24,6 +24,8 @@ export default class SSAOEffect extends Effect {
 
 		this.intensity = 1;
 
+		this.autoSampleWeight = false;
+
 		// Quality of SSAO. 'Low'|'Medium'|'High'|'Ultra'
 		this.quality = 'Medium';
 
@@ -76,6 +78,10 @@ export default class SSAOEffect extends Effect {
 		this._ssaoPass.uniforms.power = this.power;
 		this._ssaoPass.uniforms.bias = this.bias;
 		this._ssaoPass.uniforms.intensity = this.intensity;
+		if (this._ssaoPass.material.defines.AUTO_SAMPLE_WEIGHT != this.autoSampleWeight) {
+			this._ssaoPass.material.needsUpdate = true;
+			this._ssaoPass.material.defines.AUTO_SAMPLE_WEIGHT = this.autoSampleWeight;
+		}
 
 		this._ssaoPass.render(renderer);
 
@@ -278,7 +284,8 @@ const ssaoShader = {
 	defines: {
 		ALCHEMY: false,
 		DEPTH_PACKING: 0,
-		KERNEL_SIZE: 64
+		KERNEL_SIZE: 64,
+		AUTO_SAMPLE_WEIGHT: false
 	},
 	uniforms: {
 		normalTex: null,
@@ -336,6 +343,8 @@ const ssaoShader = {
         float ssaoEstimator(in mat3 kernelBasis, in vec3 originPos, in vec3 N) {
             float occlusion = 0.0;
 
+			float allWeight = 0.0;
+
             for (int i = 0; i < KERNEL_SIZE; i++) {
                 vec3 samplePos = kernel[i];
                 samplePos = kernelBasis * samplePos;
@@ -348,11 +357,11 @@ const ssaoShader = {
                 float sampleDepth = getDepth(texCoord.xy);
                 float z = sampleDepth * 2.0 - 1.0;
 
-                #ifdef ALCHEMY
-                    vec4 projectedPos = vec4(texCoord.xy * 2.0 - 1.0, z, 1.0);
-                    vec4 p4 = projectionInv * projectedPos;
-                    p4.xyz /= p4.w;
+				vec4 projectedPos = vec4(texCoord.xy * 2.0 - 1.0, z, 1.0);
+				vec4 p4 = projectionInv * projectedPos;
+				p4.xyz /= p4.w;
 
+                #ifdef ALCHEMY
                     vec3 cDir = p4.xyz - originPos;
 
                     float vv = dot(cDir, cDir);
@@ -362,20 +371,24 @@ const ssaoShader = {
                     vn = max(vn + p4.z * bias, 0.0);
                     float f = max(radius2 - vv, 0.0) / radius2;
                     occlusion += f * f * f * max(vn / (0.01 + vv), 0.0);
-                #else
-                    if (projection[3][3] == 0.0) {
-                        z = projection[3][2] / (z * projection[2][3] - projection[2][2]);
-                    } else {
-                        z = (z - projection[3][2]) / projection[2][2];
-                    }
 
-                    float factor = step(samplePos.z, z - bias);
-                    float rangeCheck = smoothstep(0.0, 1.0, radius / abs(originPos.z - z));
-                    occlusion += rangeCheck * factor;
+					allWeight += 1.0;
+                #else
+					float factor = step(samplePos.z, p4.z - bias);
+					float rangeCheck = smoothstep(0.0, 1.0, radius / abs(originPos.z - p4.z));
+
+					#ifdef AUTO_SAMPLE_WEIGHT
+						float weight = smoothstep(0., radius, radius - length(originPos.xy - samplePos.xy));
+					#else
+						float weight = 1.0;
+					#endif
+					
+					occlusion += rangeCheck * factor * weight;
+					allWeight += weight;
                 #endif
             }
 
-            occlusion = 1.0 - occlusion / float(KERNEL_SIZE);
+            occlusion = 1.0 - occlusion / allWeight;
 
             return pow(occlusion, power);
         }

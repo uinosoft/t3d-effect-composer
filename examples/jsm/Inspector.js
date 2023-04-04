@@ -25,6 +25,7 @@ class Inspector {
 			ssaoFolder.add(ssaoEffect, "quality", ['Low', 'Medium', 'High', 'Ultra']);
 			ssaoFolder.add(ssaoEffect, "blurSize").min(0).max(3).step(0.01);
 			ssaoFolder.add(ssaoEffect, "depthRange").min(0).max(3).step(0.01);
+			ssaoFolder.add(ssaoEffect, "autoSampleWeight");
 
 			const ssrEffect = effectComposer.getEffect('SSR');
 			const ssrFolder = postEffectFolder.addFolder("SSR");
