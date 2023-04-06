@@ -18,6 +18,8 @@ export default class Buffer {
 
 	setGeometryReplaceFunction(func) {}
 
+	setIfRenderReplaceFunction(func) {}
+
 	// SceneBuffer does not have this method
 	// setMaterialReplaceFunction(func) {}
 

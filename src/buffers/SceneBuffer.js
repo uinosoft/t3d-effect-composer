@@ -53,6 +53,14 @@ export default class SceneBuffer extends Buffer {
 		this.needsUpdate = true;
 	}
 
+	setIfRenderReplaceFunction(func) {
+		if (!!func) {
+			this._sceneRenderOptions.ifRender = func;
+		} else {
+			delete this._sceneRenderOptions.ifRender;
+		}
+	}
+
 	setGeometryReplaceFunction(func) {
 		if (!!func) {
 			this._sceneRenderOptions.getGeometry = func;

@@ -32,17 +32,27 @@ export default class NonDepthMarkBuffer extends Buffer {
 
 		this._opacityRenderOptions = {
 			getMaterial: createGetMaterialFunction(undefined, this._state, attachManager, RenderListMask.OPAQUE),
-			ifRender: createIfRenderFunction(this._state, RenderListMask.OPAQUE)
+			ifRender: createIfRenderFunction(undefined, this._state, RenderListMask.OPAQUE)
 		};
 
 		this._transparentRenderOptions = {
 			getMaterial: createGetMaterialFunction(undefined, this._state, attachManager, RenderListMask.TRANSPARENT),
-			ifRender: createIfRenderFunction(this._state, RenderListMask.TRANSPARENT)
+			ifRender: createIfRenderFunction(undefined, this._state, RenderListMask.TRANSPARENT)
 		};
 
 		this.attachManager = attachManager;
 
 		this.layers = [0];
+	}
+
+	setIfRenderReplaceFunction(func) {
+		if (!!func) {
+			this._opacityRenderOptions.ifRender = createIfRenderFunction(func, this._state, RenderListMask.OPAQUE);
+			this._transparentRenderOptions.ifRender = createIfRenderFunction(func, this._state, RenderListMask.TRANSPARENT);
+		} else {
+			this._opacityRenderOptions.ifRender = createIfRenderFunction(undefined, this._state, RenderListMask.OPAQUE);
+			this._transparentRenderOptions.ifRender = createIfRenderFunction(undefined, this._state, RenderListMask.TRANSPARENT);
+		}
 	}
 
 	setGeometryReplaceFunction(func) {
@@ -140,6 +150,33 @@ export default class NonDepthMarkBuffer extends Buffer {
 
 }
 
+function createIfRenderFunction(func = defaultIfRenderReplaceFunction, state, renderMask) {
+	return function(renderable) {
+		if (!func(renderable)) {
+			return false;
+		}
+
+		if (!renderable.object.effects) {
+			return false;
+		}
+
+		let mask = 0;
+
+		for (let i = 0; i < state.attachInfo.count; i++) {
+			const key = state.attachInfo.keys[i];
+			if (!!renderable.object.effects[key]) {
+				mask |= state.attachInfo.masks[i];
+			}
+		}
+
+		return mask & renderMask;
+	}
+}
+
+function defaultIfRenderReplaceFunction(renderable) {
+	return true;
+}
+
 function createGetMaterialFunction(func = defaultMaterialReplaceFunction, state, attachManager, renderMask) {
 	return function(renderable) {
 		const material = func(renderable);
@@ -157,25 +194,6 @@ function createGetMaterialFunction(func = defaultMaterialReplaceFunction, state,
 		}
 
 		return material;
-	}
-}
-
-function createIfRenderFunction(state, renderMask) {
-	return function(renderable) {
-		if (!renderable.object.effects) {
-			return false;
-		}
-
-		let mask = 0;
-
-		for (let i = 0; i < state.attachInfo.count; i++) {
-			const key = state.attachInfo.keys[i];
-			if (!!renderable.object.effects[key]) {
-				mask |= state.attachInfo.masks[i];
-			}
-		}
-
-		return mask & renderMask;
 	}
 }
 
