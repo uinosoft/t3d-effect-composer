@@ -33,14 +33,20 @@ export default class GBuffer extends Buffer {
 
 		this._renderOptions = {
 			getMaterial: createGetMaterialFunction(),
-			ifRender: function(renderable) {
-				return !!renderable.geometry.getAttribute('a_Normal');
-			}
+			ifRender: createIfRenderFunction(undefined)
 		};
 
 		this._renderStates = null;
 
 		this.layers = [0];
+	}
+
+	setIfRenderReplaceFunction(func) {
+		if (!!func) {
+			this._renderOptions.ifRender = createIfRenderFunction(func);
+		} else {
+			this._renderOptions.ifRender = createIfRenderFunction(undefined);
+		}
 	}
 
 	setGeometryReplaceFunction(func) {
@@ -99,6 +105,20 @@ export default class GBuffer extends Buffer {
 		this._rt.dispose();
 	}
 
+}
+
+function createIfRenderFunction(func = defaultIfRenderReplaceFunction) {
+	return function(renderable) {
+		if (!func(renderable)) {
+			return false;
+		}
+
+		return !!renderable.geometry.getAttribute('a_Normal');
+	}
+}
+
+function defaultIfRenderReplaceFunction(renderable) {
+	return true;
 }
 
 function createGetMaterialFunction(func = defaultMaterialReplaceFunction) {

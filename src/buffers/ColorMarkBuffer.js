@@ -33,22 +33,20 @@ export default class ColorMarkBuffer extends Buffer {
 
 		this._renderOptions = {
 			getMaterial: createGetMaterialFunction(undefined, state),
-			ifRender: function(renderable) {
-				if (!renderable.object.effects) {
-					return false;
-				}
-
-				if (!!renderable.object.effects[state.key]) {
-					return true;
-				}
-
-				return false;
-			}
+			ifRender: createIfRenderFunction(undefined, state)
 		};
 
 		this.attachManager = attachManager;
 
 		this.layers = [0];
+	}
+
+	setIfRenderReplaceFunction(func) {
+		if (!!func) {
+			this._renderOptions.ifRender = createIfRenderFunction(func, this._state);
+		} else {
+			this._renderOptions.ifRender = createIfRenderFunction(undefined, this._state);
+		}
 	}
 
 	setGeometryReplaceFunction(func) {
@@ -169,6 +167,28 @@ export default class ColorMarkBuffer extends Buffer {
 		this._mrts.forEach(mrt => mrt.dispose());
 	}
 
+}
+
+function createIfRenderFunction(func = defaultIfRenderReplaceFunction, state) {
+	return function(renderable) {
+		if (!func(renderable)) {
+			return false;
+		}
+
+		if (!renderable.object.effects) {
+			return false;
+		}
+
+		if (!!renderable.object.effects[state.key]) {
+			return true;
+		}
+
+		return false;
+	}
+}
+
+function defaultIfRenderReplaceFunction(renderable) {
+	return true;
 }
 
 function createGetMaterialFunction(func = defaultMaterialReplaceFunction, state) {
