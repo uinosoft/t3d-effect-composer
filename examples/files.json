@@ -22,7 +22,8 @@
 		"advanced_lensflare",
 		"advanced_overlay",
 		"advanced_snow",
-		"advanced_rain"
+		"advanced_rain",
+		"advanced_heightfog"
 	],
 	"debugger": [
 		"debugger_uv"
