@@ -21,6 +21,8 @@ class Buffer {
 
 	setGeometryReplaceFunction(func) {}
 
+	setIfRenderReplaceFunction(func) {}
+
 	// SceneBuffer does not have this method
 	// setMaterialReplaceFunction(func) {}
 
@@ -4574,14 +4576,20 @@ class GBuffer extends Buffer {
 
 		this._renderOptions = {
 			getMaterial: createGetMaterialFunction$2(),
-			ifRender: function(renderable) {
-				return !!renderable.geometry.getAttribute('a_Normal');
-			}
+			ifRender: createIfRenderFunction$2(undefined)
 		};
 
 		this._renderStates = null;
 
 		this.layers = [0];
+	}
+
+	setIfRenderReplaceFunction(func) {
+		if (!!func) {
+			this._renderOptions.ifRender = createIfRenderFunction$2(func);
+		} else {
+			this._renderOptions.ifRender = createIfRenderFunction$2(undefined);
+		}
 	}
 
 	setGeometryReplaceFunction(func) {
@@ -4640,6 +4648,20 @@ class GBuffer extends Buffer {
 		this._rt.dispose();
 	}
 
+}
+
+function createIfRenderFunction$2(func = defaultIfRenderReplaceFunction$2) {
+	return function(renderable) {
+		if (!func(renderable)) {
+			return false;
+		}
+
+		return !!renderable.geometry.getAttribute('a_Normal');
+	}
+}
+
+function defaultIfRenderReplaceFunction$2(renderable) {
+	return true;
 }
 
 function createGetMaterialFunction$2(func = defaultMaterialReplaceFunction$2) {
@@ -4888,17 +4910,27 @@ class NonDepthMarkBuffer extends Buffer {
 
 		this._opacityRenderOptions = {
 			getMaterial: createGetMaterialFunction$1(undefined, this._state, attachManager, RenderListMask.OPAQUE),
-			ifRender: createIfRenderFunction(this._state, RenderListMask.OPAQUE)
+			ifRender: createIfRenderFunction$1(undefined, this._state, RenderListMask.OPAQUE)
 		};
 
 		this._transparentRenderOptions = {
 			getMaterial: createGetMaterialFunction$1(undefined, this._state, attachManager, RenderListMask.TRANSPARENT),
-			ifRender: createIfRenderFunction(this._state, RenderListMask.TRANSPARENT)
+			ifRender: createIfRenderFunction$1(undefined, this._state, RenderListMask.TRANSPARENT)
 		};
 
 		this.attachManager = attachManager;
 
 		this.layers = [0];
+	}
+
+	setIfRenderReplaceFunction(func) {
+		if (!!func) {
+			this._opacityRenderOptions.ifRender = createIfRenderFunction$1(func, this._state, RenderListMask.OPAQUE);
+			this._transparentRenderOptions.ifRender = createIfRenderFunction$1(func, this._state, RenderListMask.TRANSPARENT);
+		} else {
+			this._opacityRenderOptions.ifRender = createIfRenderFunction$1(undefined, this._state, RenderListMask.OPAQUE);
+			this._transparentRenderOptions.ifRender = createIfRenderFunction$1(undefined, this._state, RenderListMask.TRANSPARENT);
+		}
 	}
 
 	setGeometryReplaceFunction(func) {
@@ -4996,6 +5028,33 @@ class NonDepthMarkBuffer extends Buffer {
 
 }
 
+function createIfRenderFunction$1(func = defaultIfRenderReplaceFunction$1, state, renderMask) {
+	return function(renderable) {
+		if (!func(renderable)) {
+			return false;
+		}
+
+		if (!renderable.object.effects) {
+			return false;
+		}
+
+		let mask = 0;
+
+		for (let i = 0; i < state.attachInfo.count; i++) {
+			const key = state.attachInfo.keys[i];
+			if (!!renderable.object.effects[key]) {
+				mask |= state.attachInfo.masks[i];
+			}
+		}
+
+		return mask & renderMask;
+	}
+}
+
+function defaultIfRenderReplaceFunction$1(renderable) {
+	return true;
+}
+
 function createGetMaterialFunction$1(func = defaultMaterialReplaceFunction$1, state, attachManager, renderMask) {
 	return function(renderable) {
 		const material = func(renderable);
@@ -5013,25 +5072,6 @@ function createGetMaterialFunction$1(func = defaultMaterialReplaceFunction$1, st
 		}
 
 		return material;
-	}
-}
-
-function createIfRenderFunction(state, renderMask) {
-	return function(renderable) {
-		if (!renderable.object.effects) {
-			return false;
-		}
-
-		let mask = 0;
-
-		for (let i = 0; i < state.attachInfo.count; i++) {
-			const key = state.attachInfo.keys[i];
-			if (!!renderable.object.effects[key]) {
-				mask |= state.attachInfo.masks[i];
-			}
-		}
-
-		return mask & renderMask;
 	}
 }
 
@@ -5175,22 +5215,20 @@ class ColorMarkBuffer extends Buffer {
 
 		this._renderOptions = {
 			getMaterial: createGetMaterialFunction(undefined, state),
-			ifRender: function(renderable) {
-				if (!renderable.object.effects) {
-					return false;
-				}
-
-				if (!!renderable.object.effects[state.key]) {
-					return true;
-				}
-
-				return false;
-			}
+			ifRender: createIfRenderFunction(undefined, state)
 		};
 
 		this.attachManager = attachManager;
 
 		this.layers = [0];
+	}
+
+	setIfRenderReplaceFunction(func) {
+		if (!!func) {
+			this._renderOptions.ifRender = createIfRenderFunction(func, this._state);
+		} else {
+			this._renderOptions.ifRender = createIfRenderFunction(undefined, this._state);
+		}
 	}
 
 	setGeometryReplaceFunction(func) {
@@ -5311,6 +5349,28 @@ class ColorMarkBuffer extends Buffer {
 		this._mrts.forEach(mrt => mrt.dispose());
 	}
 
+}
+
+function createIfRenderFunction(func = defaultIfRenderReplaceFunction, state) {
+	return function(renderable) {
+		if (!func(renderable)) {
+			return false;
+		}
+
+		if (!renderable.object.effects) {
+			return false;
+		}
+
+		if (!!renderable.object.effects[state.key]) {
+			return true;
+		}
+
+		return false;
+	}
+}
+
+function defaultIfRenderReplaceFunction(renderable) {
+	return true;
 }
 
 function createGetMaterialFunction(func = defaultMaterialReplaceFunction, state) {
@@ -5456,6 +5516,14 @@ class SceneBuffer extends Buffer {
 		}
 
 		this.needsUpdate = true;
+	}
+
+	setIfRenderReplaceFunction(func) {
+		if (!!func) {
+			this._sceneRenderOptions.ifRender = func;
+		} else {
+			delete this._sceneRenderOptions.ifRender;
+		}
 	}
 
 	setGeometryReplaceFunction(func) {
