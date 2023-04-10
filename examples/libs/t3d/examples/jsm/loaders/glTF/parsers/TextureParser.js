@@ -1,9 +1,9 @@
 import {
 	Texture2D,
 	TEXTURE_FILTER,
-	TEXTURE_WRAP
+	TEXTURE_WRAP,
 } from 't3d';
-import { WEBGL_WRAPPINGS, WEBGL_FILTERS } from "../Constants.js";
+import { WEBGL_WRAPPINGS, WEBGL_FILTERS } from '../Constants.js';
 
 export class TextureParser {
 
@@ -15,15 +15,43 @@ export class TextureParser {
 		// TODO need to cache textures by source and samplers?
 
 		return Promise.all(
-			gltf.textures.map(({ sampler, source = 0, name: textureName }, index) => {
-				const image = images[source];
+			gltf.textures.map((params, index) => {
+				const { sampler, source = 0, name: textureName } = params;
+
 				const texture = new Texture2D();
-				texture.image = image;
+
+				if (params.extensions) {
+					const { KHR_texture_basisu } = params.extensions;
+					if (KHR_texture_basisu) {
+						const transcodeResult = images[KHR_texture_basisu.source];
+
+						const { image, mipmaps, type, format, minFilter, magFilter, generateMipmaps, encoding, premultiplyAlpha } = transcodeResult;
+						texture.image = image;
+						texture.mipmaps = mipmaps;
+						texture.type = type;
+						texture.format = format;
+						texture.minFilter = minFilter;
+						texture.magFilter = magFilter;
+						texture.generateMipmaps = generateMipmaps;
+						texture.encoding = encoding;
+						texture.premultiplyAlpha = premultiplyAlpha;
+					} else if (Object.values(params.extensions).length && Object.values(params.extensions)[0].hasOwnProperty('source')) {
+						texture.image = images[Object.values(params.extensions)[0].source];
+					} else {
+						console.error('GLTFLoader: Couldn\'t load texture');
+						return null;
+					}
+				} else {
+					texture.image = images[source];
+				}
+
 				texture.version++;
-				texture.name = textureName || image.__name || `texture_${index}`;
+				texture.name = textureName || texture.image.__name || `texture_${index}`;
 				texture.flipY = false;
+
 				const samplers = gltf.samplers || {};
 				parseSampler(texture, samplers[sampler]);
+
 				return texture;
 			})
 		).then(textures => {
