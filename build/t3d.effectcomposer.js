@@ -19,7 +19,8 @@
 			}
 			return false;
 		};
-		_proto.setGeometryReplaceFunction = function setGeometryReplaceFunction(func) {}
+		_proto.setGeometryReplaceFunction = function setGeometryReplaceFunction(func) {};
+		_proto.setIfRenderReplaceFunction = function setIfRenderReplaceFunction(func) {}
 
 		// SceneBuffer does not have this method
 		// setMaterialReplaceFunction(func) {}
@@ -2183,15 +2184,20 @@
 			_this._rt.attach(depthTexture, t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 			_this._renderOptions = {
 				getMaterial: createGetMaterialFunction$2(),
-				ifRender: function ifRender(renderable) {
-					return !!renderable.geometry.getAttribute('a_Normal');
-				}
+				ifRender: createIfRenderFunction$2(undefined)
 			};
 			_this._renderStates = null;
 			_this.layers = [0];
 			return _this;
 		}
 		var _proto = GBuffer.prototype;
+		_proto.setIfRenderReplaceFunction = function setIfRenderReplaceFunction(func) {
+			if (!!func) {
+				this._renderOptions.ifRender = createIfRenderFunction$2(func);
+			} else {
+				this._renderOptions.ifRender = createIfRenderFunction$2(undefined);
+			}
+		};
 		_proto.setGeometryReplaceFunction = function setGeometryReplaceFunction(func) {
 			if (!!func) {
 				this._renderOptions.getGeometry = func;
@@ -2238,6 +2244,20 @@
 		};
 		return GBuffer;
 	}(Buffer);
+	function createIfRenderFunction$2(func) {
+		if (func === void 0) {
+			func = defaultIfRenderReplaceFunction$2;
+		}
+		return function (renderable) {
+			if (!func(renderable)) {
+				return false;
+			}
+			return !!renderable.geometry.getAttribute('a_Normal');
+		};
+	}
+	function defaultIfRenderReplaceFunction$2(renderable) {
+		return true;
+	}
 	function createGetMaterialFunction$2(func) {
 		if (func === void 0) {
 			func = defaultMaterialReplaceFunction$2;
@@ -2406,17 +2426,26 @@
 			var attachManager = new BufferAttachManager(4);
 			_this._opacityRenderOptions = {
 				getMaterial: createGetMaterialFunction$1(undefined, _this._state, attachManager, RenderListMask.OPAQUE),
-				ifRender: createIfRenderFunction(_this._state, RenderListMask.OPAQUE)
+				ifRender: createIfRenderFunction$1(undefined, _this._state, RenderListMask.OPAQUE)
 			};
 			_this._transparentRenderOptions = {
 				getMaterial: createGetMaterialFunction$1(undefined, _this._state, attachManager, RenderListMask.TRANSPARENT),
-				ifRender: createIfRenderFunction(_this._state, RenderListMask.TRANSPARENT)
+				ifRender: createIfRenderFunction$1(undefined, _this._state, RenderListMask.TRANSPARENT)
 			};
 			_this.attachManager = attachManager;
 			_this.layers = [0];
 			return _this;
 		}
 		var _proto = NonDepthMarkBuffer.prototype;
+		_proto.setIfRenderReplaceFunction = function setIfRenderReplaceFunction(func) {
+			if (!!func) {
+				this._opacityRenderOptions.ifRender = createIfRenderFunction$1(func, this._state, RenderListMask.OPAQUE);
+				this._transparentRenderOptions.ifRender = createIfRenderFunction$1(func, this._state, RenderListMask.TRANSPARENT);
+			} else {
+				this._opacityRenderOptions.ifRender = createIfRenderFunction$1(undefined, this._state, RenderListMask.OPAQUE);
+				this._transparentRenderOptions.ifRender = createIfRenderFunction$1(undefined, this._state, RenderListMask.TRANSPARENT);
+			}
+		};
 		_proto.setGeometryReplaceFunction = function setGeometryReplaceFunction(func) {
 			if (!!func) {
 				this._opacityRenderOptions.getGeometry = func;
@@ -2508,6 +2537,30 @@
 		};
 		return NonDepthMarkBuffer;
 	}(Buffer);
+	function createIfRenderFunction$1(func, state, renderMask) {
+		if (func === void 0) {
+			func = defaultIfRenderReplaceFunction$1;
+		}
+		return function (renderable) {
+			if (!func(renderable)) {
+				return false;
+			}
+			if (!renderable.object.effects) {
+				return false;
+			}
+			var mask = 0;
+			for (var i = 0; i < state.attachInfo.count; i++) {
+				var key = state.attachInfo.keys[i];
+				if (!!renderable.object.effects[key]) {
+					mask |= state.attachInfo.masks[i];
+				}
+			}
+			return mask & renderMask;
+		};
+	}
+	function defaultIfRenderReplaceFunction$1(renderable) {
+		return true;
+	}
 	function createGetMaterialFunction$1(func, state, attachManager, renderMask) {
 		if (func === void 0) {
 			func = defaultMaterialReplaceFunction$1;
@@ -2526,21 +2579,6 @@
 				}
 			}
 			return material;
-		};
-	}
-	function createIfRenderFunction(state, renderMask) {
-		return function (renderable) {
-			if (!renderable.object.effects) {
-				return false;
-			}
-			var mask = 0;
-			for (var i = 0; i < state.attachInfo.count; i++) {
-				var key = state.attachInfo.keys[i];
-				if (!!renderable.object.effects[key]) {
-					mask |= state.attachInfo.masks[i];
-				}
-			}
-			return mask & renderMask;
 		};
 	}
 	var materialMap$1 = new Map();
@@ -2639,21 +2677,20 @@
 			var attachManager = new BufferAttachManager(1);
 			_this._renderOptions = {
 				getMaterial: createGetMaterialFunction(undefined, state),
-				ifRender: function ifRender(renderable) {
-					if (!renderable.object.effects) {
-						return false;
-					}
-					if (!!renderable.object.effects[state.key]) {
-						return true;
-					}
-					return false;
-				}
+				ifRender: createIfRenderFunction(undefined, state)
 			};
 			_this.attachManager = attachManager;
 			_this.layers = [0];
 			return _this;
 		}
 		var _proto = ColorMarkBuffer.prototype;
+		_proto.setIfRenderReplaceFunction = function setIfRenderReplaceFunction(func) {
+			if (!!func) {
+				this._renderOptions.ifRender = createIfRenderFunction(func, this._state);
+			} else {
+				this._renderOptions.ifRender = createIfRenderFunction(undefined, this._state);
+			}
+		};
 		_proto.setGeometryReplaceFunction = function setGeometryReplaceFunction(func) {
 			if (!!func) {
 				this._renderOptions.getGeometry = func;
@@ -2768,6 +2805,26 @@
 		};
 		return ColorMarkBuffer;
 	}(Buffer);
+	function createIfRenderFunction(func, state) {
+		if (func === void 0) {
+			func = defaultIfRenderReplaceFunction;
+		}
+		return function (renderable) {
+			if (!func(renderable)) {
+				return false;
+			}
+			if (!renderable.object.effects) {
+				return false;
+			}
+			if (!!renderable.object.effects[state.key]) {
+				return true;
+			}
+			return false;
+		};
+	}
+	function defaultIfRenderReplaceFunction(renderable) {
+		return true;
+	}
 	function createGetMaterialFunction(func, state) {
 		if (func === void 0) {
 			func = defaultMaterialReplaceFunction;
@@ -2858,6 +2915,13 @@
 				this._mrt.detach(t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 			}
 			this.needsUpdate = true;
+		};
+		_proto.setIfRenderReplaceFunction = function setIfRenderReplaceFunction(func) {
+			if (!!func) {
+				this._sceneRenderOptions.ifRender = func;
+			} else {
+				delete this._sceneRenderOptions.ifRender;
+			}
 		};
 		_proto.setGeometryReplaceFunction = function setGeometryReplaceFunction(func) {
 			if (!!func) {
