@@ -53,6 +53,21 @@
     import { GUI } from "./libs/lil-gui.esm.min.js";
     import Stats from "./libs/stats.module.js";
 
+    function isPC() {
+    	const userAgentInfo = navigator.userAgent;
+    	const Agents = ["Android", "iPhone",
+    		"SymbianOS", "Windows Phone",
+    		"iPad", "iPod"];
+    	let flag = true;
+    	for (let v = 0; v < Agents.length; v++) {
+    		if (userAgentInfo.indexOf(Agents[v]) > 0) {
+    			flag = false;
+    			break;
+    		}
+    	}
+    	return flag;
+    }
+
     let width = window.innerWidth || 2;
     let height = window.innerHeight || 2;
 
@@ -134,24 +149,28 @@
     camera.gammaFactor = 2;
     camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.GAMMA;
     effectComposer.getBuffer('SceneBuffer').setOutputEncoding(t3d.TEXEL_ENCODING_TYPE.GAMMA);
-    const rainEffect = new RainEffect();
 
-    effectComposer.addEffect('rain', rainEffect, 99);
+    const rainEffect = new RainEffect();
     rainEffect.density = 0;
+    effectComposer.addEffect('rain', rainEffect, 99);
+
+    const rainMesh = new RainMesh(20000);
+    rainMesh.number = isPC() ? 10000 : 5000;
+    scene.add(rainMesh);
+    
     const gui = new GUI();
-    const rainEffectFolder = gui.addFolder('rain');
-    rainEffectFolder.add(rainEffect, 'active');
-    rainEffectFolder.add(rainEffect, 'cover', 0, 1, 0.01);
-    rainEffectFolder.add(rainEffect, 'size', 0, 3, 0.1);
-    rainEffectFolder.add(rainEffect, 'speed', 0, 10, 2);
-    rainEffectFolder.add(rainEffect, 'angle', -60, 60, -10);
-    rainEffectFolder.add(rainEffect, 'density', 0, 10, 2);
-    const rainMesh = new RainMesh();
-    scene.add(rainMesh)
-    const rainMeshFolder = gui.addFolder('rain1');
-    rainMeshFolder.add(rainMesh, 'speed', 0, 3, 0.1);
-    rainMeshFolder.add(rainMesh, 'size', 0, 3, 0.1);
-    rainMeshFolder.add(rainMesh, 'number', 0, 50000, 1);
+    const effectFolder = gui.addFolder('effect');
+    effectFolder.add(rainEffect, 'active');
+    effectFolder.add(rainEffect, 'cover', 0, 1, 0.01);
+    effectFolder.add(rainEffect, 'size', 0, 3, 0.1);
+    effectFolder.add(rainEffect, 'speed', 0, 10, 2);
+    effectFolder.add(rainEffect, 'angle', -60, 60, -10);
+    effectFolder.add(rainEffect, 'density', 0, 10, 2);
+    const particleFolder = gui.addFolder('particles');
+    particleFolder.add(rainMesh, 'visible');
+    particleFolder.add(rainMesh, 'speed', 0, 3, 0.1);
+    particleFolder.add(rainMesh, 'size', 0, 3, 0.1);
+    particleFolder.add(rainMesh, 'number', 0, 20000, 1);
 
     const stats = new Stats();
     stats.dom.style.cssText = 'position:fixed;bottom:0;left:0;cursor:pointer;opacity:0.9;z-index:10000';

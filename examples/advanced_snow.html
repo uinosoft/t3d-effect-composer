@@ -50,6 +50,21 @@
 	import { GUI } from './libs/lil-gui.esm.min.js';
 	import Stats from './libs/stats.module.js';
 
+	function isPC() {
+		const userAgentInfo = navigator.userAgent;
+		const Agents = ["Android", "iPhone",
+			"SymbianOS", "Windows Phone",
+			"iPad", "iPod"];
+		let flag = true;
+		for (let v = 0; v < Agents.length; v++) {
+			if (userAgentInfo.indexOf(Agents[v]) > 0) {
+				flag = false;
+				break;
+			}
+		}
+		return flag;
+	}
+
 	let width = window.innerWidth || 2;
 	let height = window.innerHeight || 2;
 
@@ -131,21 +146,23 @@
 	effectComposer.getBuffer('SceneBuffer').setOutputEncoding(t3d.TEXEL_ENCODING_TYPE.GAMMA);
 
 	const snowEffect = new SnowEffect();
-
 	effectComposer.addEffect('snow', snowEffect, 99);
-	const gui = new GUI();
-	const snowEffectFolder = gui.addFolder('snowPass');
-	snowEffectFolder.add(snowEffect, 'active');
-	snowEffectFolder.add(snowEffect, 'cover', 0, 1, 0.01);
-	snowEffectFolder.add(snowEffect, 'size', 0, 5, 0.1);
-	snowEffectFolder.add(snowEffect, 'speed', 0, 10, 0.1);
-	const snowMesh = new SnowMesh(50000);
-	scene.add(snowMesh)
-	const snowMeshFolder = gui.addFolder('snowMesh');
 
-	snowMeshFolder.add(snowMesh, 'speed', 0, 3, 0.1);
-	snowMeshFolder.add(snowMesh, 'size', 0, 3, 0.1);
-	snowMeshFolder.add(snowMesh, 'number', 0, 50000, 1);
+	const snowMesh = new SnowMesh(20000);
+	snowMesh.number = isPC() ? 5000 : 100;
+	scene.add(snowMesh);
+
+	const gui = new GUI();
+	const effectFolder = gui.addFolder('effect');
+	effectFolder.add(snowEffect, 'active');
+	effectFolder.add(snowEffect, 'cover', 0, 1, 0.01);
+	effectFolder.add(snowEffect, 'size', 0, 5, 0.1);
+	effectFolder.add(snowEffect, 'speed', 0, 10, 0.1);
+	const particleFolder = gui.addFolder('particles');
+	particleFolder.add(snowMesh, 'visible');
+	particleFolder.add(snowMesh, 'speed', 0, 3, 0.1);
+	particleFolder.add(snowMesh, 'size', 0, 3, 0.1);
+	particleFolder.add(snowMesh, 'number', 0, 20000, 1);
 
 	effectComposer.sceneMSAA = true;
 
