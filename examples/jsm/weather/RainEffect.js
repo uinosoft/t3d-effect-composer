@@ -6,10 +6,11 @@ export default class RainEffect extends Effect {
 	constructor() {
 		super();
 
+		this.speed = 1;
 		this.size = 0.8;
-		this.speed = 2;
-		this.angle = -10;
-		this.density = 2;
+		this.angle = 10;
+		this.density = 1;
+		this.strength = 1;
 		this.cover = 0.4;
 
 		this.bufferDependencies = [
@@ -19,10 +20,11 @@ export default class RainEffect extends Effect {
 		this._rainPass = new ShaderPostPass(rainShader);
 		this._rainCoverPass = new ShaderPostPass(rainCoverShader);
 		this._blendPass = new ShaderPostPass(mixShader);
+
+		this._renderCover = false;
 	}
 
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-		const deltaTime = 0.0166666;
 		const tempRT1 = composer._renderTargetCache.allocate(0);
 		const tempRT2 = composer._renderTargetCache.allocate(0);
 		const gBuffer = composer.getBuffer('GBuffer');
@@ -32,24 +34,45 @@ export default class RainEffect extends Effect {
 		renderer.renderPass.setRenderTarget(tempRT1);
 		renderer.renderPass.setClearColor(1, 1, 1, 1);
 		renderer.renderPass.clear(true, true, false);
-		this._rainPass.uniforms.normalTex = gBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
-		this._rainPass.uniforms.time += deltaTime * this.speed / 5.;
-		this._rainPass.uniforms.rainAngle = this.angle;
-		this._rainPass.uniforms.rainSize = this.size;
-		this._rainPass.uniforms.rainDensity = this.density;
-		this._rainPass.uniforms.u_fragCoord[0] = gBuffer.output().width;
-		this._rainPass.uniforms.u_fragCoord[1] = gBuffer.output().height;
+
+		const deltaTime = 0.0166666;
+		this._rainPass.uniforms.time += deltaTime * this.speed * 0.4;
+		this._rainPass.uniforms.angle = this.angle;
+		this._rainPass.uniforms.size = this.size;
+		this._rainPass.uniforms.density = this.density;
+		this._rainPass.uniforms.strength = this.strength;
+
+
 		this._rainPass.render(renderer);
 
 		// Step 2: rain cover pass
 
+		if (this.cover <= 0) {
+			this._renderCover = false;
+		}
+
 		renderer.renderPass.setRenderTarget(tempRT2);
-		const gBufferRenderStates = gBuffer.getCurrentRenderStates();
-		_vec3_1.copy(gBufferRenderStates.camera.position).normalize().negate().toArray(this._rainCoverPass.uniforms.u_cameraWorldDirection);
-		this._rainCoverPass.uniforms.u_fragCoord[0] = gBuffer.output().width;
-		this._rainCoverPass.uniforms.u_fragCoord[1] = gBuffer.output().height;
-		this._rainCoverPass.uniforms.time += deltaTime * this.speed * 1.2;
-		this._rainCoverPass.render(renderer);
+		renderer.renderPass.setClearColor(0, 0, 0, 0);
+		renderer.renderPass.clear(true, true, false);
+
+		if (this._renderCover) {
+			const gBufferRenderStates = gBuffer.getCurrentRenderStates();
+			_vec3_1.copy(gBufferRenderStates.camera.position).normalize().negate().toArray(this._rainCoverPass.uniforms.u_cameraWorldDirection);
+			this._rainCoverPass.uniforms.u_fragCoord[0] = gBuffer.output().width;
+			this._rainCoverPass.uniforms.u_fragCoord[1] = gBuffer.output().height;
+			this._rainCoverPass.uniforms.time += deltaTime * this.speed * 1.2;
+			this._rainCoverPass.render(renderer);
+		}
+
+		if (this.cover > 0) {
+			this.bufferDependencies = [
+				{ key: 'GBuffer' }
+			];
+			this._renderCover = true;
+		} else {
+			this.bufferDependencies = [];
+			this._renderCover = false;
+		}
 
 		// Step 3: blend pass
 
@@ -90,68 +113,44 @@ export default class RainEffect extends Effect {
 
 const _vec3_1 = new Vector3();
 
-// www.shadertoy.com/view/wslSD2
+// shadertoy.com/view/wslSD2
 
 const rainShader = {
 	name: 'ec_rain',
 	defines: {},
 	uniforms: {
-		rainSize: 2.0,
-		rainAngle: -10,
-		rainDensity: 4,
-		u_fragCoord: [0, 0],
-		time: 0,
+		size: 2.0,
+		angle: -10,
+		density: 1,
+		time: 1,
+		strength: 1,
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
-		# define MARCH_STEPS 70
-		# define RAIN_STEPS 15
 		uniform float time;
-		uniform float rainSize;
-		uniform float rainAngle;
-		uniform int rainDensity;
+		uniform float size;
+		uniform float angle;
+		uniform float density;
+		uniform float strength;
 		varying vec2 v_Uv;
-		uniform vec2 u_fragCoord;
-
-		float rnd(float t) {
-			return fract(sin(t * 745.523) * 7894.552);
-		}
-		float rain(vec3 p) {
-			p.y -= time * 4.0;
-			p.xy *= 60.0;
-			p.y += rnd(floor(p.x)) * 80.0;
-			return clamp(1.0 - length(vec2(cos(p.x * PI), sin(p.y * 0.1) - 1.7)), 0.0, 1.0);
+		float hash(float x) {
+			return fract(sin(x*133.3)*13.13);
 		}
 		void main() {
-			vec2 uv = vec2(v_Uv.x, v_Uv.y);
-			float a = rainAngle*3.1415926/360.;
+			vec3 col = vec3(.6, .7, .8);
+			float a = angle / 180. * 3.141592;
 			float si = sin(a), co = cos(a);
-			uv -= 0.5;
-			uv /= vec2(u_fragCoord.y / u_fragCoord.x, 1);
+			vec2 uv = v_Uv;
 			uv *= mat2(co, -si, si, co);
-			vec3 s = vec3(1, sin(time * 0.3) * 0.2, -3);
-			vec3 t = vec3(0, 0, 0);
-			vec3 r = normalize(vec3(-uv, 0.7));
-			float dd = 0.0;
-			for (int i = 0; i < MARCH_STEPS; ++i) {
-				dd += 0.1;
-			}
-			vec3 col = vec3(0.0);
-			vec3 raining = vec3(0.0);
-			int steps = RAIN_STEPS;
-			float stepsize = 30.0 / float(steps);
-			vec3 raystep = r * stepsize / r.z/(0.2+rainSize/2.);
-			for (int i = 0; i < rainDensity; ++i) {
-				vec3 raypos = raystep * (float(i));
-				vec3 rainpos = raypos;
-				raining += rain(rainpos) * pow(2.0 * (1.0 - v_Uv.y) * (abs(0.6 - abs(v_Uv.x - 0.5))), 2.0);
-			}
-			col += raining;
-			col = pow(col, vec3(0.6545));
-			gl_FragColor=vec4(col,1.0);
+			uv *= length(uv + vec2(0, 4.9)) * .3 + 4. / density;
+			float v = 1. - sin(hash(floor(uv.x * 100.)));
+			float b = clamp(abs(sin(20. * time * v + uv.y / size * (5. / (2. + v)))) - .85, 0., 1.);
+			col *= v * b;
+			gl_FragColor = vec4(col * strength, 1.0);
 		}
 	`
 };
+
 const rainCoverShader = {
 	name: 'ec_rain_cover',
 	defines: {},
@@ -288,7 +287,8 @@ const mixShader = {
 			vec4 texel2 = texture2D(texture2, v_Uv);
 			vec4 texel3 = texture2D(texture3, v_Uv);
 			vec4 texel4 = texture2D(texture4, v_Uv);
-			gl_FragColor=(texel4.y*2.0-1.0)>0.90?vec4(vec3(texel1.rgb + texel2.rgb +texel3.rgb *cover),texel1.a) :vec4(vec3(texel1.rgb + texel2.rgb),texel1.a);
+			float coverDensity = step(0.9, texel4.y * 2.0 - 1.0);
+			gl_FragColor = vec4(vec3(texel1.rgb + texel2.rgb + texel3.rgb * cover * coverDensity), texel1.a);
 		}
 	`
 };

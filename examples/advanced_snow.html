@@ -15,7 +15,7 @@
 <body>
     <div id="container" ></div>
     <div id="info">
-        Sketch Effect, press 'i' to show Inspector <br/>
+        Snow Effect, press 'i' to show Inspector <br/>
         "Low Poly Lake Scene" by <a href="https://sketchfab.com/Edwin3D" target="_blank" rel="noopener">EdwinRC</a>, <a href="http://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC Attribution</a>
     </div>
 </body>
@@ -43,27 +43,11 @@
 
 	import { DefaultEffectComposer } from 't3d-effect-composer';
 	import SnowEffect  from './jsm/weather/SnowEffect.js';
-	import SnowMesh  from './jsm/weather/SnowMesh.js';
 
 	import { Inspector } from './jsm/Inspector.js';
 
 	import { GUI } from './libs/lil-gui.esm.min.js';
 	import Stats from './libs/stats.module.js';
-
-	function isPC() {
-		const userAgentInfo = navigator.userAgent;
-		const Agents = ["Android", "iPhone",
-			"SymbianOS", "Windows Phone",
-			"iPad", "iPod"];
-		let flag = true;
-		for (let v = 0; v < Agents.length; v++) {
-			if (userAgentInfo.indexOf(Agents[v]) > 0) {
-				flag = false;
-				break;
-			}
-		}
-		return flag;
-	}
 
 	let width = window.innerWidth || 2;
 	let height = window.innerHeight || 2;
@@ -85,6 +69,7 @@
 		webgl2: renderer.renderPass.capabilities.version > 1,
 		floatColorBuffer: !!renderer.renderPass.capabilities.getExtension("EXT_color_buffer_float")
 	});
+	effectComposer.sceneMSAA = true;
 
 	const scene = new t3d.Scene();
 	scene.environmentLightIntensity = 1;
@@ -148,23 +133,14 @@
 	const snowEffect = new SnowEffect();
 	effectComposer.addEffect('snow', snowEffect, 99);
 
-	const snowMesh = new SnowMesh(20000);
-	snowMesh.number = isPC() ? 5000 : 100;
-	scene.add(snowMesh);
-
 	const gui = new GUI();
-	const effectFolder = gui.addFolder('effect');
-	effectFolder.add(snowEffect, 'active');
-	effectFolder.add(snowEffect, 'cover', 0, 1, 0.01);
-	effectFolder.add(snowEffect, 'size', 0, 5, 0.1);
-	effectFolder.add(snowEffect, 'speed', 0, 10, 0.1);
-	const particleFolder = gui.addFolder('particles');
-	particleFolder.add(snowMesh, 'visible');
-	particleFolder.add(snowMesh, 'speed', 0, 3, 0.1);
-	particleFolder.add(snowMesh, 'size', 0, 3, 0.1);
-	particleFolder.add(snowMesh, 'number', 0, 20000, 1);
-
-	effectComposer.sceneMSAA = true;
+	gui.add(snowEffect, 'active');
+	gui.add(snowEffect, 'cover', 0, 1, 0.01);
+	gui.add(snowEffect, 'size', 0, 5, 0.1);
+	gui.add(snowEffect, 'speed', 0, 10, 0.1);
+	gui.add(snowEffect, 'angle', -60, 60, 1);
+	gui.add(snowEffect, 'density', 0, 5, 0.1);
+	gui.add(snowEffect, 'strength', 0, 1, 0.1);
 
 	const stats = new Stats();
 	stats.dom.style.cssText = 'position:fixed;bottom:0;left:0;cursor:pointer;opacity:0.9;z-index:10000';
@@ -185,9 +161,6 @@
 	});
 
 	const controller = new OrbitControls(camera, canvas);
-	controller.screenSpacePanning = true;
-
-	// TODO Clock
 
 	function loop(count) {
 		requestAnimationFrame(loop);
@@ -199,8 +172,6 @@
 		scene.updateMatrix();
 		scene.updateRenderStates(camera);
 		scene.updateRenderQueue(camera).getLayer(0);
-
-		snowMesh.update();
 
 		shadowMapPass.render(renderer, scene);
 
