@@ -39,6 +39,8 @@ export default class SnowEffect extends Effect {
 		this._snowPass.uniforms.angle = this.angle;
 		this._snowPass.uniforms.density = this.density;
 		this._snowPass.uniforms.strength = this.strength;
+		this._snowPass.uniforms.viewportSize[0] =  inputRenderTarget.width;
+		this._snowPass.uniforms.viewportSize[1] =  inputRenderTarget.height;
 
 		this._snowPass.render(renderer);
 
@@ -90,7 +92,8 @@ const snowShader = {
 		size: 2.0,
 		angle: 0,
 		density: 1.,
-		strength: 1.
+		strength: 1.,
+		viewportSize: [512, 512]
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
@@ -100,6 +103,7 @@ const snowShader = {
 		uniform float angle;
 		uniform float density;
 		uniform float strength;
+		uniform vec2 viewportSize;
 		float snow(vec2 uv,float scale) {
 			float time1 = time ;
 			float w = smoothstep(1.,0.,-uv.y * (scale/10.));if(w < .1)return 0.;
@@ -117,6 +121,8 @@ const snowShader = {
 			float a =  angle / 180. * 3.141592;
 			float si = sin(a), co = cos(a);
 			vec2 uv = v_Uv;
+			uv.x = uv.x * viewportSize.x / 1024.;
+			uv.y = uv.y * viewportSize.y / 1024.;
 			uv *= mat2(co, -si, si, co);
 			uv *= density;
 			vec3 finalColor = vec3(0);

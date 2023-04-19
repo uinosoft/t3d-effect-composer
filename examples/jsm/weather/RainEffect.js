@@ -41,7 +41,8 @@ export default class RainEffect extends Effect {
 		this._rainPass.uniforms.size = this.size;
 		this._rainPass.uniforms.density = this.density;
 		this._rainPass.uniforms.strength = this.strength;
-
+		this._rainPass.uniforms.viewportSize[0] =  inputRenderTarget.width;
+		this._rainPass.uniforms.viewportSize[1] =  inputRenderTarget.height;
 
 		this._rainPass.render(renderer);
 
@@ -124,6 +125,7 @@ const rainShader = {
 		density: 1,
 		time: 1,
 		strength: 1,
+		viewportSize: [512, 512]
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
@@ -132,6 +134,7 @@ const rainShader = {
 		uniform float angle;
 		uniform float density;
 		uniform float strength;
+		uniform vec2 viewportSize;
 		varying vec2 v_Uv;
 		float hash(float x) {
 			return fract(sin(x*133.3)*13.13);
@@ -141,6 +144,8 @@ const rainShader = {
 			float a = angle / 180. * 3.141592;
 			float si = sin(a), co = cos(a);
 			vec2 uv = v_Uv;
+			uv.x = uv.x * viewportSize.x / 1024.;
+			uv.y = uv.y * viewportSize.y / 1024.;
 			uv *= mat2(co, -si, si, co);
 			uv *= length(uv + vec2(0, 4.9)) * .3 + 4. / density;
 			float v = 1. - sin(hash(floor(uv.x * 100.)));
@@ -226,7 +231,7 @@ const rainCoverShader = {
 				}
 			return vec3(yz * .1);
 		}
-		# define iterRippleCount 2.
+		# define iterRippleCount 1.
 		float dfRipples(vec3 p) {
 			float pl = (p.y + 1.);
 			vec3 r = vec3(0);
