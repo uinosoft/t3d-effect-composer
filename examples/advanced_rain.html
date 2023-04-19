@@ -52,6 +52,21 @@
     import { GUI } from "./libs/lil-gui.esm.min.js";
     import Stats from "./libs/stats.module.js";
 
+    function isPC() {
+    	const userAgentInfo = navigator.userAgent;
+    	const Agents = ["Android", "iPhone",
+    		"SymbianOS", "Windows Phone",
+    		"iPad", "iPod"];
+    	let flag = true;
+    	for (let v = 0; v < Agents.length; v++) {
+    		if (userAgentInfo.indexOf(Agents[v]) > 0) {
+    			flag = false;
+    			break;
+    		}
+    	}
+    	return flag;
+    }
+
     let width = window.innerWidth || 2;
     let height = window.innerHeight || 2;
 
@@ -137,6 +152,12 @@
 
     const rainEffect = new RainEffect();
     effectComposer.addEffect('rain', rainEffect, 99);
+
+    // The rain cover effect is slow for now
+    // turn off this on mobile
+    if (!isPC()) {
+    	rainEffect.cover = 0;
+    }
     
     const gui = new GUI();
     gui.add(rainEffect, 'active');

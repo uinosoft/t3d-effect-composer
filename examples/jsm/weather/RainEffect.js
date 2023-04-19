@@ -7,7 +7,7 @@ export default class RainEffect extends Effect {
 		super();
 
 		this.speed = 1;
-		this.size = 0.8;
+		this.size = 0.6;
 		this.angle = 10;
 		this.density = 1;
 		this.strength = 1;
