@@ -10,8 +10,7 @@ export const SketchShader = {
 		invResolution: [1 / 512, 1 / 512],
 		uThreshold: 0.55,
 		uContrast: 0.5,
-		matProjViewInverse: new Array(16),
-		uColor: [0, 0, 0]
+		matProjViewInverse: new Array(16)
 	},
 	vertexShader: `
 		attribute vec3 a_Position;
@@ -55,8 +54,6 @@ export const SketchShader = {
 		 	return max(planeDist, normalDist) * step(-5.9, test);
 		}
 
-		uniform vec3 uColor;
-
 		vec4 shade() {
 			vec2 vFragCoord = v_Uv;
 		 	vec2 coordUp = vFragCoord - vec2(0.0, invResolution.y);
@@ -75,7 +72,7 @@ export const SketchShader = {
 		 	float edge = length(planeDist);
 		 	float sketch = step(edge, uThreshold);
 			sketch = clamp(uContrast * (1.0 - sketch), 0.0, 1.0);
-			return vec4(uColor, sketch);
+			return vec4(vec3(sketch), 1.0);
 		}
 
 		void main() {

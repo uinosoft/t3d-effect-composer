@@ -135,6 +135,8 @@
 
 	const gui = new GUI();
 	gui.add(snowEffect, 'active');
+	gui.add(snowEffect, 'fxaa');
+	gui.addColor(snowEffect, "color");
 	gui.add(snowEffect, 'cover', 0, 1, 0.01);
 	gui.add(snowEffect, 'size', 0, 5, 0.1);
 	gui.add(snowEffect, 'speed', 0, 10, 0.1);

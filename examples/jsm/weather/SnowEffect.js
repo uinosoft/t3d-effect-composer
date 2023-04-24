@@ -1,5 +1,5 @@
-import { ShaderPostPass, ATTACHMENT  } from 't3d';
-import { Effect, defaultVertexShader } from 't3d-effect-composer';
+import { ShaderPostPass, ATTACHMENT, Color3  } from 't3d';
+import { Effect, defaultVertexShader, fxaaShader } from 't3d-effect-composer';
 
 export default class SnowEffect extends Effect {
 
@@ -11,26 +11,32 @@ export default class SnowEffect extends Effect {
 		this.angle = 0;
 		this.density = 1;
 		this.strength = 1;
-		this.cover = 0.6;
+		this.cover = 1;
+		this.color = new Color3(1, 1, 1);
+		this.fxaa = true;
 
 		this.bufferDependencies = [
 			{ key: 'GBuffer' }
 		];
 
 		this._snowPass = new ShaderPostPass(snowShader);
-		this._mixSnowPass = new ShaderPostPass(mixSnowShader);
+		this._snowCoverPass = new ShaderPostPass(snowCoverShader);
+		this._fxaaPass = new ShaderPostPass(fxaaShader);
+		this._snowMixPass = new ShaderPostPass(snowMixShader);
 
 		this._renderCover = false;
 	}
 
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
 		const tempRT1 = composer._renderTargetCache.allocate(0);
+		const tempRT2 = composer._renderTargetCache.allocate(0);
+		const tempRT3 = composer._renderTargetCache.allocate(0);
 		const gBuffer = composer.getBuffer('GBuffer');
 
-		// Step 1: snow pass
+		// Render snow pass
 
 		renderer.renderPass.setRenderTarget(tempRT1);
-		renderer.renderPass.setClearColor(1, 1, 1, 1);
+		renderer.renderPass.setClearColor(0, 0, 0, 0);
 		renderer.renderPass.clear(true, true, false);
 
 		const deltaTime = 0.0166666;
@@ -44,7 +50,31 @@ export default class SnowEffect extends Effect {
 
 		this._snowPass.render(renderer);
 
-		// Step 2: blend pass
+		// Render snow cover pass
+
+		renderer.renderPass.setRenderTarget(tempRT2);
+		renderer.renderPass.setClearColor(1, 1, 1, 1);
+		renderer.renderPass.clear(true, true, false);
+
+		this._snowCoverPass.uniforms.normalTexture = gBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
+		this._snowCoverPass.uniforms.cover = this.cover;
+
+		this._snowCoverPass.render(renderer);
+
+		// (Optional) Render fxaa pass
+
+		if (this.fxaa) 		{
+			renderer.renderPass.setRenderTarget(tempRT3);
+			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.renderPass.clear(true, true, true);
+
+			this._fxaaPass.uniforms.resolution[0] = 1 / gBuffer.output().width;
+			this._fxaaPass.uniforms.resolution[1] = 1 / gBuffer.output().height;
+			this._fxaaPass.uniforms.tDiffuse = tempRT2.texture;
+			this._fxaaPass.render(renderer);
+		}
+
+		// Render snow mix pass
 
 		if (this.cover != 0) {
 			this.bufferDependencies = [
@@ -61,25 +91,31 @@ export default class SnowEffect extends Effect {
 		} else {
 			renderer.renderPass.clear(true, true, false);
 		}
-		this._mixSnowPass.uniforms.texture1 = inputRenderTarget.texture;
-		this._mixSnowPass.uniforms.texture2 = tempRT1.texture;
-		this._mixSnowPass.uniforms.texture3 = gBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
-		this._mixSnowPass.uniforms.cover = this.cover;
+		this._snowMixPass.uniforms.texture1 = inputRenderTarget.texture;
+		this._snowMixPass.uniforms.texture2 = this.fxaa ? tempRT3.texture : tempRT2.texture;
+		this._snowMixPass.uniforms.texture3 = tempRT1.texture;
+		this.color.toArray(this._snowMixPass.uniforms.uColor);
+
 		if (finish) {
-			this._mixSnowPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._mixSnowPass.renderStates.camera.rect.fromArray(composer._tempViewport);
+			this._snowMixPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
+			this._snowMixPass.renderStates.camera.rect.fromArray(composer._tempViewport);
 		}
-		this._mixSnowPass.render(renderer);
+		this._snowMixPass.render(renderer);
 		if (finish) {
-			this._mixSnowPass.material.transparent = false;
-			this._mixSnowPass.renderStates.camera.rect.set(0, 0, 1, 1);
+			this._snowMixPass.material.transparent = false;
+			this._snowMixPass.renderStates.camera.rect.set(0, 0, 1, 1);
 		}
+
 		composer._renderTargetCache.release(tempRT1, 0);
+		composer._renderTargetCache.release(tempRT2, 0);
+		composer._renderTargetCache.release(tempRT3, 0);
 	}
 
 	dispose() {
 		this._snowPass.dispose();
-		this._mixSnowPass.dispose();
+		this._snowCoverPass.dispose();
+		this._fxaaPass.dispose();
+		this._snowMixPass.dispose();
 	}
 
 }
@@ -135,19 +171,40 @@ const snowShader = {
 			c += snow(uv,6.);
 			c += snow(uv,5.);
 			finalColor = (vec3(c));
-			gl_FragColor = vec4(finalColor * strength , 1.);
+			gl_FragColor = vec4(finalColor * strength, 1.);
 		}
 	`
 };
 
-const mixSnowShader = {
+const snowCoverShader = {
+	name: 'ec_snow_cover',
+	defines: {},
+	uniforms: {
+		normalTexture: null,
+		cover: 1.0
+	},
+	vertexShader: defaultVertexShader,
+	fragmentShader: `
+		uniform sampler2D normalTexture;
+		uniform float cover;
+		varying vec2 v_Uv;
+		void main() {
+			vec4 texel = texture2D(normalTexture, v_Uv);
+			float coverDensity = step(0.1, texel.y * 2.0 - 1.0) * (texel.y * 2.0 - 1.0);
+			gl_FragColor = vec4(vec3(coverDensity * cover), 1.0);
+		}
+	`
+};
+
+const snowMixShader = {
 	name: 'ec_snow_mix',
 	defines: {},
 	uniforms: {
 		texture1: null,
 		texture2: null,
 		texture3: null,
-		cover: 1.0
+		cover: 1.0,
+		uColor: [1, 1, 1]
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
@@ -155,14 +212,15 @@ const mixSnowShader = {
 		uniform sampler2D texture2;
 		uniform sampler2D texture3;
 		uniform float cover;
+		uniform vec3 uColor;
 		varying vec2 v_Uv;
 		void main() {
 			vec4 texel1 = texture2D(texture1, v_Uv);
 			vec4 texel2 = texture2D(texture2, v_Uv);
 			vec4 texel3 = texture2D(texture3, v_Uv);
-			vec4 color = vec4(1.0);
-			float coverDensity = step(0.1, texel3.y * 2.0 - 1.0) * (texel3.y * 2.0 - 1.0);
-			gl_FragColor = vec4(texel1.rgb + texel2.rgb+color.rgb * coverDensity * cover,texel1.a);
+			vec3 color = mix(texel1.rgb, uColor, texel2.r);
+			color += texel3.rgb;
+			gl_FragColor = vec4(color, texel1.a);
 		}
 	`
 };

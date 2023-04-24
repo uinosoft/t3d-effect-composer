@@ -138,6 +138,7 @@
     const gui = new GUI();
     const sketchFolder = gui.addFolder("Sketch");
     sketchFolder.add(sketchEffect, 'active');
+    sketchFolder.add(sketchEffect, 'fxaa');
     sketchFolder.add(sketchEffect, 'threshold', 0, 1, 0.01);
     sketchFolder.add(sketchEffect, 'contrast', 0, 1, 0.01);
     sketchFolder.addColor(sketchEffect, "color");

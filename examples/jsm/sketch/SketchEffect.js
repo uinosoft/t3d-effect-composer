@@ -1,5 +1,5 @@
 import { ShaderPostPass, Color3, Matrix4, ATTACHMENT } from 't3d';
-import { Effect } from 't3d-effect-composer';
+import { Effect, defaultVertexShader, fxaaShader } from 't3d-effect-composer';
 import { SketchShader } from './SketchShader.js';
 
 const _matProjViewInverse = new Matrix4();
@@ -16,17 +16,21 @@ export class SketchEffect extends Effect {
 		this.threshold = 0.55;
 		this.contrast = 0.5;
 		this.color = new Color3(0, 0, 0);
+		this.fxaa = true;
 
 		this._sketchPass = new ShaderPostPass(SketchShader);
-
+		this._fxaaPass = new ShaderPostPass(fxaaShader);
 		this._mixPass = new ShaderPostPass(mixShader);
 	}
 
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
 		const tempRT1 = composer._renderTargetCache.allocate(0);
+		const tempRT2 = composer._renderTargetCache.allocate(0);
 
 		const gBuffer = composer.getBuffer('GBuffer');
 		const gBufferRenderStates = gBuffer.getCurrentRenderStates();
+
+		// Render sketch pass
 
 		_matProjViewInverse.copy(gBufferRenderStates.camera.projectionViewMatrix).inverse();
 
@@ -38,19 +42,31 @@ export class SketchEffect extends Effect {
 
 		this._sketchPass.uniforms.uThreshold = this.threshold;
 		this._sketchPass.uniforms.uContrast = this.contrast;
-		this.color.toArray(this._sketchPass.uniforms.uColor);
 
 		renderer.renderPass.setRenderTarget(tempRT1);
-
 		renderer.renderPass.setClearColor(0, 0, 0, 0);
-
 		renderer.renderPass.clear(true, true, true);
 
 		this._sketchPass.render(renderer);
 
+		// (Optional) Render fxaa pass
+
+		if (this.fxaa) {
+			renderer.renderPass.setRenderTarget(tempRT2);
+			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.renderPass.clear(true, true, true);
+
+			this._fxaaPass.uniforms.resolution[0] = 1 / gBuffer.output().width;
+			this._fxaaPass.uniforms.resolution[1] = 1 / gBuffer.output().height;
+			this._fxaaPass.uniforms.tDiffuse = tempRT1.texture;
+			this._fxaaPass.render(renderer);
+		}
+
+		// Render mix pass
+
 		renderer.renderPass.setRenderTarget(outputRenderTarget);
 
-		renderer.renderPass.setClearColor(1, 1, 1, 0);
+		renderer.renderPass.setClearColor(0, 0, 0, 0);
 
 		if (finish) {
 			renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
@@ -59,8 +75,8 @@ export class SketchEffect extends Effect {
 		}
 
 		this._mixPass.uniforms['diffuse'] = inputRenderTarget.texture;
-
-		this._mixPass.uniforms['sketch'] = tempRT1.texture;
+		this._mixPass.uniforms['sketch'] = this.fxaa ? tempRT2.texture : tempRT1.texture;
+		this.color.toArray(this._mixPass.uniforms['color']);
 
 		if (finish) {
 			this._mixPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
@@ -75,45 +91,37 @@ export class SketchEffect extends Effect {
 		}
 
 		composer._renderTargetCache.release(tempRT1, 0);
+		composer._renderTargetCache.release(tempRT2, 0);
+	}
+
+	dispose() {
+		this._sketchPass.dispose();
+		this._fxaaPass.dispose();
+		this._mixPass.dispose();
 	}
 
 }
 
 const mixShader = {
-	name: 'ec_sketchMix',
+	name: 'ec_sketch_mix',
 	defines: {},
 	uniforms: {
 		sketch: null,
-		diffuse: null
+		diffuse: null,
+		color: [0, 0, 0],
 	},
-	vertexShader: `
-		attribute vec3 a_Position;
-		attribute vec2 a_Uv;
-
-		uniform mat4 u_ProjectionView;
-		uniform mat4 u_Model;
-
-		varying vec2 v_Uv;
-
-		void main() {
-			v_Uv = a_Uv;
-
-			gl_Position = u_ProjectionView * u_Model * vec4( a_Position, 1.0 );
-		}
-	`,
+	vertexShader: defaultVertexShader,
 	fragmentShader: `
 		uniform sampler2D sketch;
-
 		uniform sampler2D diffuse;
+		uniform vec3 color;
 
 		varying vec2 v_Uv;
 
 		void main() {
-		    vec4 diffuseTexel = texture2D( diffuse, v_Uv );
-
-		    vec4 sketchTexel = texture2D( sketch, v_Uv );
-
-            gl_FragColor = mix(diffuseTexel, sketchTexel, sketchTexel.a);
+		    vec4 diffuseTexel = texture2D(diffuse, v_Uv);
+		    vec4 sketchTexel = texture2D(sketch, v_Uv);
+            gl_FragColor = mix(diffuseTexel, vec4(color, sketchTexel.r), sketchTexel.r);
 		}
 	`
 };

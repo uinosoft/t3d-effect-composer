@@ -410,558 +410,7 @@
 				}
 		`
 	};
-	function isDepthStencilAttachment(attachment) {
-		return attachment.format === t3d.PIXEL_FORMAT.DEPTH_STENCIL || attachment.format === t3d.PIXEL_FORMAT.DEPTH24_STENCIL8;
-	}
-	const RenderListMask = {
-		OPAQUE: 1,
-		// 0001
-		TRANSPARENT: 2,
-		// 0010
-		ALL: 15 // 1111
-	};
-
-	class BloomEffect extends Effect {
-		constructor() {
-			super();
-			this.threshold = 0.7;
-			this.smoothWidth = 0.01;
-			this.blurSize = 2;
-			this.strength = 1;
-			this._highlightPass = new t3d.ShaderPostPass(highlightShader);
-			this._blurPass = new t3d.ShaderPostPass(blurShader);
-			this._blendPass = new t3d.ShaderPostPass(additiveShader);
-			this._blendPass.material.premultipliedAlpha = true;
-		}
-		resize(width, height) {
-			this._blurPass.uniforms.textureSize[0] = width;
-			this._blurPass.uniforms.textureSize[1] = height;
-		}
-		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-			const tempRT1 = composer._renderTargetCache.allocate(0);
-			const tempRT2 = composer._renderTargetCache.allocate(1);
-			const tempRT3 = composer._renderTargetCache.allocate(1);
-			renderer.renderPass.setRenderTarget(tempRT1);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
-			this._highlightPass.uniforms.tDiffuse = inputRenderTarget.texture;
-			this._highlightPass.uniforms.threshold = this.threshold;
-			this._highlightPass.uniforms.smoothWidth = this.smoothWidth;
-			this._highlightPass.render(renderer);
-			renderer.renderPass.setRenderTarget(tempRT2);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
-			this._blurPass.uniforms.tDiffuse = tempRT1.texture;
-			this._blurPass.uniforms.direction = 0;
-			this._blurPass.uniforms.blurSize = this.blurSize;
-			this._blurPass.render(renderer);
-			renderer.renderPass.setRenderTarget(tempRT3);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
-			this._blurPass.uniforms.tDiffuse = tempRT2.texture;
-			this._blurPass.uniforms.direction = 1;
-			this._blurPass.uniforms.blurSize = this.blurSize;
-			this._blurPass.render(renderer);
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-			} else {
-				renderer.renderPass.clear(true, true, false);
-			}
-			this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
-			this._blendPass.uniforms.texture2 = tempRT3.texture;
-			this._blendPass.uniforms.colorWeight1 = 1;
-			this._blendPass.uniforms.alphaWeight1 = 1;
-			this._blendPass.uniforms.colorWeight2 = this.strength;
-			this._blendPass.uniforms.alphaWeight2 = this.strength;
-			if (finish) {
-				this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-				this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-			}
-			this._blendPass.render(renderer);
-			if (finish) {
-				this._blendPass.material.transparent = false;
-				this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-			}
-			composer._renderTargetCache.release(tempRT1, 0);
-			composer._renderTargetCache.release(tempRT2, 1);
-			composer._renderTargetCache.release(tempRT3, 1);
-		}
-		dispose() {
-			this._highlightPass.dispose();
-			this._blurPass.dispose();
-			this._blendPass.dispose();
-		}
-	}
-
-	class ChromaticAberrationEffect extends Effect {
-		constructor() {
-			super();
-			this.chromaFactor = 0.025;
-			this._mainPass = new t3d.ShaderPostPass(shader$4);
-			this._mainPass.material.premultipliedAlpha = true;
-		}
-		resize(width, height) {
-			this._mainPass.uniforms.resolution[0] = 1 / width;
-			this._mainPass.uniforms.resolution[1] = 1 / height;
-		}
-		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-			} else {
-				renderer.renderPass.clear(true, true, false);
-			}
-			const mainPass = this._mainPass;
-			mainPass.uniforms.tDiffuse = inputRenderTarget.texture;
-			mainPass.uniforms.uChromaFactor = this.chromaFactor;
-			if (finish) {
-				mainPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-				mainPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-			}
-			mainPass.render(renderer);
-			if (finish) {
-				mainPass.material.transparent = false;
-				mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
-			}
-		}
-		dispose() {
-			this._mainPass.dispose();
-		}
-	}
-	const shader$4 = {
-		name: 'ec_chromatic_aberration',
-		defines: {},
-		uniforms: {
-			tDiffuse: null,
-			uChromaFactor: 0.025,
-			uResolutionRatio: [1, 1],
-			resolution: [1 / 1024, 1 / 512]
-		},
-		vertexShader: defaultVertexShader,
-		fragmentShader: `
-				uniform float uChromaFactor;
-				uniform vec2 uResolutionRatio;
-				uniform vec2 resolution;
-
-				uniform sampler2D tDiffuse;
-				varying vec2 v_Uv;
-
-				void main() {
-						vec2 uv = v_Uv;
-						vec2 dist = uv - 0.5;
-						vec2 offset = uChromaFactor * dist * length(dist);
-						vec4 col = texture2D(tDiffuse, min(uv, 1.0 - resolution) * uResolutionRatio);
-						col.r = texture2D(tDiffuse, min(uv - offset, 1.0 - resolution) * uResolutionRatio).r;
-						col.b = texture2D(tDiffuse, min(uv + offset, 1.0 - resolution) * uResolutionRatio).b;
-						gl_FragColor = col;
-				}
-		`
-	};
-
-	class ColorCorrectionEffect extends Effect {
-		constructor() {
-			super();
-			this.brightness = 0;
-			this.contrast = 1.02;
-			this.exposure = 0;
-			this.gamma = 1;
-			this.saturation = 1.02;
-			this._mainPass = new t3d.ShaderPostPass(shader$3);
-			this._mainPass.material.premultipliedAlpha = true;
-			this._mainPass.uniforms.contrast = 1.02;
-			this._mainPass.uniforms.saturation = 1.02;
-		}
-		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-			} else {
-				renderer.renderPass.clear(true, true, false);
-			}
-			const mainPass = this._mainPass;
-			mainPass.uniforms.tDiffuse = inputRenderTarget.texture;
-			mainPass.uniforms.brightness = this.brightness;
-			mainPass.uniforms.contrast = this.contrast;
-			mainPass.uniforms.exposure = this.exposure;
-			mainPass.uniforms.gamma = this.gamma;
-			mainPass.uniforms.saturation = this.saturation;
-			if (finish) {
-				mainPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-				mainPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-			}
-			mainPass.render(renderer);
-			if (finish) {
-				mainPass.material.transparent = false;
-				mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
-			}
-		}
-		dispose() {
-			this._mainPass.dispose();
-		}
-	}
-	const shader$3 = {
-		name: 'ec_color_correction',
-		defines: {},
-		uniforms: {
-			tDiffuse: null,
-			brightness: 0.0,
-			contrast: 1.0,
-			exposure: 0.0,
-			gamma: 1.0,
-			saturation: 1.0
-		},
-		vertexShader: defaultVertexShader,
-		fragmentShader: `
-				uniform float brightness;
-				uniform float contrast;
-				uniform float exposure;
-				uniform float gamma;
-				uniform float saturation;
-
-				uniform sampler2D tDiffuse;
-				varying vec2 v_Uv;
-
-				// Values from "Graphics Shaders: Theory and Practice" by Bailey and Cunningham
-				const vec3 w = vec3(0.2125, 0.7154, 0.0721);
-
-				void main() {
-						vec4 tex = texture2D(tDiffuse, v_Uv);
-						// brightness
-						vec3 color = clamp(tex.rgb + vec3(brightness), 0.0, 1.0);
-						// contrast
-						color = clamp((color - vec3(0.5)) * contrast + vec3(0.5), 0.0, 1.0);
-						// exposure
-						color = clamp(color * pow(2.0, exposure), 0.0, 1.0);
-						// gamma
-						color = clamp(pow(color, vec3(gamma)), 0.0, 1.0);
-						float luminance = dot(color, w);
-						color = mix(vec3(luminance), color, saturation);
-						gl_FragColor = vec4(color, tex.a);
-				}
-		`
-	};
-
-	class DOFEffect extends Effect {
-		constructor() {
-			super();
-			this.bufferDependencies = [{
-				key: 'GBuffer'
-			}];
-			this.focalDepth = 1;
-			this.focalLength = 24;
-			this.fstop = 0.9;
-			this.maxblur = 1.0;
-			this.threshold = 0.9;
-			this.gain = 1.0;
-			this.bias = 0.5;
-			this.dithering = 0.0001;
-			this._mainPass = new t3d.ShaderPostPass(bokehShader);
-			this._mainPass.material.premultipliedAlpha = true;
-		}
-		resize(width, height) {
-			this._mainPass.uniforms.resolution[0] = 1 / width;
-			this._mainPass.uniforms.resolution[1] = 1 / height;
-		}
-		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-			} else {
-				renderer.renderPass.clear(true, true, false);
-			}
-			const gBuffer = composer.getBuffer('GBuffer');
-			const gBufferRenderStates = gBuffer.getCurrentRenderStates();
-			this._mainPass.uniforms.tColor = inputRenderTarget.texture;
-			this._mainPass.uniforms.tDepth = gBuffer.output()._attachments[t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
-			let cameraNear = 0,
-				cameraFar = 0;
-			const projectionMatrix = gBufferRenderStates.camera.projectionMatrix;
-			if (_isPerspectiveMatrix(projectionMatrix)) {
-				cameraNear = projectionMatrix.elements[14] / (projectionMatrix.elements[10] - 1);
-				cameraFar = projectionMatrix.elements[14] / (projectionMatrix.elements[10] + 1);
-			} else {
-				cameraNear = (projectionMatrix.elements[14] + 1) / projectionMatrix.elements[10];
-				cameraFar = (projectionMatrix.elements[14] - 1) / projectionMatrix.elements[10];
-			}
-			this._mainPass.uniforms.znear = cameraNear;
-			this._mainPass.uniforms.zfar = cameraFar;
-			this._mainPass.uniforms.focalDepth = this.focalDepth;
-			this._mainPass.uniforms.focalLength = this.focalLength;
-			this._mainPass.uniforms.fstop = this.fstop;
-			this._mainPass.uniforms.maxblur = this.maxblur;
-			this._mainPass.uniforms.threshold = this.threshold;
-			this._mainPass.uniforms.gain = this.gain;
-			this._mainPass.uniforms.bias = this.bias;
-			this._mainPass.uniforms.dithering = this.dithering;
-			if (finish) {
-				this._mainPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-				this._mainPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-			}
-			this._mainPass.render(renderer);
-			if (finish) {
-				this._mainPass.material.transparent = false;
-				this._mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
-			}
-		}
-		dispose() {
-			this._mainPass.dispose();
-		}
-	}
-	function _isPerspectiveMatrix(m) {
-		return m.elements[11] === -1.0;
-	}
-	const bokehShader = {
-		name: 'ec_bokeh',
-		defines: {
-			RINGS: 3,
-			SAMPLES: 4
-		},
-		uniforms: {
-			tColor: null,
-			tDepth: null,
-			resolution: [1 / 1024, 1 / 512],
-			znear: 0.1,
-			zfar: 100,
-			focalDepth: 1.0,
-			focalLength: 24,
-			fstop: 0.9,
-			maxblur: 1.0,
-			threshold: 0.5,
-			gain: 2.0,
-			bias: 0.5,
-			dithering: 0.0001
-		},
-		vertexShader: defaultVertexShader,
-		fragmentShader: `
-				varying vec2 v_Uv;
-
-				uniform sampler2D tColor;
-				uniform sampler2D tDepth;
-				
-				uniform vec2 resolution;	
-				
-				uniform float znear;
-				uniform float zfar;
-
-				uniform float focalDepth;
-				uniform float focalLength;
-				uniform float fstop;
-
-				uniform float maxblur; // clamp value of max blur (0.0 = no blur, 1.0 default)
-				uniform float threshold; // highlight threshold
-				uniform float gain; // highlight gain
-				uniform float bias; // bokeh edge bias
-				uniform float dithering;
-
-				const int samples = SAMPLES;
-				const int rings = RINGS;
-				const int maxringsamples = rings * samples;
-
-				float CoC = 0.03; // circle of confusion size in mm (35mm film = 0.03mm)
-
-				vec4 color(vec2 coords, float blur) {
-						vec4 col = texture2D(tColor, coords);
-						vec3 lumcoeff = vec3(0.299, 0.587, 0.114);
-						float lum = dot(col.rgb, lumcoeff);
-						float thresh = max((lum - threshold) * gain, 0.0);
-						return vec4(col.rgb + mix(vec3(0.0), col.rgb, thresh * blur), col.a);
-				}
-
-				float linearize(float depth) {
-						return -zfar * znear / (depth * (zfar - znear) - zfar);
-				}
-
-				float gather(float i, float j, int ringsamples, inout vec3 colorSum, float w, float h, float blur) {
-						float rings2 = float(rings);
-						float step = PI * 2.0 / float(ringsamples);
-						float pw = cos(j * step) * i;
-						float ph = sin(j * step) * i;
-			vec4 sampleColor = color(v_Uv + vec2(pw * w, ph * h), blur);
-			float weight = mix(1.0, i / rings2, bias) * sampleColor.a;
-						colorSum += sampleColor.rgb	* weight;
-						return weight;
-				}
-
-				void main() {
-						float depth = linearize(texture2D(tDepth,	v_Uv).x);
-						float fDepth = focalDepth;
-
-						// dof blur factor calculation
-
-						float f = focalLength; // focal length in mm
-						float d = fDepth * 1000.; // focal plane in mm
-						float o = depth * 1000.; // depth in mm
-
-						float a = (o * f) / (o - f);
-						float b = (d * f) / (d - f);
-						float c = (d - f) / (d * fstop * CoC);
-
-						float blur = abs(a - b) * c;
-						blur = clamp(blur, 0.0, 1.0);
-
-						// calculation of pattern for dithering
-
-						vec2 noise = vec2(rand( v_Uv), rand( v_Uv + vec2(0.4, 0.6))) * dithering * blur;
-
-						// getting blur x and y step factor
-
-						float w = resolution.x * blur * maxblur + noise.x;
-						float h = resolution.y * blur * maxblur + noise.y;
-
-						// calculation of final color
-
-						vec3 col = vec3(0.0);
-			vec4 centerColor = texture2D(tColor,	v_Uv);
-
-						if (blur < 0.05) {
-								col = centerColor.rgb;
-						} else {
-								col = centerColor.rgb;
-
-								float s = 1.0;
-								int ringsamples;
-
-								for(int i = 1; i <= rings; i++) {
-										ringsamples = i * samples;
-
-										for (int j = 0; j < maxringsamples; j++) {
-												if (j >= ringsamples) break;
-												s += gather(float(i), float(j), ringsamples, col, w, h, blur);
-										}
-								}
-
-								col /= s; // divide by sample count
-						}
-
-						gl_FragColor = vec4(col, centerColor.a);
-				}
-		`
-	};
-
-	class FilmEffect extends Effect {
-		constructor() {
-			super();
-			this.noiseIntensity = 0.35;
-			this.scanlinesIntensity = 0.5;
-			this.scanlinesCount = 2048;
-			this.grayscale = true;
-			this._time = 0;
-			this._mainPass = new t3d.ShaderPostPass(shader$2);
-			this._mainPass.material.premultipliedAlpha = true;
-		}
-		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-			} else {
-				renderer.renderPass.clear(true, true, false);
-			}
-			const mainPass = this._mainPass;
-			mainPass.uniforms.tDiffuse = inputRenderTarget.texture;
-			mainPass.uniforms.nIntensity = this.noiseIntensity;
-			mainPass.uniforms.sIntensity = this.scanlinesIntensity;
-			mainPass.uniforms.sCount = this.scanlinesCount;
-			mainPass.uniforms.grayscale = this.grayscale;
-			this._time += 0.01667;
-			mainPass.uniforms.time = this._time;
-			if (finish) {
-				mainPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-				mainPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-			}
-			mainPass.render(renderer);
-			if (finish) {
-				mainPass.material.transparent = false;
-				mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
-			}
-		}
-		dispose() {
-			this._mainPass.dispose();
-		}
-	}
-	const shader$2 = {
-		name: 'ec_film',
-		defines: {},
-		uniforms: {
-			tDiffuse: null,
-			time: 0,
-			nIntensity: 0.5,
-			sIntensity: 0.05,
-			sCount: 4096,
-			grayscale: true
-		},
-		vertexShader: defaultVertexShader,
-		fragmentShader: `
-				uniform float time;
-				uniform float nIntensity;
-				uniform float sIntensity;
-				uniform float sCount;
-				uniform bool grayscale;
-
-				uniform sampler2D tDiffuse;
-				varying vec2 v_Uv;
-
-				void main() {
-						// sample the source
-						vec4 cTextureScreen = texture2D(tDiffuse, v_Uv);
-						// make some noise
-						float dx = rand(v_Uv + time);
-						// add noise
-						vec3 cResult = cTextureScreen.rgb + cTextureScreen.rgb * clamp(0.1 + dx, 0.0, 1.0);
-						// get us a sine and cosine
-						vec2 sc = vec2(sin(v_Uv.y * sCount), cos(v_Uv.y * sCount));
-						// add scanlines
-						cResult += cTextureScreen.rgb * vec3(sc.x, sc.y, sc.x) * sIntensity;
-						// interpolate between source and result by intensity
-						cResult = cTextureScreen.rgb + clamp(nIntensity, 0.0, 1.0) * (cResult - cTextureScreen.rgb);
-						// convert to grayscale if desired
-						if(grayscale) {
-								cResult = vec3(cResult.r * 0.3 + cResult.g * 0.59 + cResult.b * 0.11);
-						}
-						gl_FragColor = vec4(cResult, cTextureScreen.a);
-				}
-		`
-	};
-
-	class FXAAEffect extends Effect {
-		constructor() {
-			super();
-			this._mainPass = new t3d.ShaderPostPass(shader$1);
-			this._mainPass.material.premultipliedAlpha = true;
-		}
-		resize(width, height) {
-			this._mainPass.uniforms.resolution[0] = 1 / width;
-			this._mainPass.uniforms.resolution[1] = 1 / height;
-		}
-		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-			} else {
-				renderer.renderPass.clear(true, true, false);
-			}
-			this._mainPass.uniforms.tDiffuse = inputRenderTarget.texture;
-			if (finish) {
-				this._mainPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-				this._mainPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-			}
-			this._mainPass.render(renderer);
-			if (finish) {
-				this._mainPass.material.transparent = false;
-				this._mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
-			}
-		}
-		dispose() {
-			this._mainPass.dispose();
-		}
-	}
-	const shader$1 = {
+	const fxaaShader = {
 		name: 'ec_fxaa',
 		defines: {},
 		uniforms: {
@@ -2048,6 +1497,557 @@
 				}
 		`
 	};
+	function isDepthStencilAttachment(attachment) {
+		return attachment.format === t3d.PIXEL_FORMAT.DEPTH_STENCIL || attachment.format === t3d.PIXEL_FORMAT.DEPTH24_STENCIL8;
+	}
+	const RenderListMask = {
+		OPAQUE: 1,
+		// 0001
+		TRANSPARENT: 2,
+		// 0010
+		ALL: 15 // 1111
+	};
+
+	class BloomEffect extends Effect {
+		constructor() {
+			super();
+			this.threshold = 0.7;
+			this.smoothWidth = 0.01;
+			this.blurSize = 2;
+			this.strength = 1;
+			this._highlightPass = new t3d.ShaderPostPass(highlightShader);
+			this._blurPass = new t3d.ShaderPostPass(blurShader);
+			this._blendPass = new t3d.ShaderPostPass(additiveShader);
+			this._blendPass.material.premultipliedAlpha = true;
+		}
+		resize(width, height) {
+			this._blurPass.uniforms.textureSize[0] = width;
+			this._blurPass.uniforms.textureSize[1] = height;
+		}
+		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
+			const tempRT1 = composer._renderTargetCache.allocate(0);
+			const tempRT2 = composer._renderTargetCache.allocate(1);
+			const tempRT3 = composer._renderTargetCache.allocate(1);
+			renderer.renderPass.setRenderTarget(tempRT1);
+			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.renderPass.clear(true, true, false);
+			this._highlightPass.uniforms.tDiffuse = inputRenderTarget.texture;
+			this._highlightPass.uniforms.threshold = this.threshold;
+			this._highlightPass.uniforms.smoothWidth = this.smoothWidth;
+			this._highlightPass.render(renderer);
+			renderer.renderPass.setRenderTarget(tempRT2);
+			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.renderPass.clear(true, true, false);
+			this._blurPass.uniforms.tDiffuse = tempRT1.texture;
+			this._blurPass.uniforms.direction = 0;
+			this._blurPass.uniforms.blurSize = this.blurSize;
+			this._blurPass.render(renderer);
+			renderer.renderPass.setRenderTarget(tempRT3);
+			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.renderPass.clear(true, true, false);
+			this._blurPass.uniforms.tDiffuse = tempRT2.texture;
+			this._blurPass.uniforms.direction = 1;
+			this._blurPass.uniforms.blurSize = this.blurSize;
+			this._blurPass.render(renderer);
+			renderer.renderPass.setRenderTarget(outputRenderTarget);
+			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			if (finish) {
+				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+			} else {
+				renderer.renderPass.clear(true, true, false);
+			}
+			this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
+			this._blendPass.uniforms.texture2 = tempRT3.texture;
+			this._blendPass.uniforms.colorWeight1 = 1;
+			this._blendPass.uniforms.alphaWeight1 = 1;
+			this._blendPass.uniforms.colorWeight2 = this.strength;
+			this._blendPass.uniforms.alphaWeight2 = this.strength;
+			if (finish) {
+				this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
+				this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
+			}
+			this._blendPass.render(renderer);
+			if (finish) {
+				this._blendPass.material.transparent = false;
+				this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
+			}
+			composer._renderTargetCache.release(tempRT1, 0);
+			composer._renderTargetCache.release(tempRT2, 1);
+			composer._renderTargetCache.release(tempRT3, 1);
+		}
+		dispose() {
+			this._highlightPass.dispose();
+			this._blurPass.dispose();
+			this._blendPass.dispose();
+		}
+	}
+
+	class ChromaticAberrationEffect extends Effect {
+		constructor() {
+			super();
+			this.chromaFactor = 0.025;
+			this._mainPass = new t3d.ShaderPostPass(shader$3);
+			this._mainPass.material.premultipliedAlpha = true;
+		}
+		resize(width, height) {
+			this._mainPass.uniforms.resolution[0] = 1 / width;
+			this._mainPass.uniforms.resolution[1] = 1 / height;
+		}
+		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
+			renderer.renderPass.setRenderTarget(outputRenderTarget);
+			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			if (finish) {
+				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+			} else {
+				renderer.renderPass.clear(true, true, false);
+			}
+			const mainPass = this._mainPass;
+			mainPass.uniforms.tDiffuse = inputRenderTarget.texture;
+			mainPass.uniforms.uChromaFactor = this.chromaFactor;
+			if (finish) {
+				mainPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
+				mainPass.renderStates.camera.rect.fromArray(composer._tempViewport);
+			}
+			mainPass.render(renderer);
+			if (finish) {
+				mainPass.material.transparent = false;
+				mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
+			}
+		}
+		dispose() {
+			this._mainPass.dispose();
+		}
+	}
+	const shader$3 = {
+		name: 'ec_chromatic_aberration',
+		defines: {},
+		uniforms: {
+			tDiffuse: null,
+			uChromaFactor: 0.025,
+			uResolutionRatio: [1, 1],
+			resolution: [1 / 1024, 1 / 512]
+		},
+		vertexShader: defaultVertexShader,
+		fragmentShader: `
+				uniform float uChromaFactor;
+				uniform vec2 uResolutionRatio;
+				uniform vec2 resolution;
+
+				uniform sampler2D tDiffuse;
+				varying vec2 v_Uv;
+
+				void main() {
+						vec2 uv = v_Uv;
+						vec2 dist = uv - 0.5;
+						vec2 offset = uChromaFactor * dist * length(dist);
+						vec4 col = texture2D(tDiffuse, min(uv, 1.0 - resolution) * uResolutionRatio);
+						col.r = texture2D(tDiffuse, min(uv - offset, 1.0 - resolution) * uResolutionRatio).r;
+						col.b = texture2D(tDiffuse, min(uv + offset, 1.0 - resolution) * uResolutionRatio).b;
+						gl_FragColor = col;
+				}
+		`
+	};
+
+	class ColorCorrectionEffect extends Effect {
+		constructor() {
+			super();
+			this.brightness = 0;
+			this.contrast = 1.02;
+			this.exposure = 0;
+			this.gamma = 1;
+			this.saturation = 1.02;
+			this._mainPass = new t3d.ShaderPostPass(shader$2);
+			this._mainPass.material.premultipliedAlpha = true;
+			this._mainPass.uniforms.contrast = 1.02;
+			this._mainPass.uniforms.saturation = 1.02;
+		}
+		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
+			renderer.renderPass.setRenderTarget(outputRenderTarget);
+			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			if (finish) {
+				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+			} else {
+				renderer.renderPass.clear(true, true, false);
+			}
+			const mainPass = this._mainPass;
+			mainPass.uniforms.tDiffuse = inputRenderTarget.texture;
+			mainPass.uniforms.brightness = this.brightness;
+			mainPass.uniforms.contrast = this.contrast;
+			mainPass.uniforms.exposure = this.exposure;
+			mainPass.uniforms.gamma = this.gamma;
+			mainPass.uniforms.saturation = this.saturation;
+			if (finish) {
+				mainPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
+				mainPass.renderStates.camera.rect.fromArray(composer._tempViewport);
+			}
+			mainPass.render(renderer);
+			if (finish) {
+				mainPass.material.transparent = false;
+				mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
+			}
+		}
+		dispose() {
+			this._mainPass.dispose();
+		}
+	}
+	const shader$2 = {
+		name: 'ec_color_correction',
+		defines: {},
+		uniforms: {
+			tDiffuse: null,
+			brightness: 0.0,
+			contrast: 1.0,
+			exposure: 0.0,
+			gamma: 1.0,
+			saturation: 1.0
+		},
+		vertexShader: defaultVertexShader,
+		fragmentShader: `
+				uniform float brightness;
+				uniform float contrast;
+				uniform float exposure;
+				uniform float gamma;
+				uniform float saturation;
+
+				uniform sampler2D tDiffuse;
+				varying vec2 v_Uv;
+
+				// Values from "Graphics Shaders: Theory and Practice" by Bailey and Cunningham
+				const vec3 w = vec3(0.2125, 0.7154, 0.0721);
+
+				void main() {
+						vec4 tex = texture2D(tDiffuse, v_Uv);
+						// brightness
+						vec3 color = clamp(tex.rgb + vec3(brightness), 0.0, 1.0);
+						// contrast
+						color = clamp((color - vec3(0.5)) * contrast + vec3(0.5), 0.0, 1.0);
+						// exposure
+						color = clamp(color * pow(2.0, exposure), 0.0, 1.0);
+						// gamma
+						color = clamp(pow(color, vec3(gamma)), 0.0, 1.0);
+						float luminance = dot(color, w);
+						color = mix(vec3(luminance), color, saturation);
+						gl_FragColor = vec4(color, tex.a);
+				}
+		`
+	};
+
+	class DOFEffect extends Effect {
+		constructor() {
+			super();
+			this.bufferDependencies = [{
+				key: 'GBuffer'
+			}];
+			this.focalDepth = 1;
+			this.focalLength = 24;
+			this.fstop = 0.9;
+			this.maxblur = 1.0;
+			this.threshold = 0.9;
+			this.gain = 1.0;
+			this.bias = 0.5;
+			this.dithering = 0.0001;
+			this._mainPass = new t3d.ShaderPostPass(bokehShader);
+			this._mainPass.material.premultipliedAlpha = true;
+		}
+		resize(width, height) {
+			this._mainPass.uniforms.resolution[0] = 1 / width;
+			this._mainPass.uniforms.resolution[1] = 1 / height;
+		}
+		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
+			renderer.renderPass.setRenderTarget(outputRenderTarget);
+			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			if (finish) {
+				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+			} else {
+				renderer.renderPass.clear(true, true, false);
+			}
+			const gBuffer = composer.getBuffer('GBuffer');
+			const gBufferRenderStates = gBuffer.getCurrentRenderStates();
+			this._mainPass.uniforms.tColor = inputRenderTarget.texture;
+			this._mainPass.uniforms.tDepth = gBuffer.output()._attachments[t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
+			let cameraNear = 0,
+				cameraFar = 0;
+			const projectionMatrix = gBufferRenderStates.camera.projectionMatrix;
+			if (_isPerspectiveMatrix(projectionMatrix)) {
+				cameraNear = projectionMatrix.elements[14] / (projectionMatrix.elements[10] - 1);
+				cameraFar = projectionMatrix.elements[14] / (projectionMatrix.elements[10] + 1);
+			} else {
+				cameraNear = (projectionMatrix.elements[14] + 1) / projectionMatrix.elements[10];
+				cameraFar = (projectionMatrix.elements[14] - 1) / projectionMatrix.elements[10];
+			}
+			this._mainPass.uniforms.znear = cameraNear;
+			this._mainPass.uniforms.zfar = cameraFar;
+			this._mainPass.uniforms.focalDepth = this.focalDepth;
+			this._mainPass.uniforms.focalLength = this.focalLength;
+			this._mainPass.uniforms.fstop = this.fstop;
+			this._mainPass.uniforms.maxblur = this.maxblur;
+			this._mainPass.uniforms.threshold = this.threshold;
+			this._mainPass.uniforms.gain = this.gain;
+			this._mainPass.uniforms.bias = this.bias;
+			this._mainPass.uniforms.dithering = this.dithering;
+			if (finish) {
+				this._mainPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
+				this._mainPass.renderStates.camera.rect.fromArray(composer._tempViewport);
+			}
+			this._mainPass.render(renderer);
+			if (finish) {
+				this._mainPass.material.transparent = false;
+				this._mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
+			}
+		}
+		dispose() {
+			this._mainPass.dispose();
+		}
+	}
+	function _isPerspectiveMatrix(m) {
+		return m.elements[11] === -1.0;
+	}
+	const bokehShader = {
+		name: 'ec_bokeh',
+		defines: {
+			RINGS: 3,
+			SAMPLES: 4
+		},
+		uniforms: {
+			tColor: null,
+			tDepth: null,
+			resolution: [1 / 1024, 1 / 512],
+			znear: 0.1,
+			zfar: 100,
+			focalDepth: 1.0,
+			focalLength: 24,
+			fstop: 0.9,
+			maxblur: 1.0,
+			threshold: 0.5,
+			gain: 2.0,
+			bias: 0.5,
+			dithering: 0.0001
+		},
+		vertexShader: defaultVertexShader,
+		fragmentShader: `
+				varying vec2 v_Uv;
+
+				uniform sampler2D tColor;
+				uniform sampler2D tDepth;
+				
+				uniform vec2 resolution;	
+				
+				uniform float znear;
+				uniform float zfar;
+
+				uniform float focalDepth;
+				uniform float focalLength;
+				uniform float fstop;
+
+				uniform float maxblur; // clamp value of max blur (0.0 = no blur, 1.0 default)
+				uniform float threshold; // highlight threshold
+				uniform float gain; // highlight gain
+				uniform float bias; // bokeh edge bias
+				uniform float dithering;
+
+				const int samples = SAMPLES;
+				const int rings = RINGS;
+				const int maxringsamples = rings * samples;
+
+				float CoC = 0.03; // circle of confusion size in mm (35mm film = 0.03mm)
+
+				vec4 color(vec2 coords, float blur) {
+						vec4 col = texture2D(tColor, coords);
+						vec3 lumcoeff = vec3(0.299, 0.587, 0.114);
+						float lum = dot(col.rgb, lumcoeff);
+						float thresh = max((lum - threshold) * gain, 0.0);
+						return vec4(col.rgb + mix(vec3(0.0), col.rgb, thresh * blur), col.a);
+				}
+
+				float linearize(float depth) {
+						return -zfar * znear / (depth * (zfar - znear) - zfar);
+				}
+
+				float gather(float i, float j, int ringsamples, inout vec3 colorSum, float w, float h, float blur) {
+						float rings2 = float(rings);
+						float step = PI * 2.0 / float(ringsamples);
+						float pw = cos(j * step) * i;
+						float ph = sin(j * step) * i;
+			vec4 sampleColor = color(v_Uv + vec2(pw * w, ph * h), blur);
+			float weight = mix(1.0, i / rings2, bias) * sampleColor.a;
+						colorSum += sampleColor.rgb	* weight;
+						return weight;
+				}
+
+				void main() {
+						float depth = linearize(texture2D(tDepth,	v_Uv).x);
+						float fDepth = focalDepth;
+
+						// dof blur factor calculation
+
+						float f = focalLength; // focal length in mm
+						float d = fDepth * 1000.; // focal plane in mm
+						float o = depth * 1000.; // depth in mm
+
+						float a = (o * f) / (o - f);
+						float b = (d * f) / (d - f);
+						float c = (d - f) / (d * fstop * CoC);
+
+						float blur = abs(a - b) * c;
+						blur = clamp(blur, 0.0, 1.0);
+
+						// calculation of pattern for dithering
+
+						vec2 noise = vec2(rand( v_Uv), rand( v_Uv + vec2(0.4, 0.6))) * dithering * blur;
+
+						// getting blur x and y step factor
+
+						float w = resolution.x * blur * maxblur + noise.x;
+						float h = resolution.y * blur * maxblur + noise.y;
+
+						// calculation of final color
+
+						vec3 col = vec3(0.0);
+			vec4 centerColor = texture2D(tColor,	v_Uv);
+
+						if (blur < 0.05) {
+								col = centerColor.rgb;
+						} else {
+								col = centerColor.rgb;
+
+								float s = 1.0;
+								int ringsamples;
+
+								for(int i = 1; i <= rings; i++) {
+										ringsamples = i * samples;
+
+										for (int j = 0; j < maxringsamples; j++) {
+												if (j >= ringsamples) break;
+												s += gather(float(i), float(j), ringsamples, col, w, h, blur);
+										}
+								}
+
+								col /= s; // divide by sample count
+						}
+
+						gl_FragColor = vec4(col, centerColor.a);
+				}
+		`
+	};
+
+	class FilmEffect extends Effect {
+		constructor() {
+			super();
+			this.noiseIntensity = 0.35;
+			this.scanlinesIntensity = 0.5;
+			this.scanlinesCount = 2048;
+			this.grayscale = true;
+			this._time = 0;
+			this._mainPass = new t3d.ShaderPostPass(shader$1);
+			this._mainPass.material.premultipliedAlpha = true;
+		}
+		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
+			renderer.renderPass.setRenderTarget(outputRenderTarget);
+			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			if (finish) {
+				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+			} else {
+				renderer.renderPass.clear(true, true, false);
+			}
+			const mainPass = this._mainPass;
+			mainPass.uniforms.tDiffuse = inputRenderTarget.texture;
+			mainPass.uniforms.nIntensity = this.noiseIntensity;
+			mainPass.uniforms.sIntensity = this.scanlinesIntensity;
+			mainPass.uniforms.sCount = this.scanlinesCount;
+			mainPass.uniforms.grayscale = this.grayscale;
+			this._time += 0.01667;
+			mainPass.uniforms.time = this._time;
+			if (finish) {
+				mainPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
+				mainPass.renderStates.camera.rect.fromArray(composer._tempViewport);
+			}
+			mainPass.render(renderer);
+			if (finish) {
+				mainPass.material.transparent = false;
+				mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
+			}
+		}
+		dispose() {
+			this._mainPass.dispose();
+		}
+	}
+	const shader$1 = {
+		name: 'ec_film',
+		defines: {},
+		uniforms: {
+			tDiffuse: null,
+			time: 0,
+			nIntensity: 0.5,
+			sIntensity: 0.05,
+			sCount: 4096,
+			grayscale: true
+		},
+		vertexShader: defaultVertexShader,
+		fragmentShader: `
+				uniform float time;
+				uniform float nIntensity;
+				uniform float sIntensity;
+				uniform float sCount;
+				uniform bool grayscale;
+
+				uniform sampler2D tDiffuse;
+				varying vec2 v_Uv;
+
+				void main() {
+						// sample the source
+						vec4 cTextureScreen = texture2D(tDiffuse, v_Uv);
+						// make some noise
+						float dx = rand(v_Uv + time);
+						// add noise
+						vec3 cResult = cTextureScreen.rgb + cTextureScreen.rgb * clamp(0.1 + dx, 0.0, 1.0);
+						// get us a sine and cosine
+						vec2 sc = vec2(sin(v_Uv.y * sCount), cos(v_Uv.y * sCount));
+						// add scanlines
+						cResult += cTextureScreen.rgb * vec3(sc.x, sc.y, sc.x) * sIntensity;
+						// interpolate between source and result by intensity
+						cResult = cTextureScreen.rgb + clamp(nIntensity, 0.0, 1.0) * (cResult - cTextureScreen.rgb);
+						// convert to grayscale if desired
+						if(grayscale) {
+								cResult = vec3(cResult.r * 0.3 + cResult.g * 0.59 + cResult.b * 0.11);
+						}
+						gl_FragColor = vec4(cResult, cTextureScreen.a);
+				}
+		`
+	};
+
+	class FXAAEffect extends Effect {
+		constructor() {
+			super();
+			this._mainPass = new t3d.ShaderPostPass(fxaaShader);
+			this._mainPass.material.premultipliedAlpha = true;
+		}
+		resize(width, height) {
+			this._mainPass.uniforms.resolution[0] = 1 / width;
+			this._mainPass.uniforms.resolution[1] = 1 / height;
+		}
+		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
+			renderer.renderPass.setRenderTarget(outputRenderTarget);
+			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			if (finish) {
+				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+			} else {
+				renderer.renderPass.clear(true, true, false);
+			}
+			this._mainPass.uniforms.tDiffuse = inputRenderTarget.texture;
+			if (finish) {
+				this._mainPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
+				this._mainPass.renderStates.camera.rect.fromArray(composer._tempViewport);
+			}
+			this._mainPass.render(renderer);
+			if (finish) {
+				this._mainPass.material.transparent = false;
+				this._mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
+			}
+		}
+		dispose() {
+			this._mainPass.dispose();
+		}
+	}
 
 	class SSAOEffect extends Effect {
 		constructor() {
@@ -5861,6 +5861,7 @@
 	exports.channelShader = channelShader;
 	exports.copyShader = copyShader;
 	exports.defaultVertexShader = defaultVertexShader;
+	exports.fxaaShader = fxaaShader;
 	exports.highlightShader = highlightShader;
 	exports.horizontalBlurShader = horizontalBlurShader;
 	exports.isDepthStencilAttachment = isDepthStencilAttachment;
