@@ -23,7 +23,8 @@
 		"advanced_overlay",
 		"advanced_snow",
 		"advanced_rain",
-		"advanced_heightfog"
+		"advanced_heightfog",
+		"advanced_sharpness"
 	],
 	"debugger": [
 		"debugger_uv"
