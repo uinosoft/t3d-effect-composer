@@ -190,9 +190,9 @@ const rainCoverShader = {
 			vec4 Ripple = texture2D(rainCoverTexture, UV);
 			Ripple.yz = Ripple.yz * 2. - 1.; // Decompress perturbation
 			float DropFrac = fract(Ripple.w + CurrentTime); // Apply time shift
-			float TimeFrac = DropFrac - 1.0f + Ripple.x;
-			float DropFactor = saturate(0.2f + Weight * 0.8f - DropFrac);
-			float FinalFactor = DropFactor * Ripple.x * sin(clamp(TimeFrac * 9.0f, 0.0f, 3.0f) * PI);
+			float TimeFrac = DropFrac - 1.0 + Ripple.x;
+			float DropFactor = saturate(0.2 + Weight * 0.8 - DropFrac);
+			float FinalFactor = DropFactor * Ripple.x * sin(clamp(TimeFrac * 9.0, 0.0, 3.0) * PI);
 			return vec3(FinalFactor);
 		}
 		
