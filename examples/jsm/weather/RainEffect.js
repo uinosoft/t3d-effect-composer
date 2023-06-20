@@ -1,4 +1,4 @@
-import { ShaderPostPass, ATTACHMENT, Vector3 } from 't3d';
+import { ShaderPostPass, ATTACHMENT, Matrix4 } from 't3d';
 import { Effect, defaultVertexShader } from 't3d-effect-composer';
 
 export default class RainEffect extends Effect {
@@ -11,7 +11,13 @@ export default class RainEffect extends Effect {
 		this.angle = 10;
 		this.density = 1;
 		this.strength = 1;
-		this.cover = 0.4;
+
+		this.coverStrength = 0.2;
+		this.coverDensity = 0.75;
+		this.coverSize = 5.0;
+		this.coverSpeed = 1;
+
+		this.rainCoverTexture = null;
 
 		this.bufferDependencies = [
 			{ key: 'GBuffer' }
@@ -48,7 +54,7 @@ export default class RainEffect extends Effect {
 
 		// Step 2: rain cover pass
 
-		if (this.cover <= 0) {
+		if (this.coverStrength <= 0 || !this.rainCoverTexture) {
 			this._renderCover = false;
 		}
 
@@ -58,14 +64,17 @@ export default class RainEffect extends Effect {
 
 		if (this._renderCover) {
 			const gBufferRenderStates = gBuffer.getCurrentRenderStates();
-			_vec3_1.copy(gBufferRenderStates.camera.position).normalize().negate().toArray(this._rainCoverPass.uniforms.u_cameraWorldDirection);
-			this._rainCoverPass.uniforms.u_fragCoord[0] = gBuffer.output().width;
-			this._rainCoverPass.uniforms.u_fragCoord[1] = gBuffer.output().height;
-			this._rainCoverPass.uniforms.time += deltaTime * this.speed * 1.2;
+			this._rainCoverPass.uniforms.rainCoverTexture = this.rainCoverTexture;
+			this._rainCoverPass.uniforms.depthTexture = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
+			projectionViewInverse.copy(gBufferRenderStates.camera.projectionViewMatrix).inverse();
+			projectionViewInverse.toArray(this._rainCoverPass.uniforms.projectionViewInverse);
+			this._rainCoverPass.uniforms.time += deltaTime * this.coverSpeed * 1.2;
+			this._rainCoverPass.uniforms.coverDensity = this.coverDensity;
+			this._rainCoverPass.uniforms.coverSize = this.coverSize;
 			this._rainCoverPass.render(renderer);
 		}
 
-		if (this.cover > 0) {
+		if (this.coverStrength > 0 && !!this.rainCoverTexture) {
 			this.bufferDependencies = [
 				{ key: 'GBuffer' }
 			];
@@ -89,7 +98,7 @@ export default class RainEffect extends Effect {
 		this._blendPass.uniforms.texture2 = tempRT1.texture;
 		this._blendPass.uniforms.texture3 = tempRT2.texture;
 		this._blendPass.uniforms.texture4 = gBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
-		this._blendPass.uniforms.cover = this.cover;
+		this._blendPass.uniforms.coverStrength = this.coverStrength;
 		if (finish) {
 			this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
 			this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
@@ -106,26 +115,25 @@ export default class RainEffect extends Effect {
 
 	dispose() {
 		this._rainPass.dispose();
-		this._blurPass.dispose();
+		this._rainCoverPass.dispose();
 		this._blendPass.dispose();
 	}
 
 }
 
-const _vec3_1 = new Vector3();
+const projectionViewInverse = new Matrix4();
 
 // shadertoy.com/view/wslSD2
 
 const rainShader = {
 	name: 'ec_rain',
-	defines: {},
 	uniforms: {
 		size: 2.0,
 		angle: -10,
 		density: 1,
 		time: 1,
-		strength: 1,
-		viewportSize: [512, 512]
+		viewportSize: [512, 512],
+		strength: 1
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
@@ -156,128 +164,67 @@ const rainShader = {
 	`
 };
 
+// https://seblagarde.wordpress.com/2013/01/03/water-drop-2b-dynamic-rain-and-its-effects/
 const rainCoverShader = {
 	name: 'ec_rain_cover',
-	defines: {},
 	uniforms: {
-		u_cameraWorldDirection: [0, 0, 0],
-		u_fragCoord: [0, 0],
 		time: 0.0,
+		projectionViewInverse: new Float32Array(16),
+		depthTexture: null,
+		rainCoverTexture: null,
+		coverDensity: 1.,
+		coverSize: 1,
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
-		# define camPos vec3(0, 4, -4)
-		# define camTarget vec3(0)
-		# define HASHSCALE3 vec3(.1031, .1030, .0973)
 		varying vec2 v_Uv;
-		uniform vec3 u_cameraWorldDirection;
-		uniform vec2 u_fragCoord;
-		uniform float time;
-		vec3 hash33(vec3 p3) {
-			p3 = fract(p3 * HASHSCALE3);
-			p3 += dot(p3, p3.yxz + 19.19);
-			return fract((p3.xxy + p3.yxx) * p3.zyx);
-		}
-		# define vorRainSpeed .8
-		# define vorRainScale 1.0
-		float bias(float s, float b) {
-			return s / ((((1. / b) - 2.) * (1. - s)) + 1.);
-		}
-		vec3 vorRain(vec3 p, float r) {
-			vec3 vw, xy, xz, s1, s2, xx;
-			vec3 yz = vec3(0), bz = vec3(0), az = vec3(0), xw = vec3(0);
-			p = p.xzy;
-			p /= vorRainScale;
-			vec3 uv2 = p, p2 = p;
-			p = vec3(floor(p));
-			float t = time * vorRainSpeed*4./5.;
-			vec2 yx = vec2(0);
-			for (int j = -1; j <= 1; j++)
-				for (int k = -1; k <= 1; k++) {
-					vec3 offset = vec3(float(j), float(k), 0.);
-					//hashed for grid
-					s1.xz = hash33(p + offset.xyz + 127.43 + r).xz;
-					//hashed for timer for switching positions of raindrop
-					s2.xz = floor(s1.xx + t);
-					//add timer to random value so that everytime a ripple fades, a new drop appears
-					xz.xz = hash33(p + offset.xyz + (s2) + r).xz;
-					xx = hash33(p + offset.xyz + (s2 - 1.));
-					s1 = mod(s1 + t, 1.);
-					//p2=(p2-p2)+vec3(s1.x,0.0,s1.y);
-					p2 = mod(p2, 1.0);
-					float op = 1. - s1.x; //opacity
-					op = bias(op, .21); //optional smooth blending
-					//change the profile of the timer
-					s1.x = bias(s1.x, .62); //optional harder fadeout
-					float size = mix(4., 1., s1.x); //ripple.expansion over time
-					//move ripple formation from the center as it grows
-					float size2 = mix(.005, 2.0, s1.x);
-					// make the voronoi 'balls'
-					xy.xz = vec2(length((p.xy + xz.xz) - (uv2.xy - offset.xy)) * size);
-					//xy.xz *= (1.0/9.0);
-					xx = vec3(length((p2) + xz) - (uv2 - offset) * 1.30);
-					//xx=1.-xx;//optional?
-					xy.x = 1. - xy.x; //mandatory!
-					xy.x *= size2; //almost optional viscosity
-					# define ripp
-					if (xy.x > .5) xy.x = mix(1., 0., xy.x);
-					xy.x = mix(0., 2., xy.x)
-					ripp;
-					ripp;
-					xy.x = smoothstep(.0, 1., xy.x);
-					xy *= op; // fade ripple over time
-					yz = 1. - ((1. - yz) * (1. - xy));
 
-				}
-			return vec3(yz * .1);
+		uniform sampler2D depthTexture;
+		uniform sampler2D rainCoverTexture;
+		uniform mat4 projectionViewInverse;
+		uniform float time;
+		uniform float coverDensity;
+		uniform float coverSize;
+
+		vec3 ComputeRipple(vec2 UV, float CurrentTime, float Weight) {
+			vec4 Ripple = texture2D(rainCoverTexture, UV);
+			Ripple.yz = Ripple.yz * 2. - 1.; // Decompress perturbation
+			float DropFrac = fract(Ripple.w + CurrentTime); // Apply time shift
+			float TimeFrac = DropFrac - 1.0f + Ripple.x;
+			float DropFactor = saturate(0.2f + Weight * 0.8f - DropFrac);
+			float FinalFactor = DropFactor * Ripple.x * sin(clamp(TimeFrac * 9.0f, 0.0f, 3.0f) * PI);
+			return vec3(FinalFactor);
 		}
-		# define iterRippleCount 1.
-		float dfRipples(vec3 p) {
-			float pl = (p.y + 1.);
-			vec3 r = vec3(0);
-			for (float i = 0.; i < iterRippleCount; i++) {
-				r += vorRain(p, i + 1.);
-			}
-			return pl - r.x;
-		}
-		vec3 CamCross(vec2 p, vec3 o, vec3 t, vec3 u) {
-			vec3
-			d = normalize(t - o), r = normalize(cross(u, d)),
-				Up = p.y * u;
-			r *= p.x * u_fragCoord.x / u_fragCoord.y;
-			return normalize(((o + d + r + Up) * .86) - (camPos));
-		}
+		
 		void main() {
-			vec2 u = vec2(v_Uv.x, v_Uv.y);
-			u = -1. + 2. * u;
-			vec3 rayDir = CamCross(u, camPos, camTarget,vec3(0, 1.4+u_cameraWorldDirection.y, 1.4+u_cameraWorldDirection.y));
-			vec3 plane1=vec3(0,-.01,0);
-			float d = -dot(camPos, plane1) / dot(rayDir, plane1)*5.;
-			vec3 hitPoint = (camPos + (d * rayDir));
-			hitPoint += .2;
-			float std = dfRipples(hitPoint);
-			vec2 eps = vec2( .06, 0.);
-			float v1 = dfRipples(hitPoint + eps.xyy);
-			float v2 = dfRipples(hitPoint + eps.yxy);
-			float v3 = dfRipples(hitPoint + eps.yyx);
-			vec3 n = vec3(v1, v2, v3) - std;
-			n = normalize(n) - vec3(0, 1, 0);
-			n=n.zxy;//swivel for "blue" flat water.
-			n.xy*=.5;
-			gl_FragColor = n.x*vec4(2.);
+			vec4 depthTexel = texture2D(depthTexture, v_Uv);
+			vec4 projectedPos = vec4(v_Uv * 2.0 - 1.0, depthTexel.r * 2.0 - 1.0, 1.0);
+			vec4 pos = projectionViewInverse * projectedPos;
+			vec3 posWorld = pos.xyz / pos.w / coverSize;
+
+			vec4 TimeMul = vec4(1.0, 0.85, 0.93, 1.13); 
+			vec4 TimeAdd = vec4(0.0, 0.2, 0.45, 0.7); 
+			vec4 Times = (time * TimeMul + TimeAdd) * 0.6;
+
+			vec4 Weights = coverDensity - vec4(0., 0.25, 0.5, 0.75) + 0.25;
+			vec3 coverColor1 = ComputeRipple(posWorld.xz + vec2(0.25, .0), Times.x, Weights.x); 
+			vec3 coverColor2 = ComputeRipple(posWorld.xz + vec2(-0.55, .3), Times.y, Weights.y); 
+			vec3 coverColor3 = ComputeRipple(posWorld.xz + vec2(0.6, .85), Times.z, Weights.z); 
+			vec3 coverColor4 = ComputeRipple(posWorld.xz + vec2(0.5, .75), Times.w, Weights.w); 
+			vec3 coverColor = vec3(Weights.x * coverColor1.xyz + Weights.y * coverColor2.xyz + Weights.z * coverColor3.xyz + Weights.w * coverColor4.xyz);
+			gl_FragColor = vec4(coverColor, 1.0);
 		}
 	`
 };
 
 const mixShader = {
 	name: 'ec_rain_mix',
-	defines: {},
 	uniforms: {
 		texture1: null,
 		texture2: null,
 		texture3: null,
 		texture4: null,
-		cover: 0.0
+		coverStrength: 0.0
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
@@ -285,7 +232,7 @@ const mixShader = {
 		uniform sampler2D texture2;
 		uniform sampler2D texture3;
 		uniform sampler2D texture4;
-		uniform float cover;
+		uniform float coverStrength;
 		varying vec2 v_Uv;
 		void main() {
 			vec4 texel1 = texture2D(texture1, v_Uv);
@@ -293,7 +240,7 @@ const mixShader = {
 			vec4 texel3 = texture2D(texture3, v_Uv);
 			vec4 texel4 = texture2D(texture4, v_Uv);
 			float coverDensity = step(0.9, texel4.y * 2.0 - 1.0);
-			gl_FragColor = vec4(vec3(texel1.rgb + texel2.rgb + texel3.rgb * cover * coverDensity), texel1.a);
+			gl_FragColor = vec4(vec3(texel1.rgb + texel2.rgb + texel3.rgb * coverStrength * coverDensity), texel1.a);
 		}
 	`
 };
