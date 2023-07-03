@@ -4533,10 +4533,15 @@
 	class NonDepthMarkBuffer extends Buffer {
 		constructor(width, height, options) {
 			super(width, height, options);
+			const bufferMipmaps = options.bufferMipmaps;
 			this._rts = [];
 			for (let i = 0; i < options.maxMarkAttachment; i++) {
 				const rt = new t3d.RenderTarget2D(width, height);
 				rt.detach(t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+				if (!bufferMipmaps) {
+					rt.texture.generateMipmaps = false;
+					rt.texture.minFilter = t3d.TEXTURE_FILTER.LINEAR;
+				}
 				this._rts.push(rt);
 			}
 			this._mrts = [];
@@ -4794,10 +4799,15 @@
 	class ColorMarkBuffer extends Buffer {
 		constructor(width, height, options) {
 			super(width, height, options);
+			const bufferMipmaps = options.bufferMipmaps;
 			this._rts = [];
 			for (let i = 0; i < options.maxColorAttachment; i++) {
 				const rt = new t3d.RenderTarget2D(width, height);
 				rt.detach(t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+				if (!bufferMipmaps) {
+					rt.texture.generateMipmaps = false;
+					rt.texture.minFilter = t3d.TEXTURE_FILTER.LINEAR;
+				}
 				this._rts.push(rt);
 			}
 			this._mrts = [];
@@ -5222,6 +5232,7 @@
 		 * @param {Number} height - The height of the actual rendering size.
 		 * @param {Object} [options={}]
 		 * @param {Boolean} [options.webgl2=false] - Whether to support WebGL2 features. Turning on will improve the storage accuracy of GBuffer.
+		 * @param {Boolean} [options.bufferMipmaps=false] - Whether to generate mipmaps for buffers.
 		 * @param {Boolean} [options.floatColorBuffer=false] - Whether to support the EXT_color_buffer_float feature. Turning on will improve the storage accuracy of GBuffer.
 		 * @param {Number} [options.samplerNumber=8] - MSAA sampling multiple.
 		 * @param {Number} [options.maxMarkAttachment=5] - Maximum number of mark attachments. Means that it supports up to N*4 effects that need to be marked.
@@ -5230,6 +5241,7 @@
 		constructor(width, height, options = {}) {
 			this._size = new t3d.Vector2(width, height);
 			options.webgl2 = options.webgl2 || false;
+			options.bufferMipmaps = options.bufferMipmaps || false;
 			options.floatColorBuffer = options.floatColorBuffer || false;
 			options.samplerNumber = options.samplerNumber || 8;
 			options.maxMarkAttachment = options.maxMarkAttachment || 5;
@@ -5252,6 +5264,10 @@
 
 			this._defaultColorTexture = new t3d.Texture2D();
 			this._defaultMSColorRenderBuffer = new t3d.RenderBuffer(width, height, t3d.PIXEL_FORMAT.RGBA8, options.samplerNumber);
+			if (!options.bufferMipmaps) {
+				this._defaultColorTexture.generateMipmaps = false;
+				this._defaultColorTexture.minFilter = t3d.TEXTURE_FILTER.LINEAR;
+			}
 			this._defaultDepthRenderBuffer = new t3d.RenderBuffer(width, height, t3d.PIXEL_FORMAT.DEPTH_COMPONENT16);
 			this._defaultMSDepthRenderBuffer = new t3d.RenderBuffer(width, height, t3d.PIXEL_FORMAT.DEPTH_COMPONENT16, options.samplerNumber);
 			this._defaultDepthStencilRenderBuffer = new t3d.RenderBuffer(width, height, t3d.PIXEL_FORMAT.DEPTH_STENCIL);

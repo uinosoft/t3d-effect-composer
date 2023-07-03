@@ -1,4 +1,4 @@
-import { RenderTarget2D, RenderBuffer, ATTACHMENT, PIXEL_FORMAT, DRAW_SIDE, ShaderMaterial } from 't3d';
+import { RenderTarget2D, RenderBuffer, ATTACHMENT, PIXEL_FORMAT, DRAW_SIDE, ShaderMaterial, TEXTURE_FILTER } from 't3d';
 import { isDepthStencilAttachment, RenderListMask } from '../Utils.js';
 import BufferAttachManager from './BufferAttachManager.js';
 import Buffer from './Buffer';
@@ -8,10 +8,15 @@ export default class ColorMarkBuffer extends Buffer {
 	constructor(width, height, options) {
 		super(width, height, options);
 
+		const bufferMipmaps = options.bufferMipmaps;
 		this._rts = [];
 		for (let i = 0; i < options.maxColorAttachment; i++) {
 			const rt = new RenderTarget2D(width, height);
 			rt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+			if (!bufferMipmaps) {
+				rt.texture.generateMipmaps = false;
+				rt.texture.minFilter = TEXTURE_FILTER.LINEAR;
+			}
 			this._rts.push(rt);
 		}
 

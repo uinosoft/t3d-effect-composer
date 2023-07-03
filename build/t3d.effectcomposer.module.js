@@ -4886,10 +4886,15 @@ class NonDepthMarkBuffer extends Buffer {
 	constructor(width, height, options) {
 		super(width, height, options);
 
+		const bufferMipmaps = options.bufferMipmaps;
 		this._rts = [];
 		for (let i = 0; i < options.maxMarkAttachment; i++) {
 			const rt = new RenderTarget2D(width, height);
 			rt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+			if (!bufferMipmaps) {
+				rt.texture.generateMipmaps = false;
+				rt.texture.minFilter = TEXTURE_FILTER.LINEAR;
+			}
 			this._rts.push(rt);
 		}
 
@@ -5190,10 +5195,15 @@ class ColorMarkBuffer extends Buffer {
 	constructor(width, height, options) {
 		super(width, height, options);
 
+		const bufferMipmaps = options.bufferMipmaps;
 		this._rts = [];
 		for (let i = 0; i < options.maxColorAttachment; i++) {
 			const rt = new RenderTarget2D(width, height);
 			rt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+			if (!bufferMipmaps) {
+				rt.texture.generateMipmaps = false;
+				rt.texture.minFilter = TEXTURE_FILTER.LINEAR;
+			}
 			this._rts.push(rt);
 		}
 
@@ -5702,6 +5712,7 @@ class EffectComposer {
 	 * @param {Number} height - The height of the actual rendering size.
 	 * @param {Object} [options={}]
 	 * @param {Boolean} [options.webgl2=false] - Whether to support WebGL2 features. Turning on will improve the storage accuracy of GBuffer.
+	 * @param {Boolean} [options.bufferMipmaps=false] - Whether to generate mipmaps for buffers.
 	 * @param {Boolean} [options.floatColorBuffer=false] - Whether to support the EXT_color_buffer_float feature. Turning on will improve the storage accuracy of GBuffer.
 	 * @param {Number} [options.samplerNumber=8] - MSAA sampling multiple.
 	 * @param {Number} [options.maxMarkAttachment=5] - Maximum number of mark attachments. Means that it supports up to N*4 effects that need to be marked.
@@ -5711,6 +5722,7 @@ class EffectComposer {
 		this._size = new Vector2(width, height);
 
 		options.webgl2 = options.webgl2 || false;
+		options.bufferMipmaps = options.bufferMipmaps || false;
 		options.floatColorBuffer = options.floatColorBuffer || false;
 		options.samplerNumber = options.samplerNumber || 8;
 		options.maxMarkAttachment = options.maxMarkAttachment || 5;
@@ -5740,6 +5752,10 @@ class EffectComposer {
 
 		this._defaultColorTexture = new Texture2D();
 		this._defaultMSColorRenderBuffer = new RenderBuffer(width, height, PIXEL_FORMAT.RGBA8, options.samplerNumber);
+		if (!options.bufferMipmaps) {
+			this._defaultColorTexture.generateMipmaps = false;
+			this._defaultColorTexture.minFilter = TEXTURE_FILTER.LINEAR;
+		}
 
 		this._defaultDepthRenderBuffer = new RenderBuffer(width, height, PIXEL_FORMAT.DEPTH_COMPONENT16);
 		this._defaultMSDepthRenderBuffer = new RenderBuffer(width, height, PIXEL_FORMAT.DEPTH_COMPONENT16, options.samplerNumber);
