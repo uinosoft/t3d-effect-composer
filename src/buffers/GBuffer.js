@@ -1,4 +1,4 @@
-import { RenderTarget2D, Texture2D, ATTACHMENT, PIXEL_FORMAT, PIXEL_TYPE, TEXTURE_FILTER, SHADING_TYPE, ShaderMaterial } from 't3d';
+import { RenderTarget2D, Texture2D, ATTACHMENT, PIXEL_FORMAT, PIXEL_TYPE, TEXTURE_FILTER, SHADING_TYPE, ShaderMaterial, Vector3, Matrix4, Vector4 } from 't3d';
 import Buffer from './Buffer';
 
 export default class GBuffer extends Buffer {
@@ -36,9 +36,30 @@ export default class GBuffer extends Buffer {
 			ifRender: createIfRenderFunction(undefined)
 		};
 
-		this._renderStates = null;
+		this._renderStates = {
+			scene: null,
+			lights: null,
+			camera: {
+				id: 0,
+				version: 0,
+				near: 0,
+				far: 0,
+				position: new Vector3(),
+				logDepthCameraNear: 0,
+				logDepthBufFC: 0,
+				viewMatrix: new Matrix4(),
+				projectionMatrix: new Matrix4(),
+				projectionViewMatrix: new Matrix4(),
+				rect: new Vector4(0, 0, 1, 1)
+			},
+			gammaFactor: 2.0,
+			outputEncoding: null
+		};
 
 		this.layers = [0];
+
+		this.cameraNear = -1;
+		this.cameraFar = -1;
 	}
 
 	setIfRenderReplaceFunction(func) {
@@ -77,13 +98,17 @@ export default class GBuffer extends Buffer {
 		const renderStates = scene.getRenderStates(camera);
 		const renderQueue = scene.getRenderQueue(camera);
 
-		this._renderStates = renderStates;
+		if (this.cameraNear > 0 || this.cameraFar > 0) {
+			this._renderStates = this._getFixedRenderStates(renderStates);
+		} else {
+			this._renderStates = renderStates;
+		}
 
 		const layers = this.layers;
 		for (let i = 0, l = layers.length; i < l; i++) {
 			const renderQueueLayer = renderQueue.getLayer(layers[i]);
-			renderer.renderRenderableList(renderQueueLayer.opaque, renderStates, renderOptions);
-			renderer.renderRenderableList(renderQueueLayer.transparent, renderStates, renderOptions);
+			renderer.renderRenderableList(renderQueueLayer.opaque, this._renderStates, renderOptions);
+			renderer.renderRenderableList(renderQueueLayer.transparent, this._renderStates, renderOptions);
 		}
 	}
 
@@ -103,6 +128,43 @@ export default class GBuffer extends Buffer {
 	dispose() {
 		super.dispose();
 		this._rt.dispose();
+	}
+
+	_getFixedRenderStates(renderStates) {
+		const output = this._renderStates;
+
+		// copy others
+
+		output.scene = renderStates.scene;
+		output.lights = renderStates.lights;
+		output.gammaFactor = renderStates.gammaFactor;
+		output.outputEncoding = renderStates.outputEncoding;
+
+		const outputCamera = output.camera;
+		const sourceCamera = renderStates.camera;
+
+		outputCamera.id = sourceCamera.id;
+		outputCamera.version = sourceCamera.version;
+		outputCamera.position = sourceCamera.position;
+		outputCamera.logDepthCameraNear = sourceCamera.logDepthCameraNear;
+		outputCamera.logDepthBufFC = sourceCamera.logDepthBufFC;
+		outputCamera.viewMatrix = sourceCamera.viewMatrix;
+		outputCamera.rect = sourceCamera.rect;
+
+		// fix camera far & near
+
+		const fixedNear = this.cameraNear > 0 ? this.cameraNear : sourceCamera.near,
+			fixedFar = this.cameraFar > 0 ? this.cameraFar : sourceCamera.far;
+
+		outputCamera.near = fixedNear;
+		outputCamera.far = fixedFar;
+
+		outputCamera.projectionMatrix.elements[10] = -(fixedFar + fixedNear) / (fixedFar - fixedNear);
+		outputCamera.projectionMatrix.elements[14] = -2 * fixedFar * fixedNear / (fixedFar - fixedNear);
+
+		outputCamera.projectionViewMatrix.multiplyMatrices(outputCamera.projectionMatrix, outputCamera.viewMatrix);
+
+		return output;
 	}
 
 }
