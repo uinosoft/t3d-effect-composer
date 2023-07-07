@@ -36,7 +36,8 @@ export default class GBuffer extends Buffer {
 			ifRender: createIfRenderFunction(undefined)
 		};
 
-		this._renderStates = {
+		this._renderStates = null;
+		this._fixedRenderStates = {
 			scene: null,
 			lights: null,
 			camera: {
@@ -131,7 +132,7 @@ export default class GBuffer extends Buffer {
 	}
 
 	_getFixedRenderStates(renderStates) {
-		const output = this._renderStates;
+		const output = this._fixedRenderStates;
 
 		// copy others
 
@@ -159,6 +160,7 @@ export default class GBuffer extends Buffer {
 		outputCamera.near = fixedNear;
 		outputCamera.far = fixedFar;
 
+		outputCamera.projectionMatrix.copy(sourceCamera.projectionMatrix);
 		outputCamera.projectionMatrix.elements[10] = -(fixedFar + fixedNear) / (fixedFar - fixedNear);
 		outputCamera.projectionMatrix.elements[14] = -2 * fixedFar * fixedNear / (fixedFar - fixedNear);
 

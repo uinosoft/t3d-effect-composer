@@ -4275,7 +4275,8 @@
 				getMaterial: createGetMaterialFunction$2(),
 				ifRender: createIfRenderFunction$2(undefined)
 			};
-			this._renderStates = {
+			this._renderStates = null;
+			this._fixedRenderStates = {
 				scene: null,
 				lights: null,
 				camera: {
@@ -4354,7 +4355,7 @@
 			this._rt.dispose();
 		}
 		_getFixedRenderStates(renderStates) {
-			const output = this._renderStates;
+			const output = this._fixedRenderStates;
 
 			// copy others
 
@@ -4378,6 +4379,7 @@
 				fixedFar = this.cameraFar > 0 ? this.cameraFar : sourceCamera.far;
 			outputCamera.near = fixedNear;
 			outputCamera.far = fixedFar;
+			outputCamera.projectionMatrix.copy(sourceCamera.projectionMatrix);
 			outputCamera.projectionMatrix.elements[10] = -(fixedFar + fixedNear) / (fixedFar - fixedNear);
 			outputCamera.projectionMatrix.elements[14] = -2 * fixedFar * fixedNear / (fixedFar - fixedNear);
 			outputCamera.projectionViewMatrix.multiplyMatrices(outputCamera.projectionMatrix, outputCamera.viewMatrix);
