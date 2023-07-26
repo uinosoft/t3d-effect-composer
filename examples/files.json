@@ -24,7 +24,9 @@
 		"advanced_snow",
 		"advanced_rain",
 		"advanced_heightfog",
-		"advanced_sharpness"
+		"advanced_sharpness",
+		"advanced_volume"
+
 	],
 	"debugger": [
 		"debugger_uv"
