@@ -3,7 +3,7 @@ t3d-effect-composer
 
 [![NPM Package][npm]][npm-url]
 
-Post Effects extension for [t3d.js](https://github.com/UINOSOFT/t3d.js).
+Post Effects extension for [t3d.js](https://github.com/uinosoft/t3d.js).
 
 [Examples](https://uinosoft.github.io/t3d-effect-composer/examples/) &mdash;
 Documents<[English](./docs/doc-en.md)/[中文](./docs/doc-zh.md)>

@@ -12,7 +12,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/UINOSOFT/t3d-effect-composer"
+    "url": "https://github.com/uinosoft/t3d-effect-composer"
   },
   "files": [
     "build/t3d.effectcomposer.js",
