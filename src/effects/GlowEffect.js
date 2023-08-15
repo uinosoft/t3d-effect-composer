@@ -52,9 +52,9 @@ export default class GlowEffect extends Effect {
 			const attachIndex = markBuffer.attachManager.getAttachIndex(this.name);
 			const channelIndex = markBuffer.attachManager.getChannelIndex(this.name);
 
-			renderer.renderPass.setRenderTarget(tempRT2);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT2);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._maskPass.uniforms.colorTexture = sceneBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			this._maskPass.uniforms.maskTexture = markBuffer.output(attachIndex)._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			this._maskPass.uniforms.additiveTexture = colorBufferTexture;
@@ -64,9 +64,9 @@ export default class GlowEffect extends Effect {
 			this._maskPass.render(renderer);
 		}
 
-		renderer.renderPass.setRenderTarget(tempRT1);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(tempRT1);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 		this._highlightPass.uniforms.tDiffuse = usedMarkBuffer ? tempRT2.texture : colorBufferTexture;
 		this._highlightPass.uniforms.threshold = this.threshold;
 		this._highlightPass.uniforms.smoothWidth = this.smoothWidth;
@@ -75,9 +75,9 @@ export default class GlowEffect extends Effect {
 		let inputRT = tempRT1;
 		for (let i = 0; i < kernelSizeArray.length; i++) {
 			const _tempRT1 = composer._renderTargetCache.allocate(i + 1);
-			renderer.renderPass.setRenderTarget(_tempRT1);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(_tempRT1);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._blurPass.uniforms.tDiffuse = inputRT.texture;
 			this._blurPass.uniforms.texSize[0] = inputRT.width;
 			this._blurPass.uniforms.texSize[1] = inputRT.height;
@@ -87,9 +87,9 @@ export default class GlowEffect extends Effect {
 			this._blurPass.render(renderer);
 
 			const _tempRT2 = composer._renderTargetCache.allocate(i + 1);
-			renderer.renderPass.setRenderTarget(_tempRT2);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(_tempRT2);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._blurPass.uniforms.tDiffuse = _tempRT1.texture;
 			this._blurPass.uniforms.direction[0] = 0;
 			this._blurPass.uniforms.direction[1] = 1;
@@ -101,9 +101,9 @@ export default class GlowEffect extends Effect {
 			this._tempRTList[i] = _tempRT2;
 		}
 
-		renderer.renderPass.setRenderTarget(tempRT2);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(tempRT2);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 		this._compositePass.uniforms.blurTexture1 = this._tempRTList[0].texture;
 		this._compositePass.uniforms.blurTexture2 = this._tempRTList[1].texture;
 		this._compositePass.uniforms.blurTexture3 = this._tempRTList[2].texture;
@@ -113,12 +113,12 @@ export default class GlowEffect extends Effect {
 		this._compositePass.uniforms.bloomStrength = this.strength;
 		this._compositePass.render(renderer);
 
-		renderer.renderPass.setRenderTarget(outputRenderTarget);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
+		renderer.setRenderTarget(outputRenderTarget);
+		renderer.setClearColor(0, 0, 0, 0);
 		if (finish) {
-			renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 		} else {
-			renderer.renderPass.clear(true, true, false);
+			renderer.clear(true, true, false);
 		}
 		this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 		this._blendPass.uniforms.texture2 = tempRT2.texture;

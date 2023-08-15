@@ -95,9 +95,9 @@
 	const backRenderTarget = new t3d.RenderTargetBack(canvas);
 
 	const effectComposer = new DefaultEffectComposer(width, height, {
-		samplerNumber: Math.min(renderer.renderPass.capabilities.maxSamples, 5),
-		webgl2: renderer.renderPass.capabilities.version > 1,
-		floatColorBuffer: !!renderer.renderPass.capabilities.getExtension("EXT_color_buffer_float")
+		samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
+		webgl2: renderer.capabilities.version > 1,
+		floatColorBuffer: !!renderer.capabilities.getExtension("EXT_color_buffer_float")
 	});
 	// effectComposer.getEffect('ColorCorrection').active = true;
 	effectComposer.sceneMSAA = true;
@@ -356,12 +356,14 @@
 
 		// Render occlusion texture for decal
 
-		renderer.renderPass.setRenderTarget(decal.$depthRenderTarget);
-		renderer.renderPass.setClearColor(1, 1, 1, 1);
-		renderer.renderPass.clear(true, true, true);
+		renderer.setRenderTarget(decal.$depthRenderTarget);
+		renderer.setClearColor(1, 1, 1, 1);
+		renderer.clear(true, true, true);
 
 		const renderStates = scene.updateRenderStates(decal.$camera, false);
 		const renderQueue = scene.updateRenderQueue(decal.$camera, false, false);
+
+		renderer.beginRender();
 
 		const mainLayer = renderQueue.getLayer(0);
 		if (mainLayer.opaqueCount > 0) {
@@ -371,9 +373,11 @@
 			renderer.renderRenderableList(mainLayer.transparent, renderStates, occlusionRenderOption);
 		}
 
+		renderer.endRender();
+
 		// Main render
 
-		renderer.renderPass.setClearColor(0.2, 0.2, 0.2, 1);
+		renderer.setClearColor(0.2, 0.2, 0.2, 1);
 		effectComposer.render(renderer, scene, camera, backRenderTarget);
 
 		stats.end();

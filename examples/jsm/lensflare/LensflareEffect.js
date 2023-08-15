@@ -31,14 +31,14 @@ export class LensflareEffect extends Effect {
 		const lensflareBuffer = composer.getBuffer('LensflareBuffer');
 		const lensflareInfos = lensflareBuffer.lensflareInfos;
 
-		renderer.renderPass.setRenderTarget(tempRT1);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, true);
+		renderer.setRenderTarget(tempRT1);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, true);
 
 		lensflareInfos.forEach(({ screenX, screenY, scaleX, scaleY, elements }) => {
-			renderer.renderPass.setRenderTarget(this._clippedRT);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, true);
+			renderer.setRenderTarget(this._clippedRT);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, true);
 			this._clipPass.uniforms.tDiffuse = lensflareBuffer.output().texture;
 			this._clipPass.uniforms.clipRect[0] = ((screenX - scaleX)  * 0.5 + 0.5);
 			this._clipPass.uniforms.clipRect[1] = ((screenY - scaleY) * 0.5 + 0.5);
@@ -46,7 +46,7 @@ export class LensflareEffect extends Effect {
 			this._clipPass.uniforms.clipRect[3] = scaleY;
 			this._clipPass.render(renderer);
 
-			renderer.renderPass.setRenderTarget(tempRT1);
+			renderer.setRenderTarget(tempRT1);
 
 			elements.forEach(({ texture, color, scale, offset }) => {
 				const vecX = -screenX * 2;
@@ -61,16 +61,16 @@ export class LensflareEffect extends Effect {
 				lensflareMaterial.uniforms.scale[1] = scale;
 				color.toArray(lensflareMaterial.uniforms.color);
 
-				renderer.renderPass.render(this._lensflarePass.renderQueueLayer.opaque[0], this._lensflarePass.renderStates, this._lensflarePass.renderConfig);
+				renderer.renderRenderableItem(this._lensflarePass.renderQueueLayer.opaque[0], this._lensflarePass.renderStates, this._lensflarePass.renderConfig);
 			});
 		});
 
-		renderer.renderPass.setRenderTarget(outputRenderTarget);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
+		renderer.setRenderTarget(outputRenderTarget);
+		renderer.setClearColor(0, 0, 0, 0);
 		if (finish) {
-			renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 		} else {
-			renderer.renderPass.clear(true, true, false);
+			renderer.clear(true, true, false);
 		}
 		this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 		this._blendPass.uniforms.texture2 = tempRT1.texture;

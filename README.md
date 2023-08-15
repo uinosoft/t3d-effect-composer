@@ -33,7 +33,7 @@ const gl = canvas.getContext('webgl2', {
     stencil: true
 });
 const renderer = new t3d.Renderer(gl);
-renderer.renderPass.state.colorBuffer.setClear(0.1, 0.1, 0.1, 1);
+renderer.setClearColor(0.1, 0.1, 0.1, 1);
 const backRenderTarget = new t3d.RenderTargetBack(canvas);
 
 const effectComposer = new t3d.DefaultEffectComposer(width, height, {});

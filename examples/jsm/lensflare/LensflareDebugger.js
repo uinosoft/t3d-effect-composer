@@ -12,9 +12,9 @@ export class LensflareDebugger extends Debugger {
 	}
 
 	render(renderer, composer, outputRenderTarget) {
-		renderer.renderPass.setRenderTarget(outputRenderTarget);
-		renderer.renderPass.setClearColor(0, 0, 0, 1);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(outputRenderTarget);
+		renderer.setClearColor(0, 0, 0, 1);
+		renderer.clear(true, true, false);
 
 		const buffer = composer.getBuffer('LensflareBuffer');
 

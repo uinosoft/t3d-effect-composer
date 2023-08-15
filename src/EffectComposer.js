@@ -276,7 +276,7 @@ export default class EffectComposer {
 
 	render(renderer, scene, camera, target) {
 		const renderStates = scene.getRenderStates(camera);
-		renderer.renderPass.getClearColor().toArray(this._tempClearColor); // save clear color
+		renderer.getClearColor().toArray(this._tempClearColor); // save clear color
 		camera.rect.toArray(this._tempViewport);
 		camera.rect.set(0, 0, 1, 1);
 		renderStates.camera.rect.set(0, 0, 1, 1);
@@ -298,7 +298,7 @@ export default class EffectComposer {
 
 			this.debugger.render(renderer, this, target);
 
-			renderer.renderPass.setClearColor(...this._tempClearColor); // restore clear color
+			renderer.setClearColor(...this._tempClearColor); // restore clear color
 
 			return;
 		}
@@ -362,9 +362,9 @@ export default class EffectComposer {
 			const sceneBuffer = this._bufferMap.get('SceneBuffer');
 			sceneBuffer.render(renderer, this, scene, camera);
 
-			renderer.renderPass.setRenderTarget(target);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(this.clearColor, this.clearDepth, this.clearStencil);
+			renderer.setRenderTarget(target);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(this.clearColor, this.clearDepth, this.clearStencil);
 
 			const copyPass = this._copyPass;
 			copyPass.uniforms.tDiffuse = sceneBuffer.output().texture;
@@ -372,9 +372,9 @@ export default class EffectComposer {
 			copyPass.renderStates.camera.rect.fromArray(this._tempViewport);
 			copyPass.render(renderer);
 		} else {
-			renderer.renderPass.setRenderTarget(target);
-			renderer.renderPass.setClearColor(...this._tempClearColor);
-			renderer.renderPass.clear(this.clearColor, this.clearDepth, this.clearStencil);
+			renderer.setRenderTarget(target);
+			renderer.setClearColor(...this._tempClearColor);
+			renderer.clear(this.clearColor, this.clearDepth, this.clearStencil);
 			renderStates.camera.rect.fromArray(this._tempViewport);
 
 			const renderQueue = scene.getRenderQueue(camera);
@@ -383,7 +383,7 @@ export default class EffectComposer {
 			sceneBuffer.$renderScene(renderer, renderQueue, renderStates);
 		}
 
-		renderer.renderPass.setClearColor(...this._tempClearColor); // restore clear color
+		renderer.setClearColor(...this._tempClearColor); // restore clear color
 		camera.rect.fromArray(this._tempViewport);
 		renderStates.camera.rect.fromArray(this._tempViewport);
 	}

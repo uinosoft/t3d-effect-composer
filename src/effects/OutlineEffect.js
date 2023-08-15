@@ -31,15 +31,15 @@ export default class OutlineEffect extends Effect {
 		const attachIndex = markBuffer.attachManager.getAttachIndex(this.name);
 		const channelIndex = markBuffer.attachManager.getChannelIndex(this.name);
 
-		renderer.renderPass.setRenderTarget(tempRT1);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(tempRT1);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 		this._downsamplerPass.uniforms.tDiffuse = markBuffer.output(attachIndex)._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 		this._downsamplerPass.render(renderer);
 
-		renderer.renderPass.setRenderTarget(tempRT2);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(tempRT2);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 		this._edgeDetectionPass.uniforms.tDiffuse = tempRT1.texture;
 		this._edgeDetectionPass.uniforms.texSize[0] = tempRT1.width;
 		this._edgeDetectionPass.uniforms.texSize[1] = tempRT1.height;
@@ -49,9 +49,9 @@ export default class OutlineEffect extends Effect {
 		this.color.toArray(this._edgeDetectionPass.uniforms.edgeColor);
 		this._edgeDetectionPass.render(renderer);
 
-		renderer.renderPass.setRenderTarget(tempRT1);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(tempRT1);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 		this._blurPass.uniforms.tDiffuse = tempRT2.texture;
 		this._blurPass.uniforms.texSize[0] = tempRT2.width;
 		this._blurPass.uniforms.texSize[1] = tempRT2.height;
@@ -60,20 +60,20 @@ export default class OutlineEffect extends Effect {
 		this._blurPass.uniforms.kernelRadius = this.thickness;
 		this._blurPass.render(renderer);
 
-		renderer.renderPass.setRenderTarget(tempRT2);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(tempRT2);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 		this._blurPass.uniforms.tDiffuse = tempRT1.texture;
 		this._blurPass.uniforms.direction[0] = 0;
 		this._blurPass.uniforms.direction[1] = 1;
 		this._blurPass.render(renderer);
 
-		renderer.renderPass.setRenderTarget(outputRenderTarget);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
+		renderer.setRenderTarget(outputRenderTarget);
+		renderer.setClearColor(0, 0, 0, 0);
 		if (finish) {
-			renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 		} else {
-			renderer.renderPass.clear(true, true, false);
+			renderer.clear(true, true, false);
 		}
 		this._blendPass.uniforms.colorTexture =  inputRenderTarget.texture;
 		this._blendPass.uniforms.edgeTexture = tempRT2.texture;

@@ -37,9 +37,9 @@ export default class RainEffect extends Effect {
 
 		// Step 1: rain pass
 
-		renderer.renderPass.setRenderTarget(tempRT1);
-		renderer.renderPass.setClearColor(1, 1, 1, 1);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(tempRT1);
+		renderer.setClearColor(1, 1, 1, 1);
+		renderer.clear(true, true, false);
 
 		const deltaTime = 0.0166666;
 		this._rainPass.uniforms.time += deltaTime * this.speed * 0.4;
@@ -58,9 +58,9 @@ export default class RainEffect extends Effect {
 			this._renderCover = false;
 		}
 
-		renderer.renderPass.setRenderTarget(tempRT2);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(tempRT2);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 
 		if (this._renderCover) {
 			const gBufferRenderStates = gBuffer.getCurrentRenderStates();
@@ -86,12 +86,12 @@ export default class RainEffect extends Effect {
 
 		// Step 3: blend pass
 
-		renderer.renderPass.setRenderTarget(outputRenderTarget);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
+		renderer.setRenderTarget(outputRenderTarget);
+		renderer.setClearColor(0, 0, 0, 0);
 		if (finish) {
-			renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 		} else {
-			renderer.renderPass.clear(true, true, false);
+			renderer.clear(true, true, false);
 		}
 
 		this._blendPass.uniforms.texture1 = inputRenderTarget.texture;

@@ -30,12 +30,12 @@ export default class DOFEffect extends Effect {
 	}
 
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-		renderer.renderPass.setRenderTarget(outputRenderTarget);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
+		renderer.setRenderTarget(outputRenderTarget);
+		renderer.setClearColor(0, 0, 0, 0);
 		if (finish) {
-			renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 		} else {
-			renderer.renderPass.clear(true, true, false);
+			renderer.clear(true, true, false);
 		}
 
 		const gBuffer = composer.getBuffer('GBuffer');

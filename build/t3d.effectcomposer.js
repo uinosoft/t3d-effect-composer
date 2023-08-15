@@ -1528,33 +1528,33 @@
 			const tempRT1 = composer._renderTargetCache.allocate(0);
 			const tempRT2 = composer._renderTargetCache.allocate(1);
 			const tempRT3 = composer._renderTargetCache.allocate(1);
-			renderer.renderPass.setRenderTarget(tempRT1);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT1);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._highlightPass.uniforms.tDiffuse = inputRenderTarget.texture;
 			this._highlightPass.uniforms.threshold = this.threshold;
 			this._highlightPass.uniforms.smoothWidth = this.smoothWidth;
 			this._highlightPass.render(renderer);
-			renderer.renderPass.setRenderTarget(tempRT2);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT2);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._blurPass.uniforms.tDiffuse = tempRT1.texture;
 			this._blurPass.uniforms.direction = 0;
 			this._blurPass.uniforms.blurSize = this.blurSize;
 			this._blurPass.render(renderer);
-			renderer.renderPass.setRenderTarget(tempRT3);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT3);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._blurPass.uniforms.tDiffuse = tempRT2.texture;
 			this._blurPass.uniforms.direction = 1;
 			this._blurPass.uniforms.blurSize = this.blurSize;
 			this._blurPass.render(renderer);
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.setRenderTarget(outputRenderTarget);
+			renderer.setClearColor(0, 0, 0, 0);
 			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 			} else {
-				renderer.renderPass.clear(true, true, false);
+				renderer.clear(true, true, false);
 			}
 			this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 			this._blendPass.uniforms.texture2 = tempRT3.texture;
@@ -1594,12 +1594,12 @@
 			this._mainPass.uniforms.resolution[1] = 1 / height;
 		}
 		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.setRenderTarget(outputRenderTarget);
+			renderer.setClearColor(0, 0, 0, 0);
 			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 			} else {
-				renderer.renderPass.clear(true, true, false);
+				renderer.clear(true, true, false);
 			}
 			const mainPass = this._mainPass;
 			mainPass.uniforms.tDiffuse = inputRenderTarget.texture;
@@ -1662,12 +1662,12 @@
 			this._mainPass.uniforms.saturation = 1.02;
 		}
 		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.setRenderTarget(outputRenderTarget);
+			renderer.setClearColor(0, 0, 0, 0);
 			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 			} else {
-				renderer.renderPass.clear(true, true, false);
+				renderer.clear(true, true, false);
 			}
 			const mainPass = this._mainPass;
 			mainPass.uniforms.tDiffuse = inputRenderTarget.texture;
@@ -1754,12 +1754,12 @@
 			this._mainPass.uniforms.resolution[1] = 1 / height;
 		}
 		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.setRenderTarget(outputRenderTarget);
+			renderer.setClearColor(0, 0, 0, 0);
 			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 			} else {
-				renderer.renderPass.clear(true, true, false);
+				renderer.clear(true, true, false);
 			}
 			const gBuffer = composer.getBuffer('GBuffer');
 			const gBufferRenderStates = gBuffer.getCurrentRenderStates();
@@ -1942,12 +1942,12 @@
 			this._mainPass.material.premultipliedAlpha = true;
 		}
 		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.setRenderTarget(outputRenderTarget);
+			renderer.setClearColor(0, 0, 0, 0);
 			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 			} else {
-				renderer.renderPass.clear(true, true, false);
+				renderer.clear(true, true, false);
 			}
 			const mainPass = this._mainPass;
 			mainPass.uniforms.tDiffuse = inputRenderTarget.texture;
@@ -2026,12 +2026,12 @@
 			this._mainPass.uniforms.resolution[1] = 1 / height;
 		}
 		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.setRenderTarget(outputRenderTarget);
+			renderer.setClearColor(0, 0, 0, 0);
 			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 			} else {
-				renderer.renderPass.clear(true, true, false);
+				renderer.clear(true, true, false);
 			}
 			this._mainPass.uniforms.tDiffuse = inputRenderTarget.texture;
 			if (finish) {
@@ -2091,9 +2091,9 @@
 
 			// Step 1: ssao pass
 
-			renderer.renderPass.setRenderTarget(tempRT1);
-			renderer.renderPass.setClearColor(1, 1, 1, 1);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT1);
+			renderer.setClearColor(1, 1, 1, 1);
+			renderer.clear(true, true, false);
 			this._ssaoPass.uniforms.normalTex = gBuffer.output()._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 			this._ssaoPass.uniforms.depthTex = gBuffer.output()._attachments[t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
 			this._ssaoPass.uniforms.texSize[0] = gBuffer.output().width;
@@ -2114,9 +2114,9 @@
 
 			// Step 2: blurX pass
 
-			renderer.renderPass.setRenderTarget(tempRT2);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT2);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._blurPass.uniforms.normalTex = gBuffer.output()._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 			this._blurPass.uniforms.depthTex = gBuffer.output()._attachments[t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
 			this._blurPass.uniforms.textureSize[0] = gBuffer.output().width;
@@ -2131,8 +2131,8 @@
 
 			// Step 3: blurY pass
 
-			renderer.renderPass.setRenderTarget(!!inputRenderTarget ? tempRT1 : outputRenderTarget);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(!!inputRenderTarget ? tempRT1 : outputRenderTarget);
+			renderer.clear(true, true, false);
 			this._blurPass.uniforms.direction = 1;
 			this._blurPass.uniforms.tDiffuse = tempRT2.texture;
 			this._blurPass.render(renderer);
@@ -2140,12 +2140,12 @@
 			// Step 4: blend pass
 
 			if (!!inputRenderTarget) {
-				renderer.renderPass.setRenderTarget(outputRenderTarget);
-				renderer.renderPass.setClearColor(0, 0, 0, 0);
+				renderer.setRenderTarget(outputRenderTarget);
+				renderer.setClearColor(0, 0, 0, 0);
 				if (finish) {
-					renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+					renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 				} else {
-					renderer.renderPass.clear(true, true, false);
+					renderer.clear(true, true, false);
 				}
 				this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 				this._blendPass.uniforms.texture2 = tempRT1.texture;
@@ -2479,9 +2479,9 @@
 
 			// Step 1: ssr pass
 
-			renderer.renderPass.setRenderTarget(tempRT1);
-			renderer.renderPass.setClearColor(0, 0, 0, 1);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT1);
+			renderer.setClearColor(0, 0, 0, 1);
+			renderer.clear(true, true, false);
 			this._ssrPass.uniforms.colorTex = sceneBuffer.output()._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 			this._ssrPass.uniforms.gBufferTexture1 = gBuffer.output()._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 			this._ssrPass.uniforms.gBufferTexture2 = gBuffer.output()._attachments[t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
@@ -2508,9 +2508,9 @@
 
 			// Step 2: blurX pass
 
-			renderer.renderPass.setRenderTarget(tempRT2);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT2);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._blurPass.uniforms.normalTex = gBuffer.output()._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 			this._blurPass.uniforms.depthTex = gBuffer.output()._attachments[t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
 			this._blurPass.uniforms.textureSize[0] = gBuffer.output().width;
@@ -2525,8 +2525,8 @@
 
 			// Step 3: blurY pass
 
-			renderer.renderPass.setRenderTarget(!!inputRenderTarget ? tempRT1 : outputRenderTarget);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(!!inputRenderTarget ? tempRT1 : outputRenderTarget);
+			renderer.clear(true, true, false);
 			this._blurPass.uniforms.direction = 1;
 			this._blurPass.uniforms.tDiffuse = tempRT2.texture;
 			this._blurPass.render(renderer);
@@ -2534,12 +2534,12 @@
 			// Step 4: blend pass
 
 			if (!!inputRenderTarget) {
-				renderer.renderPass.setRenderTarget(outputRenderTarget);
-				renderer.renderPass.setClearColor(0, 0, 0, 0);
+				renderer.setRenderTarget(outputRenderTarget);
+				renderer.setClearColor(0, 0, 0, 0);
 				if (finish) {
-					renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+					renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 				} else {
-					renderer.renderPass.clear(true, true, false);
+					renderer.clear(true, true, false);
 				}
 				this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 				this._blendPass.uniforms.texture2 = tempRT1.texture;
@@ -2922,12 +2922,12 @@
 			vignettingPass.uniforms.tDiffuse = inputRenderTarget.texture;
 			this.color.toArray(vignettingPass.uniforms.vignettingColor);
 			vignettingPass.uniforms.vignettingOffset = this.offset;
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.setRenderTarget(outputRenderTarget);
+			renderer.setClearColor(0, 0, 0, 0);
 			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 			} else {
-				renderer.renderPass.clear(true, true, false);
+				renderer.clear(true, true, false);
 			}
 			if (finish) {
 				vignettingPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
@@ -2987,27 +2987,27 @@
 			const blendPass = this._blendPass;
 
 			// Step 1: blur x
-			renderer.renderPass.setRenderTarget(tempRT1);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT1);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._hBlurPass.uniforms.tDiffuse = inputRenderTarget.texture;
 			this._hBlurPass.render(renderer);
 			// Step 2: blur y
-			renderer.renderPass.setRenderTarget(tempRT2);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT2);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._vBlurPass.uniforms.tDiffuse = tempRT1.texture;
 			this._vBlurPass.render(renderer);
 			// Step 3: blend
 			blendPass.uniforms.tDiffuse = inputRenderTarget.texture;
 			blendPass.uniforms.blurOffset = this.offset;
 			blendPass.uniforms.blurTexture = tempRT2.texture;
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.setRenderTarget(outputRenderTarget);
+			renderer.setClearColor(0, 0, 0, 0);
 			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 			} else {
-				renderer.renderPass.clear(true, true, false);
+				renderer.clear(true, true, false);
 			}
 			if (finish) {
 				blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
@@ -3077,14 +3077,14 @@
 			const markBuffer = composer.getBuffer('NonDepthMarkBuffer');
 			const attachIndex = markBuffer.attachManager.getAttachIndex(this.name);
 			const channelIndex = markBuffer.attachManager.getChannelIndex(this.name);
-			renderer.renderPass.setRenderTarget(tempRT1);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT1);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._downsamplerPass.uniforms.tDiffuse = markBuffer.output(attachIndex)._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 			this._downsamplerPass.render(renderer);
-			renderer.renderPass.setRenderTarget(tempRT2);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT2);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._edgeDetectionPass.uniforms.tDiffuse = tempRT1.texture;
 			this._edgeDetectionPass.uniforms.texSize[0] = tempRT1.width;
 			this._edgeDetectionPass.uniforms.texSize[1] = tempRT1.height;
@@ -3093,9 +3093,9 @@
 			}
 			this.color.toArray(this._edgeDetectionPass.uniforms.edgeColor);
 			this._edgeDetectionPass.render(renderer);
-			renderer.renderPass.setRenderTarget(tempRT1);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT1);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._blurPass.uniforms.tDiffuse = tempRT2.texture;
 			this._blurPass.uniforms.texSize[0] = tempRT2.width;
 			this._blurPass.uniforms.texSize[1] = tempRT2.height;
@@ -3103,19 +3103,19 @@
 			this._blurPass.uniforms.direction[1] = 0;
 			this._blurPass.uniforms.kernelRadius = this.thickness;
 			this._blurPass.render(renderer);
-			renderer.renderPass.setRenderTarget(tempRT2);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT2);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._blurPass.uniforms.tDiffuse = tempRT1.texture;
 			this._blurPass.uniforms.direction[0] = 0;
 			this._blurPass.uniforms.direction[1] = 1;
 			this._blurPass.render(renderer);
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.setRenderTarget(outputRenderTarget);
+			renderer.setClearColor(0, 0, 0, 0);
 			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 			} else {
-				renderer.renderPass.clear(true, true, false);
+				renderer.clear(true, true, false);
 			}
 			this._blendPass.uniforms.colorTexture = inputRenderTarget.texture;
 			this._blendPass.uniforms.edgeTexture = tempRT2.texture;
@@ -3243,35 +3243,35 @@
 			const markBuffer = composer.getBuffer('MarkBuffer');
 			const attachIndex = markBuffer.attachManager.getAttachIndex(this.name);
 			const channelIndex = markBuffer.attachManager.getChannelIndex(this.name);
-			renderer.renderPass.setRenderTarget(tempRT1);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT1);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._channelPass.uniforms['tDiffuse'] = markBuffer.output(attachIndex)._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 			for (let i = 0; i < 4; i++) {
 				this._channelPass.uniforms.channelMask[i] = i === channelIndex ? 1 : 0;
 			}
 			this._channelPass.render(renderer);
-			renderer.renderPass.setRenderTarget(tempRT2);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT2);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._blurXPass.uniforms.tDiffuse = tempRT1.texture;
 			this._blurXPass.uniforms.stride = this.stride;
 			this._blurXPass.render(renderer);
-			renderer.renderPass.setRenderTarget(tempRT3);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT3);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._blurYPass.uniforms.tDiffuse = tempRT1.texture;
 			this._blurYPass.uniforms.blurX = tempRT2.texture;
 			this._blurYPass.uniforms.stride = this.stride;
 			this._blurYPass.uniforms.glowness = this.strength;
 			this.color.toArray(this._blurYPass.uniforms.glowColor);
 			this._blurYPass.render(renderer);
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.setRenderTarget(outputRenderTarget);
+			renderer.setClearColor(0, 0, 0, 0);
 			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 			} else {
-				renderer.renderPass.clear(true, true, false);
+				renderer.clear(true, true, false);
 			}
 			this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 			this._blendPass.uniforms.texture2 = tempRT3.texture;
@@ -3522,9 +3522,9 @@
 			if (usedMarkBuffer) {
 				const attachIndex = markBuffer.attachManager.getAttachIndex(this.name);
 				const channelIndex = markBuffer.attachManager.getChannelIndex(this.name);
-				renderer.renderPass.setRenderTarget(tempRT2);
-				renderer.renderPass.setClearColor(0, 0, 0, 0);
-				renderer.renderPass.clear(true, true, false);
+				renderer.setRenderTarget(tempRT2);
+				renderer.setClearColor(0, 0, 0, 0);
+				renderer.clear(true, true, false);
 				this._maskPass.uniforms.colorTexture = sceneBuffer.output()._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 				this._maskPass.uniforms.maskTexture = markBuffer.output(attachIndex)._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 				this._maskPass.uniforms.additiveTexture = colorBufferTexture;
@@ -3533,9 +3533,9 @@
 				}
 				this._maskPass.render(renderer);
 			}
-			renderer.renderPass.setRenderTarget(tempRT1);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT1);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._highlightPass.uniforms.tDiffuse = usedMarkBuffer ? tempRT2.texture : colorBufferTexture;
 			this._highlightPass.uniforms.threshold = this.threshold;
 			this._highlightPass.uniforms.smoothWidth = this.smoothWidth;
@@ -3543,9 +3543,9 @@
 			let inputRT = tempRT1;
 			for (let i = 0; i < kernelSizeArray.length; i++) {
 				const _tempRT1 = composer._renderTargetCache.allocate(i + 1);
-				renderer.renderPass.setRenderTarget(_tempRT1);
-				renderer.renderPass.setClearColor(0, 0, 0, 0);
-				renderer.renderPass.clear(true, true, false);
+				renderer.setRenderTarget(_tempRT1);
+				renderer.setClearColor(0, 0, 0, 0);
+				renderer.clear(true, true, false);
 				this._blurPass.uniforms.tDiffuse = inputRT.texture;
 				this._blurPass.uniforms.texSize[0] = inputRT.width;
 				this._blurPass.uniforms.texSize[1] = inputRT.height;
@@ -3554,9 +3554,9 @@
 				this._blurPass.uniforms.kernelRadius = kernelSizeArray[i];
 				this._blurPass.render(renderer);
 				const _tempRT2 = composer._renderTargetCache.allocate(i + 1);
-				renderer.renderPass.setRenderTarget(_tempRT2);
-				renderer.renderPass.setClearColor(0, 0, 0, 0);
-				renderer.renderPass.clear(true, true, false);
+				renderer.setRenderTarget(_tempRT2);
+				renderer.setClearColor(0, 0, 0, 0);
+				renderer.clear(true, true, false);
 				this._blurPass.uniforms.tDiffuse = _tempRT1.texture;
 				this._blurPass.uniforms.direction[0] = 0;
 				this._blurPass.uniforms.direction[1] = 1;
@@ -3565,9 +3565,9 @@
 				inputRT = _tempRT2;
 				this._tempRTList[i] = _tempRT2;
 			}
-			renderer.renderPass.setRenderTarget(tempRT2);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT2);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._compositePass.uniforms.blurTexture1 = this._tempRTList[0].texture;
 			this._compositePass.uniforms.blurTexture2 = this._tempRTList[1].texture;
 			this._compositePass.uniforms.blurTexture3 = this._tempRTList[2].texture;
@@ -3576,12 +3576,12 @@
 			this._compositePass.uniforms.bloomRadius = this.radius;
 			this._compositePass.uniforms.bloomStrength = this.strength;
 			this._compositePass.render(renderer);
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.setRenderTarget(outputRenderTarget);
+			renderer.setClearColor(0, 0, 0, 0);
 			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 			} else {
-				renderer.renderPass.clear(true, true, false);
+				renderer.clear(true, true, false);
 			}
 			this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 			this._blendPass.uniforms.texture2 = tempRT2.texture;
@@ -3702,9 +3702,9 @@
 			if (usedMarkBuffer) {
 				const attachIndex = markBuffer.attachManager.getAttachIndex(this.name);
 				const channelIndex = markBuffer.attachManager.getChannelIndex(this.name);
-				renderer.renderPass.setRenderTarget(this._tempRTList[0]);
-				renderer.renderPass.setClearColor(0, 0, 0, 0);
-				renderer.renderPass.clear(true, true, false);
+				renderer.setRenderTarget(this._tempRTList[0]);
+				renderer.setClearColor(0, 0, 0, 0);
+				renderer.clear(true, true, false);
 				this._maskPass.uniforms.colorTexture = sceneBuffer.output()._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 				this._maskPass.uniforms.maskTexture = markBuffer.output(attachIndex)._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 				this._maskPass.uniforms.additiveTexture = colorBufferTexture;
@@ -3713,9 +3713,9 @@
 				}
 				this._maskPass.render(renderer);
 			}
-			renderer.renderPass.setRenderTarget(this._tempRTList[1]);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(this._tempRTList[1]);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._downSamplerPass.uniforms.tDiffuse = usedMarkBuffer ? this._tempRTList[0].texture : colorBufferTexture;
 			this._downSamplerPass.uniforms.texSize[0] = this._tempRTList[0].width;
 			this._downSamplerPass.uniforms.texSize[1] = this._tempRTList[0].height;
@@ -3724,9 +3724,9 @@
 
 			// down sampler
 			for (let i = 2; i < 6; i++) {
-				renderer.renderPass.setRenderTarget(this._tempRTList[i]);
-				renderer.renderPass.setClearColor(0, 0, 0, 0);
-				renderer.renderPass.clear(true, true, false);
+				renderer.setRenderTarget(this._tempRTList[i]);
+				renderer.setClearColor(0, 0, 0, 0);
+				renderer.clear(true, true, false);
 				this._downSamplerPass.uniforms.tDiffuse = this._tempRTList[i - 1].texture;
 				this._downSamplerPass.uniforms.texSize[0] = this._tempRTList[i - 1].width;
 				this._downSamplerPass.uniforms.texSize[1] = this._tempRTList[i - 1].height;
@@ -3736,9 +3736,9 @@
 
 			// up sampler and blur h
 			for (let i = 0; i < 5; i++) {
-				renderer.renderPass.setRenderTarget(this._tempRTList[i]);
-				renderer.renderPass.setClearColor(0, 0, 0, 0);
-				renderer.renderPass.clear(true, true, false);
+				renderer.setRenderTarget(this._tempRTList[i]);
+				renderer.setClearColor(0, 0, 0, 0);
+				renderer.clear(true, true, false);
 				this._hBlurPass.uniforms.tDiffuse = this._tempRTList[i + 1].texture;
 				this._hBlurPass.uniforms.h = 2 * this.blurSize / this._tempRTList[i].width;
 				this._hBlurPass.render(renderer);
@@ -3746,9 +3746,9 @@
 
 			// blur v
 			for (let i = 0; i < 5; i++) {
-				renderer.renderPass.setRenderTarget(this._tempRTList2[i]);
-				renderer.renderPass.setClearColor(0, 0, 0, 0);
-				renderer.renderPass.clear(true, true, false);
+				renderer.setRenderTarget(this._tempRTList2[i]);
+				renderer.setClearColor(0, 0, 0, 0);
+				renderer.clear(true, true, false);
 				this._vBlurPass.uniforms.tDiffuse = this._tempRTList[i].texture;
 				this._vBlurPass.uniforms.v = 2 * this.blurSize / this._tempRTList[i].height;
 				this._vBlurPass.render(renderer);
@@ -3756,9 +3756,9 @@
 
 			// blend glow
 			for (let i = 3; i >= 0; i--) {
-				renderer.renderPass.setRenderTarget(this._tempRTList[i]);
-				renderer.renderPass.setClearColor(0, 0, 0, 0);
-				renderer.renderPass.clear(true, true, false);
+				renderer.setRenderTarget(this._tempRTList[i]);
+				renderer.setClearColor(0, 0, 0, 0);
+				renderer.clear(true, true, false);
 				this._blendPass.uniforms.texture1 = this._tempRTList2[i].texture;
 				this._blendPass.uniforms.texture2 = i < 3 ? this._tempRTList[i + 1].texture : this._tempRTList2[i + 1].texture;
 				this._blendPass.uniforms.colorWeight1 = (1 - this.blendRate) * this.strength;
@@ -3767,12 +3767,12 @@
 				this._blendPass.uniforms.alphaWeight2 = this.blendRate * this.strength;
 				this._blendPass.render(renderer);
 			}
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.setRenderTarget(outputRenderTarget);
+			renderer.setClearColor(0, 0, 0, 0);
 			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 			} else {
-				renderer.renderPass.clear(true, true, false);
+				renderer.clear(true, true, false);
 			}
 			this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 			this._blendPass.uniforms.texture2 = this._tempRTList[0].texture;
@@ -3865,9 +3865,9 @@
 			if (usedMarkBuffer) {
 				const attachIndex = markBuffer.attachManager.getAttachIndex(this.name);
 				const channelIndex = markBuffer.attachManager.getChannelIndex(this.name);
-				renderer.renderPass.setRenderTarget(tempRT1);
-				renderer.renderPass.setClearColor(0, 0, 0, 0);
-				renderer.renderPass.clear(true, true, false);
+				renderer.setRenderTarget(tempRT1);
+				renderer.setClearColor(0, 0, 0, 0);
+				renderer.clear(true, true, false);
 				this._maskPass.uniforms.colorTexture = sceneBuffer.output()._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 				this._maskPass.uniforms.maskTexture = markBuffer.output(attachIndex)._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 				this._maskPass.uniforms.additiveTexture = colorBufferTexture;
@@ -3876,9 +3876,9 @@
 				}
 				this._maskPass.render(renderer);
 			}
-			renderer.renderPass.setRenderTarget(tempRT2);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT2);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._tailingPass.uniforms.blurMap = usedMarkBuffer ? tempRT1.texture : colorBufferTexture;
 			this._tailingPass.uniforms.center[0] = this.center.x;
 			this._tailingPass.uniforms.center[1] = this.center.y;
@@ -3888,12 +3888,12 @@
 			// this.direction.toArray(this._tailingPass.uniforms.direction);
 			this._tailingPass.uniforms.intensity = 10 * this.strength;
 			this._tailingPass.render(renderer);
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.setRenderTarget(outputRenderTarget);
+			renderer.setClearColor(0, 0, 0, 0);
 			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 			} else {
-				renderer.renderPass.clear(true, true, false);
+				renderer.clear(true, true, false);
 			}
 			this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 			this._blendPass.uniforms.texture2 = tempRT2.texture;
@@ -4012,9 +4012,9 @@
 			if (usedMarkBuffer) {
 				const attachIndex = markBuffer.attachManager.getAttachIndex(this.name);
 				const channelIndex = markBuffer.attachManager.getChannelIndex(this.name);
-				renderer.renderPass.setRenderTarget(tempRT1);
-				renderer.renderPass.setClearColor(0, 0, 0, 0);
-				renderer.renderPass.clear(true, true, false);
+				renderer.setRenderTarget(tempRT1);
+				renderer.setClearColor(0, 0, 0, 0);
+				renderer.clear(true, true, false);
 				this._maskPass.uniforms.colorTexture = sceneBuffer.output()._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 				this._maskPass.uniforms.maskTexture = markBuffer.output(attachIndex)._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 				this._maskPass.uniforms.additiveTexture = colorBufferTexture;
@@ -4023,21 +4023,21 @@
 				}
 				this._maskPass.render(renderer);
 			}
-			renderer.renderPass.setRenderTarget(tempRT2);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT2);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._radialTailingPass.uniforms.blurMap = usedMarkBuffer ? tempRT1.texture : colorBufferTexture;
 			this._radialTailingPass.uniforms.center[0] = this.center.x;
 			this._radialTailingPass.uniforms.center[1] = this.center.y;
 			// this.center.toArray(this._radialTailingPass.uniforms.center);
 			this._radialTailingPass.uniforms.intensity = 10 * this.strength;
 			this._radialTailingPass.render(renderer);
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.setRenderTarget(outputRenderTarget);
+			renderer.setClearColor(0, 0, 0, 0);
 			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 			} else {
-				renderer.renderPass.clear(true, true, false);
+				renderer.clear(true, true, false);
 			}
 			this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 			this._blendPass.uniforms.texture2 = tempRT2.texture;
@@ -4154,9 +4154,9 @@
 			if (usedMarkBuffer) {
 				const attachIndex = markBuffer.attachManager.getAttachIndex(this.name);
 				const channelIndex = markBuffer.attachManager.getChannelIndex(this.name);
-				renderer.renderPass.setRenderTarget(tempRT1);
-				renderer.renderPass.setClearColor(0, 0, 0, 0);
-				renderer.renderPass.clear(true, true, false);
+				renderer.setRenderTarget(tempRT1);
+				renderer.setClearColor(0, 0, 0, 0);
+				renderer.clear(true, true, false);
 				this._maskPass.uniforms.colorTexture = sceneBuffer.output()._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 				this._maskPass.uniforms.maskTexture = markBuffer.output(attachIndex)._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 				this._maskPass.uniforms.additiveTexture = colorBufferTexture;
@@ -4165,21 +4165,21 @@
 				}
 				this._maskPass.render(renderer);
 			}
-			renderer.renderPass.setRenderTarget(tempRT2);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT2);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._ghostingPass.uniforms.blurMap = usedMarkBuffer ? tempRT1.texture : colorBufferTexture;
 			this._ghostingPass.uniforms.center[0] = this.center.x;
 			this._ghostingPass.uniforms.center[1] = this.center.y;
 			// this.center.toArray(this._ghostingPass.uniforms.center);
 			this._ghostingPass.uniforms.intensity = 3 * this.strength;
 			this._ghostingPass.render(renderer);
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.setRenderTarget(outputRenderTarget);
+			renderer.setClearColor(0, 0, 0, 0);
 			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 			} else {
-				renderer.renderPass.clear(true, true, false);
+				renderer.clear(true, true, false);
 			}
 			this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 			this._blendPass.uniforms.texture2 = tempRT2.texture;
@@ -4322,9 +4322,9 @@
 		}
 		render(renderer, composer, scene, camera) {
 			if (!this.needRender()) return;
-			renderer.renderPass.setRenderTarget(this._rt);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(this._rt);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			const renderOptions = this._renderOptions;
 			const renderStates = scene.getRenderStates(camera);
 			const renderQueue = scene.getRenderQueue(camera);
@@ -4333,12 +4333,14 @@
 			} else {
 				this._renderStates = renderStates;
 			}
+			renderer.beginRender();
 			const layers = this.layers;
 			for (let i = 0, l = layers.length; i < l; i++) {
 				const renderQueueLayer = renderQueue.getLayer(layers[i]);
 				renderer.renderRenderableList(renderQueueLayer.opaque, this._renderStates, renderOptions);
 				renderer.renderRenderableList(renderQueueLayer.transparent, this._renderStates, renderOptions);
 			}
+			renderer.endRender();
 		}
 		output() {
 			return this._rt;
@@ -4664,13 +4666,13 @@
 				const rt = this._rts[attachIndex];
 				const mrt = this._mrts[attachIndex];
 				if (composer.$useMSAA) {
-					renderer.renderPass.setRenderTarget(mrt);
-					renderer.renderPass.setClearColor(0, 0, 0, 0);
-					renderer.renderPass.clear(true, false, false);
+					renderer.setRenderTarget(mrt);
+					renderer.setClearColor(0, 0, 0, 0);
+					renderer.clear(true, false, false);
 				} else {
-					renderer.renderPass.setRenderTarget(rt);
-					renderer.renderPass.setClearColor(0, 0, 0, 0);
-					renderer.renderPass.clear(true, false, false);
+					renderer.setRenderTarget(rt);
+					renderer.setClearColor(0, 0, 0, 0);
+					renderer.clear(true, false, false);
 				}
 				const renderStates = scene.getRenderStates(camera);
 				const renderQueue = scene.getRenderQueue(camera);
@@ -4682,6 +4684,7 @@
 				for (let i = 0; i < maskLength; i++) {
 					attachMask |= attachMasks[i];
 				}
+				renderer.beginRender();
 				const layers = this.layers;
 				for (let i = 0, l = layers.length; i < l; i++) {
 					const renderQueueLayer = renderQueue.getLayer(layers[i]);
@@ -4692,13 +4695,14 @@
 						renderer.renderRenderableList(renderQueueLayer.transparent, renderStates, this._transparentRenderOptions);
 					}
 				}
+				renderer.endRender();
 				if (composer.$useMSAA) {
-					renderer.renderPass.setRenderTarget(rt);
-					renderer.renderPass.blitRenderTarget(mrt, rt, true, false, false);
+					renderer.setRenderTarget(rt);
+					renderer.blitRenderTarget(mrt, rt, true, false, false);
 				}
 
 				// generate mipmaps for down sampler
-				renderer.renderPass.updateRenderTargetMipmap(rt);
+				renderer.updateRenderTargetMipmap(rt);
 			}
 		}
 		output(attachIndex = 0) {
@@ -4943,13 +4947,13 @@
 				const rt = this._rts[attachIndex];
 				const mrt = this._mrts[attachIndex];
 				if (composer.$useMSAA) {
-					renderer.renderPass.setRenderTarget(mrt);
-					renderer.renderPass.setClearColor(0, 0, 0, 0);
-					renderer.renderPass.clear(true, false, false);
+					renderer.setRenderTarget(mrt);
+					renderer.setClearColor(0, 0, 0, 0);
+					renderer.clear(true, false, false);
 				} else {
-					renderer.renderPass.setRenderTarget(rt);
-					renderer.renderPass.setClearColor(0, 0, 0, 0);
-					renderer.renderPass.clear(true, false, false);
+					renderer.setRenderTarget(rt);
+					renderer.setClearColor(0, 0, 0, 0);
+					renderer.clear(true, false, false);
 				}
 				const renderOptions = this._renderOptions;
 				const attachManager = this.attachManager;
@@ -4957,6 +4961,7 @@
 				const renderQueue = scene.getRenderQueue(camera);
 				this._state.key = attachManager.getKey(attachIndex, 0);
 				const mask = attachManager.getMask(attachIndex, 0);
+				renderer.beginRender();
 				const layers = this.layers;
 				for (let i = 0, l = layers.length; i < l; i++) {
 					const renderQueueLayer = renderQueue.getLayer(layers[i]);
@@ -4967,13 +4972,14 @@
 						renderer.renderRenderableList(renderQueueLayer.transparent, renderStates, renderOptions);
 					}
 				}
+				renderer.endRender();
 				if (composer.$useMSAA) {
-					renderer.renderPass.setRenderTarget(rt);
-					renderer.renderPass.blitRenderTarget(mrt, rt, true, false, false);
+					renderer.setRenderTarget(rt);
+					renderer.blitRenderTarget(mrt, rt, true, false, false);
 				}
 
 				// generate mipmaps for down sampler
-				renderer.renderPass.updateRenderTargetMipmap(rt);
+				renderer.updateRenderTargetMipmap(rt);
 			}
 		}
 		output(attachIndex = 0) {
@@ -5157,23 +5163,23 @@
 			const useMSAA = composer.$useMSAA;
 			const renderTarget = useMSAA ? this._mrt : this._rt;
 			const hasStencil = !!renderTarget._attachments[t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
-			renderer.renderPass.setRenderTarget(renderTarget);
+			renderer.setRenderTarget(renderTarget);
 			if (composer.clearColor) {
-				renderer.renderPass.setClearColor(...composer._tempClearColor);
+				renderer.setClearColor(...composer._tempClearColor);
 			} else {
-				renderer.renderPass.setClearColor(0, 0, 0, 0);
+				renderer.setClearColor(0, 0, 0, 0);
 			}
-			renderer.renderPass.clear(this.clearColor, this.clearDepth, this.clearStencil && hasStencil);
+			renderer.clear(this.clearColor, this.clearDepth, this.clearStencil && hasStencil);
 			const renderStates = scene.getRenderStates(camera);
 			const renderQueue = scene.getRenderQueue(camera);
 			this.$renderScene(renderer, renderQueue, renderStates);
 			if (useMSAA) {
-				renderer.renderPass.setRenderTarget(this._rt);
-				renderer.renderPass.blitRenderTarget(this._mrt, this._rt, true, true, hasStencil);
+				renderer.setRenderTarget(this._rt);
+				renderer.blitRenderTarget(this._mrt, this._rt, true, true, hasStencil);
 			}
 
 			// generate mipmaps for down sampler
-			renderer.renderPass.updateRenderTargetMipmap(this._rt);
+			renderer.updateRenderTargetMipmap(this._rt);
 		}
 		output() {
 			return this._rt;
@@ -5190,6 +5196,7 @@
 		}
 		$renderScene(renderer, renderQueue, renderStates) {
 			const sceneRenderOptions = this._sceneRenderOptions;
+			renderer.beginRender();
 			const renderLayers = this.renderLayers;
 			for (let i = 0, l = renderLayers.length; i < l; i++) {
 				const {
@@ -5207,15 +5214,18 @@
 					}
 				}
 			}
+			renderer.endRender();
 
 			// TODO Overlay layer
 
 			const overlayLayer = renderQueue.getLayer(1);
 			if (overlayLayer && overlayLayer.opaqueCount + overlayLayer.transparentCount > 0) {
-				renderer.renderPass.clear(false, true, false); // TODO Forcing clear depth may cause bugs
+				renderer.clear(false, true, false); // TODO Forcing clear depth may cause bugs
 
+				renderer.beginRender();
 				renderer.renderRenderableList(overlayLayer.opaque, renderStates, sceneRenderOptions);
 				renderer.renderRenderableList(overlayLayer.transparent, renderStates, sceneRenderOptions);
+				renderer.endRender();
 			}
 		}
 	}
@@ -5514,7 +5524,7 @@
 		}
 		render(renderer, scene, camera, target) {
 			const renderStates = scene.getRenderStates(camera);
-			renderer.renderPass.getClearColor().toArray(this._tempClearColor); // save clear color
+			renderer.getClearColor().toArray(this._tempClearColor); // save clear color
 			camera.rect.toArray(this._tempViewport);
 			camera.rect.set(0, 0, 1, 1);
 			renderStates.camera.rect.set(0, 0, 1, 1);
@@ -5532,7 +5542,7 @@
 					buffer.render(renderer, this, scene, camera);
 				});
 				this.debugger.render(renderer, this, target);
-				renderer.renderPass.setClearColor(...this._tempClearColor); // restore clear color
+				renderer.setClearColor(...this._tempClearColor); // restore clear color
 
 				return;
 			}
@@ -5581,24 +5591,24 @@
 			} else if (!!this._externalColorAttachment && !!this._externalDepthAttachment) {
 				const sceneBuffer = this._bufferMap.get('SceneBuffer');
 				sceneBuffer.render(renderer, this, scene, camera);
-				renderer.renderPass.setRenderTarget(target);
-				renderer.renderPass.setClearColor(0, 0, 0, 0);
-				renderer.renderPass.clear(this.clearColor, this.clearDepth, this.clearStencil);
+				renderer.setRenderTarget(target);
+				renderer.setClearColor(0, 0, 0, 0);
+				renderer.clear(this.clearColor, this.clearDepth, this.clearStencil);
 				const copyPass = this._copyPass;
 				copyPass.uniforms.tDiffuse = sceneBuffer.output().texture;
 				copyPass.material.transparent = this._tempClearColor[3] < 1 || !this.clearColor;
 				copyPass.renderStates.camera.rect.fromArray(this._tempViewport);
 				copyPass.render(renderer);
 			} else {
-				renderer.renderPass.setRenderTarget(target);
-				renderer.renderPass.setClearColor(...this._tempClearColor);
-				renderer.renderPass.clear(this.clearColor, this.clearDepth, this.clearStencil);
+				renderer.setRenderTarget(target);
+				renderer.setClearColor(...this._tempClearColor);
+				renderer.clear(this.clearColor, this.clearDepth, this.clearStencil);
 				renderStates.camera.rect.fromArray(this._tempViewport);
 				const renderQueue = scene.getRenderQueue(camera);
 				const sceneBuffer = this._bufferMap.get('SceneBuffer');
 				sceneBuffer.$renderScene(renderer, renderQueue, renderStates);
 			}
-			renderer.renderPass.setClearColor(...this._tempClearColor); // restore clear color
+			renderer.setClearColor(...this._tempClearColor); // restore clear color
 			camera.rect.fromArray(this._tempViewport);
 			renderStates.camera.rect.fromArray(this._tempViewport);
 		}
@@ -5692,9 +5702,9 @@
 			this.mask = RenderListMask.ALL;
 		}
 		render(renderer, composer, outputRenderTarget) {
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 1);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(outputRenderTarget);
+			renderer.setClearColor(0, 0, 0, 1);
+			renderer.clear(true, true, false);
 			const buffer = composer.getBuffer('ColorMarkBuffer');
 			const attachIndex = buffer.attachManager.getAttachIndex(this.channel);
 			this._mainPass.uniforms['tDiffuse'] = buffer.output(attachIndex)._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
@@ -5710,9 +5720,9 @@
 			this.debugType = DebugTypes.Normal;
 		}
 		render(renderer, composer, outputRenderTarget) {
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 1);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(outputRenderTarget);
+			renderer.setClearColor(0, 0, 0, 1);
+			renderer.clear(true, true, false);
 			const gBuffer = composer.getBuffer('GBuffer');
 			const gBufferRenderStates = gBuffer.getCurrentRenderStates();
 			this._mainPass.uniforms['normalGlossinessTexture'] = gBuffer.output()._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
@@ -5793,9 +5803,9 @@
 			this.mask = RenderListMask.ALL;
 		}
 		render(renderer, composer, outputRenderTarget) {
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 1);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(outputRenderTarget);
+			renderer.setClearColor(0, 0, 0, 1);
+			renderer.clear(true, true, false);
 			const buffer = composer.getBuffer('MarkBuffer');
 			const attachIndex = buffer.attachManager.getAttachIndex(this.channel);
 			const channelIndex = buffer.attachManager.getChannelIndex(this.channel);
@@ -5816,9 +5826,9 @@
 			this.mask = RenderListMask.ALL;
 		}
 		render(renderer, composer, outputRenderTarget) {
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 1);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(outputRenderTarget);
+			renderer.setClearColor(0, 0, 0, 1);
+			renderer.clear(true, true, false);
 			const buffer = composer.getBuffer('NonDepthMarkBuffer');
 			const attachIndex = buffer.attachManager.getAttachIndex(this.channel);
 			const channelIndex = buffer.attachManager.getChannelIndex(this.channel);

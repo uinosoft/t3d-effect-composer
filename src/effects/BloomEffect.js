@@ -28,36 +28,36 @@ export default class BloomEffect extends Effect {
 		const tempRT2 = composer._renderTargetCache.allocate(1);
 		const tempRT3 = composer._renderTargetCache.allocate(1);
 
-		renderer.renderPass.setRenderTarget(tempRT1);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(tempRT1);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 		this._highlightPass.uniforms.tDiffuse = inputRenderTarget.texture;
 		this._highlightPass.uniforms.threshold = this.threshold;
 		this._highlightPass.uniforms.smoothWidth = this.smoothWidth;
 		this._highlightPass.render(renderer);
 
-		renderer.renderPass.setRenderTarget(tempRT2);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(tempRT2);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 		this._blurPass.uniforms.tDiffuse = tempRT1.texture;
 		this._blurPass.uniforms.direction = 0;
 		this._blurPass.uniforms.blurSize = this.blurSize;
 		this._blurPass.render(renderer);
 
-		renderer.renderPass.setRenderTarget(tempRT3);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(tempRT3);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 		this._blurPass.uniforms.tDiffuse = tempRT2.texture;
 		this._blurPass.uniforms.direction = 1;
 		this._blurPass.uniforms.blurSize = this.blurSize;
 		this._blurPass.render(renderer);
 
-		renderer.renderPass.setRenderTarget(outputRenderTarget);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
+		renderer.setRenderTarget(outputRenderTarget);
+		renderer.setClearColor(0, 0, 0, 0);
 		if (finish) {
-			renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 		} else {
-			renderer.renderPass.clear(true, true, false);
+			renderer.clear(true, true, false);
 		}
 		this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 		this._blendPass.uniforms.texture2 = tempRT3.texture;

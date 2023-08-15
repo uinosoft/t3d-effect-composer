@@ -14,12 +14,12 @@ export class LutEffect extends Effect {
 	}
 
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-		renderer.renderPass.setRenderTarget(outputRenderTarget);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
+		renderer.setRenderTarget(outputRenderTarget);
+		renderer.setClearColor(0, 0, 0, 0);
 		if (finish) {
-			renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 		} else {
-			renderer.renderPass.clear(true, true, true);
+			renderer.clear(true, true, true);
 		}
 
 		const lutPass = this._lutPass;

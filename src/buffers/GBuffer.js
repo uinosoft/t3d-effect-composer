@@ -90,9 +90,9 @@ export default class GBuffer extends Buffer {
 	render(renderer, composer, scene, camera) {
 		if (!this.needRender()) return;
 
-		renderer.renderPass.setRenderTarget(this._rt);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(this._rt);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 
 		const renderOptions = this._renderOptions;
 
@@ -105,12 +105,16 @@ export default class GBuffer extends Buffer {
 			this._renderStates = renderStates;
 		}
 
+		renderer.beginRender();
+
 		const layers = this.layers;
 		for (let i = 0, l = layers.length; i < l; i++) {
 			const renderQueueLayer = renderQueue.getLayer(layers[i]);
 			renderer.renderRenderableList(renderQueueLayer.opaque, this._renderStates, renderOptions);
 			renderer.renderRenderableList(renderQueueLayer.transparent, this._renderStates, renderOptions);
 		}
+
+		renderer.endRender();
 	}
 
 	output() {

@@ -72,27 +72,35 @@ export default class ThicknessBuffer extends Buffer {
 		const renderStates = scene.getRenderStates(camera);
 		const renderQueue = scene.getRenderQueue(camera);
 
-		renderer.renderPass.setRenderTarget(this._frontDepthRenderTarget);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(this._frontDepthRenderTarget);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 
-		let layers = this.layers;
+		const layers = this.layers;
+
+		renderer.beginRender();
+
 		for (let i = 0, l = layers.length; i < l; i++) {
 			const renderQueueLayer = renderQueue.getLayer(layers[i]);
 			renderer.renderRenderableList(renderQueueLayer.opaque, renderStates, this._frontRenderOptions);
 			renderer.renderRenderableList(renderQueueLayer.transparent, renderStates, this._frontRenderOptions);
 		}
 
-		renderer.renderPass.setRenderTarget(this._backDepthRenderTarget);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.endRender();
 
-		layers = this.layers;
+		renderer.setRenderTarget(this._backDepthRenderTarget);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
+
+		renderer.beginRender();
+
 		for (let i = 0, l = layers.length; i < l; i++) {
 			const renderQueueLayer = renderQueue.getLayer(layers[i]);
 			renderer.renderRenderableList(renderQueueLayer.opaque, renderStates, this._backRenderOptions);
 			renderer.renderRenderableList(renderQueueLayer.transparent, renderStates, this._backRenderOptions);
 		}
+
+		renderer.endRender();
 	}
 
 	output() {

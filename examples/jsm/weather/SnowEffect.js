@@ -35,9 +35,9 @@ export default class SnowEffect extends Effect {
 
 		// Render snow pass
 
-		renderer.renderPass.setRenderTarget(tempRT1);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(tempRT1);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 
 		const deltaTime = 0.0166666;
 		this._snowPass.uniforms.time += deltaTime * this.speed / 8.;
@@ -52,9 +52,9 @@ export default class SnowEffect extends Effect {
 
 		// Render snow cover pass
 
-		renderer.renderPass.setRenderTarget(tempRT2);
-		renderer.renderPass.setClearColor(1, 1, 1, 1);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(tempRT2);
+		renderer.setClearColor(1, 1, 1, 1);
+		renderer.clear(true, true, false);
 
 		this._snowCoverPass.uniforms.normalTexture = gBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 		this._snowCoverPass.uniforms.cover = this.cover;
@@ -64,9 +64,9 @@ export default class SnowEffect extends Effect {
 		// (Optional) Render fxaa pass
 
 		if (this.fxaa) 		{
-			renderer.renderPass.setRenderTarget(tempRT3);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, true);
+			renderer.setRenderTarget(tempRT3);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, true);
 
 			this._fxaaPass.uniforms.resolution[0] = 1 / gBuffer.output().width;
 			this._fxaaPass.uniforms.resolution[1] = 1 / gBuffer.output().height;
@@ -84,12 +84,12 @@ export default class SnowEffect extends Effect {
 			this.bufferDependencies = [];
 		}
 
-		renderer.renderPass.setRenderTarget(outputRenderTarget);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
+		renderer.setRenderTarget(outputRenderTarget);
+		renderer.setClearColor(0, 0, 0, 0);
 		if (finish) {
-			renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 		} else {
-			renderer.renderPass.clear(true, true, false);
+			renderer.clear(true, true, false);
 		}
 		this._snowMixPass.uniforms.texture1 = inputRenderTarget.texture;
 		this._snowMixPass.uniforms.texture2 = this.fxaa ? tempRT3.texture : tempRT2.texture;

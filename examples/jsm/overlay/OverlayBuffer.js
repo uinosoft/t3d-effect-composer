@@ -47,14 +47,16 @@ export class OverlayBuffer extends Buffer {
 		const useMSAA = composer.$useMSAA;
 		const renderTarget = useMSAA ? this._mrt : this._rt;
 
-		renderer.renderPass.setRenderTarget(renderTarget);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, true);
+		renderer.setRenderTarget(renderTarget);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, true);
 
 		const renderStates = scene.getRenderStates(camera);
 		const renderQueue = scene.getRenderQueue(camera);
 
 		const renderOptions = this._renderOptions;
+
+		renderer.beginRender();
 
 		const renderLayers = this.renderLayers;
 		for (let i = 0, l = renderLayers.length; i < l; i++) {
@@ -70,13 +72,15 @@ export class OverlayBuffer extends Buffer {
 			}
 		}
 
+		renderer.endRender();
+
 		if (useMSAA) {
-			renderer.renderPass.setRenderTarget(this._rt);
-			renderer.renderPass.blitRenderTarget(this._mrt, this._rt, true, true, true);
+			renderer.setRenderTarget(this._rt);
+			renderer.blitRenderTarget(this._mrt, this._rt, true, true, true);
 		}
 
 		// generate mipmaps for down sampler
-		renderer.renderPass.updateRenderTargetMipmap(this._rt);
+		renderer.updateRenderTargetMipmap(this._rt);
 	}
 
 	output() {

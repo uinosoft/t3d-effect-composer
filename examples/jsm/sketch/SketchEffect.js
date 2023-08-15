@@ -43,18 +43,18 @@ export class SketchEffect extends Effect {
 		this._sketchPass.uniforms.uThreshold = this.threshold;
 		this._sketchPass.uniforms.uContrast = this.contrast;
 
-		renderer.renderPass.setRenderTarget(tempRT1);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, true);
+		renderer.setRenderTarget(tempRT1);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, true);
 
 		this._sketchPass.render(renderer);
 
 		// (Optional) Render fxaa pass
 
 		if (this.fxaa) {
-			renderer.renderPass.setRenderTarget(tempRT2);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, true);
+			renderer.setRenderTarget(tempRT2);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, true);
 
 			this._fxaaPass.uniforms.resolution[0] = 1 / gBuffer.output().width;
 			this._fxaaPass.uniforms.resolution[1] = 1 / gBuffer.output().height;
@@ -64,14 +64,14 @@ export class SketchEffect extends Effect {
 
 		// Render mix pass
 
-		renderer.renderPass.setRenderTarget(outputRenderTarget);
+		renderer.setRenderTarget(outputRenderTarget);
 
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
+		renderer.setClearColor(0, 0, 0, 0);
 
 		if (finish) {
-			renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 		} else {
-			renderer.renderPass.clear(true, true, true);
+			renderer.clear(true, true, true);
 		}
 
 		this._mixPass.uniforms['diffuse'] = inputRenderTarget.texture;

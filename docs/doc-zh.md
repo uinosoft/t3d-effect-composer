@@ -11,9 +11,9 @@
 
 ````javascript
 const effectComposer = new EffectComposer(width, height, {
-    samplerNumber: Math.min(renderer.renderPass.capabilities.maxSamples, 5),
-    webgl2: renderer.renderPass.capabilities.version > 1,
-    floatColorBuffer: !!renderer.renderPass.capabilities.getExtension("EXT_color_buffer_float"),
+    samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
+    webgl2: renderer.capabilities.version > 1,
+    floatColorBuffer: !!renderer.capabilities.getExtension("EXT_color_buffer_float"),
     maxMarkAttachment: 5,
     maxColorAttachment: 5
 });

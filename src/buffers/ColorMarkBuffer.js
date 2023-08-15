@@ -115,13 +115,13 @@ export default class ColorMarkBuffer extends Buffer {
 			const mrt = this._mrts[attachIndex];
 
 			if (composer.$useMSAA) {
-				renderer.renderPass.setRenderTarget(mrt);
-				renderer.renderPass.setClearColor(0, 0, 0, 0);
-				renderer.renderPass.clear(true, false, false);
+				renderer.setRenderTarget(mrt);
+				renderer.setClearColor(0, 0, 0, 0);
+				renderer.clear(true, false, false);
 			} else {
-				renderer.renderPass.setRenderTarget(rt);
-				renderer.renderPass.setClearColor(0, 0, 0, 0);
-				renderer.renderPass.clear(true, false, false);
+				renderer.setRenderTarget(rt);
+				renderer.setClearColor(0, 0, 0, 0);
+				renderer.clear(true, false, false);
 			}
 
 			const renderOptions = this._renderOptions;
@@ -132,6 +132,8 @@ export default class ColorMarkBuffer extends Buffer {
 
 			this._state.key = attachManager.getKey(attachIndex, 0);
 			const mask = attachManager.getMask(attachIndex, 0);
+
+			renderer.beginRender();
 
 			const layers = this.layers;
 			for (let i = 0, l = layers.length; i < l; i++) {
@@ -146,13 +148,15 @@ export default class ColorMarkBuffer extends Buffer {
 				}
 			}
 
+			renderer.endRender();
+
 			if (composer.$useMSAA) {
-				renderer.renderPass.setRenderTarget(rt);
-				renderer.renderPass.blitRenderTarget(mrt, rt, true, false, false);
+				renderer.setRenderTarget(rt);
+				renderer.blitRenderTarget(mrt, rt, true, false, false);
 			}
 
 			// generate mipmaps for down sampler
-			renderer.renderPass.updateRenderTargetMipmap(rt);
+			renderer.updateRenderTargetMipmap(rt);
 		}
 	}
 

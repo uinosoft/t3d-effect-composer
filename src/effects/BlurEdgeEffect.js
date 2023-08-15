@@ -27,15 +27,15 @@ export default class BlurEdgeEffect extends Effect {
 		const blendPass = this._blendPass;
 
 		// Step 1: blur x
-		renderer.renderPass.setRenderTarget(tempRT1);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(tempRT1);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 		this._hBlurPass.uniforms.tDiffuse = inputRenderTarget.texture;
 		this._hBlurPass.render(renderer);
 		// Step 2: blur y
-		renderer.renderPass.setRenderTarget(tempRT2);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(tempRT2);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 		this._vBlurPass.uniforms.tDiffuse = tempRT1.texture;
 		this._vBlurPass.render(renderer);
 		// Step 3: blend
@@ -43,12 +43,12 @@ export default class BlurEdgeEffect extends Effect {
 		blendPass.uniforms.blurOffset = this.offset;
 		blendPass.uniforms.blurTexture = tempRT2.texture;
 
-		renderer.renderPass.setRenderTarget(outputRenderTarget);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
+		renderer.setRenderTarget(outputRenderTarget);
+		renderer.setClearColor(0, 0, 0, 0);
 		if (finish) {
-			renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 		} else {
-			renderer.renderPass.clear(true, true, false);
+			renderer.clear(true, true, false);
 		}
 		if (finish) {
 			blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;

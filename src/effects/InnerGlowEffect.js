@@ -41,25 +41,25 @@ export default class InnerGlowEffect extends Effect {
 		const attachIndex = markBuffer.attachManager.getAttachIndex(this.name);
 		const channelIndex = markBuffer.attachManager.getChannelIndex(this.name);
 
-		renderer.renderPass.setRenderTarget(tempRT1);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(tempRT1);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 		this._channelPass.uniforms['tDiffuse'] = markBuffer.output(attachIndex)._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 		for (let i = 0; i < 4; i++) {
 			this._channelPass.uniforms.channelMask[i] = (i === channelIndex) ? 1 : 0;
 		}
 		this._channelPass.render(renderer);
 
-		renderer.renderPass.setRenderTarget(tempRT2);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(tempRT2);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 		this._blurXPass.uniforms.tDiffuse = tempRT1.texture;
 		this._blurXPass.uniforms.stride = this.stride;
 		this._blurXPass.render(renderer);
 
-		renderer.renderPass.setRenderTarget(tempRT3);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(tempRT3);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 		this._blurYPass.uniforms.tDiffuse = tempRT1.texture;
 		this._blurYPass.uniforms.blurX = tempRT2.texture;
 		this._blurYPass.uniforms.stride = this.stride;
@@ -67,12 +67,12 @@ export default class InnerGlowEffect extends Effect {
 		this.color.toArray(this._blurYPass.uniforms.glowColor);
 		this._blurYPass.render(renderer);
 
-		renderer.renderPass.setRenderTarget(outputRenderTarget);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
+		renderer.setRenderTarget(outputRenderTarget);
+		renderer.setClearColor(0, 0, 0, 0);
 		if (finish) {
-			renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 		} else {
-			renderer.renderPass.clear(true, true, false);
+			renderer.clear(true, true, false);
 		}
 		this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 		this._blendPass.uniforms.texture2 = tempRT3.texture;

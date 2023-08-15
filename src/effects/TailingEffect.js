@@ -44,9 +44,9 @@ export default class TailingEffect extends Effect {
 			const attachIndex = markBuffer.attachManager.getAttachIndex(this.name);
 			const channelIndex = markBuffer.attachManager.getChannelIndex(this.name);
 
-			renderer.renderPass.setRenderTarget(tempRT1);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(tempRT1);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._maskPass.uniforms.colorTexture = sceneBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			this._maskPass.uniforms.maskTexture = markBuffer.output(attachIndex)._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			this._maskPass.uniforms.additiveTexture = colorBufferTexture;
@@ -56,9 +56,9 @@ export default class TailingEffect extends Effect {
 			this._maskPass.render(renderer);
 		}
 
-		renderer.renderPass.setRenderTarget(tempRT2);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(tempRT2);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 		this._tailingPass.uniforms.blurMap = usedMarkBuffer ? tempRT1.texture : colorBufferTexture;
 		this._tailingPass.uniforms.center[0] = this.center.x;
 		this._tailingPass.uniforms.center[1] = this.center.y;
@@ -69,12 +69,12 @@ export default class TailingEffect extends Effect {
 		this._tailingPass.uniforms.intensity = 10 * this.strength;
 		this._tailingPass.render(renderer);
 
-		renderer.renderPass.setRenderTarget(outputRenderTarget);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
+		renderer.setRenderTarget(outputRenderTarget);
+		renderer.setClearColor(0, 0, 0, 0);
 		if (finish) {
-			renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 		} else {
-			renderer.renderPass.clear(true, true, false);
+			renderer.clear(true, true, false);
 		}
 		this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 		this._blendPass.uniforms.texture2 = tempRT2.texture;

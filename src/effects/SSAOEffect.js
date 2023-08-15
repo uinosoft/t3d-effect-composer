@@ -59,9 +59,9 @@ export default class SSAOEffect extends Effect {
 
 		// Step 1: ssao pass
 
-		renderer.renderPass.setRenderTarget(tempRT1);
-		renderer.renderPass.setClearColor(1, 1, 1, 1);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(tempRT1);
+		renderer.setClearColor(1, 1, 1, 1);
+		renderer.clear(true, true, false);
 
 		this._ssaoPass.uniforms.normalTex = gBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 		this._ssaoPass.uniforms.depthTex = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
@@ -87,9 +87,9 @@ export default class SSAOEffect extends Effect {
 
 		// Step 2: blurX pass
 
-		renderer.renderPass.setRenderTarget(tempRT2);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(tempRT2);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 
 		this._blurPass.uniforms.normalTex = gBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 		this._blurPass.uniforms.depthTex = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
@@ -109,8 +109,8 @@ export default class SSAOEffect extends Effect {
 
 		// Step 3: blurY pass
 
-		renderer.renderPass.setRenderTarget(!!inputRenderTarget ? tempRT1 : outputRenderTarget);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(!!inputRenderTarget ? tempRT1 : outputRenderTarget);
+		renderer.clear(true, true, false);
 
 		this._blurPass.uniforms.direction = 1;
 		this._blurPass.uniforms.tDiffuse = tempRT2.texture;
@@ -120,12 +120,12 @@ export default class SSAOEffect extends Effect {
 		// Step 4: blend pass
 
 		if (!!inputRenderTarget) {
-			renderer.renderPass.setRenderTarget(outputRenderTarget);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
+			renderer.setRenderTarget(outputRenderTarget);
+			renderer.setClearColor(0, 0, 0, 0);
 			if (finish) {
-				renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 			} else {
-				renderer.renderPass.clear(true, true, false);
+				renderer.clear(true, true, false);
 			}
 
 			this._blendPass.uniforms.texture1 = inputRenderTarget.texture;

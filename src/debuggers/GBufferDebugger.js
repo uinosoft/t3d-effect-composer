@@ -14,9 +14,9 @@ export default class GBufferDebugger extends Debugger {
 	}
 
 	render(renderer, composer, outputRenderTarget) {
-		renderer.renderPass.setRenderTarget(outputRenderTarget);
-		renderer.renderPass.setClearColor(0, 0, 0, 1);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(outputRenderTarget);
+		renderer.setClearColor(0, 0, 0, 1);
+		renderer.clear(true, true, false);
 
 		const gBuffer = composer.getBuffer('GBuffer');
 		const gBufferRenderStates = gBuffer.getCurrentRenderStates();

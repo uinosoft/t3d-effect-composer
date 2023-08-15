@@ -17,12 +17,12 @@ export class OverlayEffect extends Effect {
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
 		const overlayBuffer = composer.getBuffer('OverlayBuffer');
 
-		renderer.renderPass.setRenderTarget(outputRenderTarget);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
+		renderer.setRenderTarget(outputRenderTarget);
+		renderer.setClearColor(0, 0, 0, 0);
 		if (finish) {
-			renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 		} else {
-			renderer.renderPass.clear(true, true, false);
+			renderer.clear(true, true, false);
 		}
 		this._blendPass.uniforms.srcTex = overlayBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 		this._blendPass.uniforms.dstTex = inputRenderTarget.texture;

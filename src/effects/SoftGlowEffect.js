@@ -51,9 +51,9 @@ export default class SoftGlowEffect extends Effect {
 			const attachIndex = markBuffer.attachManager.getAttachIndex(this.name);
 			const channelIndex = markBuffer.attachManager.getChannelIndex(this.name);
 
-			renderer.renderPass.setRenderTarget(this._tempRTList[0]);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(this._tempRTList[0]);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._maskPass.uniforms.colorTexture = sceneBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			this._maskPass.uniforms.maskTexture = markBuffer.output(attachIndex)._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			this._maskPass.uniforms.additiveTexture = colorBufferTexture;
@@ -63,9 +63,9 @@ export default class SoftGlowEffect extends Effect {
 			this._maskPass.render(renderer);
 		}
 
-		renderer.renderPass.setRenderTarget(this._tempRTList[1]);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(this._tempRTList[1]);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 		this._downSamplerPass.uniforms.tDiffuse = usedMarkBuffer ? this._tempRTList[0].texture : colorBufferTexture;
 		this._downSamplerPass.uniforms.texSize[0] = this._tempRTList[0].width;
 		this._downSamplerPass.uniforms.texSize[1] = this._tempRTList[0].height;
@@ -74,9 +74,9 @@ export default class SoftGlowEffect extends Effect {
 
 		// down sampler
 		for (let i = 2; i < 6; i++) {
-			renderer.renderPass.setRenderTarget(this._tempRTList[i]);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(this._tempRTList[i]);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._downSamplerPass.uniforms.tDiffuse = this._tempRTList[i - 1].texture;
 			this._downSamplerPass.uniforms.texSize[0] = this._tempRTList[i - 1].width;
 			this._downSamplerPass.uniforms.texSize[1] = this._tempRTList[i - 1].height;
@@ -86,9 +86,9 @@ export default class SoftGlowEffect extends Effect {
 
 		// up sampler and blur h
 		for (let i = 0; i < 5; i++) {
-			renderer.renderPass.setRenderTarget(this._tempRTList[i]);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(this._tempRTList[i]);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._hBlurPass.uniforms.tDiffuse = this._tempRTList[i + 1].texture;
 			this._hBlurPass.uniforms.h = 2 * this.blurSize / this._tempRTList[i].width;
 			this._hBlurPass.render(renderer);
@@ -96,9 +96,9 @@ export default class SoftGlowEffect extends Effect {
 
 		// blur v
 		for (let i = 0; i < 5; i++) {
-			renderer.renderPass.setRenderTarget(this._tempRTList2[i]);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(this._tempRTList2[i]);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._vBlurPass.uniforms.tDiffuse = this._tempRTList[i].texture;
 			this._vBlurPass.uniforms.v = 2 * this.blurSize / this._tempRTList[i].height;
 			this._vBlurPass.render(renderer);
@@ -106,9 +106,9 @@ export default class SoftGlowEffect extends Effect {
 
 		// blend glow
 		for (let i = 3; i >= 0; i--) {
-			renderer.renderPass.setRenderTarget(this._tempRTList[i]);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(this._tempRTList[i]);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this._blendPass.uniforms.texture1 = this._tempRTList2[i].texture;
 			this._blendPass.uniforms.texture2 = (i < 3) ? this._tempRTList[i + 1].texture : this._tempRTList2[i + 1].texture;
 			this._blendPass.uniforms.colorWeight1 = (1 - this.blendRate) * this.strength;
@@ -119,12 +119,12 @@ export default class SoftGlowEffect extends Effect {
 			this._blendPass.render(renderer);
 		}
 
-		renderer.renderPass.setRenderTarget(outputRenderTarget);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
+		renderer.setRenderTarget(outputRenderTarget);
+		renderer.setClearColor(0, 0, 0, 0);
 		if (finish) {
-			renderer.renderPass.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
 		} else {
-			renderer.renderPass.clear(true, true, false);
+			renderer.clear(true, true, false);
 		}
 		this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 		this._blendPass.uniforms.texture2 = this._tempRTList[0].texture;

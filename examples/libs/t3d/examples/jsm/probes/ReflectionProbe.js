@@ -40,12 +40,10 @@ class ReflectionProbe {
 	/**
 	 * Render the reflection.
 	 * Need update scene data and collect light data before calling this method.
-	 * @param {t3d.Renderer} renderer
+	 * @param {t3d.ThinRenderer} renderer
 	 * @param {t3d.Scene} scene
 	 */
 	render(renderer, scene) {
-		const renderPass = renderer.renderPass;
-
 		this.camera.position.copy(this.position);
 
 		for (let i = 0; i < 6; i++) {
@@ -54,22 +52,25 @@ class ReflectionProbe {
 			this.camera.updateMatrix();
 
 			this.renderTarget.activeCubeFace = i;
-			renderPass.setRenderTarget(this.renderTarget);
+			renderer.setRenderTarget(this.renderTarget);
 
-			renderPass.clear(true, true, true); // TODO depth bug here?
+			renderer.clear(true, true, true); // TODO depth bug here?
 
 			const renderStates = scene.updateRenderStates(this.camera, false);
 			const renderQueue = scene.updateRenderQueue(this.camera, false, false);
 
-			let renderQueueLayer;
+			renderer.beginRender();
 
+			let renderQueueLayer;
 			for (let i = 0, l = renderQueue.layerList.length; i < l; i++) {
 				renderQueueLayer = renderQueue.layerList[i];
 				renderer.renderRenderableList(renderQueueLayer.opaque, renderStates, this.renderOption);
 				renderer.renderRenderableList(renderQueueLayer.transparent, renderStates, this.renderOption);
 			}
 
-			renderPass.updateRenderTargetMipmap(this.renderTarget);
+			renderer.endRender();
+
+			renderer.updateRenderTargetMipmap(this.renderTarget);
 		}
 	}
 

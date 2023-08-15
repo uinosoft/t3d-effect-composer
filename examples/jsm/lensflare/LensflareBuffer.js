@@ -40,14 +40,15 @@ export class LensflareBuffer extends Buffer {
 
 		if (!renderQueueLayer) return;
 
-		renderer.renderPass.setRenderTarget(this._occlusionRenderTarget);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, false, false);
+		renderer.setRenderTarget(this._occlusionRenderTarget);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, false, false);
 
 		const aspect = this._occlusionRenderTarget.height / this._occlusionRenderTarget.width;
 
 		this.lensflareInfos.length = 0;
 
+		renderer.beginRender();
 		renderer.renderRenderableList(renderQueueLayer.opaque, renderStates, {
 			beforeRender: renderable => {
 				const { object, material } = renderable;
@@ -64,6 +65,7 @@ export class LensflareBuffer extends Buffer {
 				});
 			}
 		});
+		renderer.endRender();
 	}
 
 	output() {

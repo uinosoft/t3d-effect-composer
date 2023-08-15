@@ -61,9 +61,9 @@
 	const backRenderTarget = new t3d.RenderTargetBack(canvas);
 
 	const effectComposer = new DefaultEffectComposer(width, height, {
-		samplerNumber: Math.min(renderer.renderPass.capabilities.maxSamples, 5),
-		webgl2: renderer.renderPass.capabilities.version > 1,
-		floatColorBuffer: !!renderer.renderPass.capabilities.getExtension(
+		samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
+		webgl2: renderer.capabilities.version > 1,
+		floatColorBuffer: !!renderer.capabilities.getExtension(
 			"EXT_color_buffer_float"
 		),
 	});
@@ -187,7 +187,7 @@
 		scene.updateRenderStates(camera);
 		scene.updateRenderQueue(camera).getLayer(0);
 
-		renderer.renderPass.setClearColor(0, 0, 0, 1);
+		renderer.setClearColor(0, 0, 0, 1);
 
 		effectComposer.render(renderer, scene, camera, backRenderTarget);
 
