@@ -32,7 +32,7 @@ const gl = canvas.getContext('webgl2', {
     alpha: false,
     stencil: true
 });
-const renderer = new t3d.Renderer(gl);
+const renderer = new t3d.WebGLRenderer(gl);
 renderer.setClearColor(0.1, 0.1, 0.1, 1);
 const backRenderTarget = new t3d.RenderTargetBack(canvas);
 

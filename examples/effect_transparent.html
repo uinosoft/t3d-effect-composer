@@ -66,7 +66,7 @@
 
     const contextParams = { antialias: true, alpha: true };
     const gl = canvas.getContext("webgl2", contextParams) || canvas.getContext("webgl", contextParams);
-    const renderer = new t3d.Renderer(gl);
+    const renderer = new t3d.WebGLRenderer(gl);
     const backRenderTarget = new t3d.RenderTargetBack(canvas);
 
     const shadowMapPass = new t3d.ShadowMapPass();
