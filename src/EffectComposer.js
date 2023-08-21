@@ -6,6 +6,7 @@ import ColorMarkBuffer from './buffers/ColorMarkBuffer.js';
 import SceneBuffer from './buffers/SceneBuffer.js';
 import RenderTargetCache from './RenderTargetCache.js';
 import { copyShader, isDepthStencilAttachment } from './Utils.js';
+import CameraJitter from './CameraJitter.js';
 
 export default class EffectComposer {
 
@@ -80,6 +81,7 @@ export default class EffectComposer {
 		this._copyPass.material.premultipliedAlpha = true;
 
 		this._renderTargetCache = new RenderTargetCache(width, height);
+		this._cameraJitter = new CameraJitter();
 
 		this._effectList = [];
 
@@ -313,6 +315,8 @@ export default class EffectComposer {
 		if (postEffectEnable) {
 			this._tempBufferNames.add('SceneBuffer'); // Insert SceneBuffer first
 
+			let needCameraJitter = false;
+
 			this._effectList.forEach(item => {
 				if (item.effect.active) {
 					item.effect.bufferDependencies.forEach(({ key, mask }) => {
@@ -321,8 +325,12 @@ export default class EffectComposer {
 							this._bufferMap.get(key).attachManager.allocate(item.name, mask);
 						}
 					});
+
+					needCameraJitter = needCameraJitter || item.effect.needCameraJitter;
 				}
 			});
+
+			this._cameraJitter.enable = needCameraJitter;
 
 			this._tempBufferNames.forEach(name => {
 				this._bufferMap.get(name).render(renderer, this, scene, camera);
@@ -358,6 +366,8 @@ export default class EffectComposer {
 
 			this._renderTargetCache.release(inputRT);
 			this._renderTargetCache.release(outputRT);
+
+			this._cameraJitter.update();
 		} else if (!!this._externalColorAttachment && !!this._externalDepthAttachment) {
 			const sceneBuffer = this._bufferMap.get('SceneBuffer');
 			sceneBuffer.render(renderer, this, scene, camera);
@@ -430,6 +440,10 @@ export default class EffectComposer {
 
 	get $useMSAA() {
 		return ((this._externalMSAA !== null) ? this._externalMSAA : this.sceneMSAA) && (this._samplerNumber > 1);
+	}
+
+	get $cameraJitter() {
+		return this._cameraJitter;
 	}
 
 }

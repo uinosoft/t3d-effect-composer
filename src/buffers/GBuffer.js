@@ -6,6 +6,8 @@ export default class GBuffer extends Buffer {
 	constructor(width, height, options) {
 		super(width, height, options);
 
+		this.enableCameraJitter = true;
+
 		this._rt = new RenderTarget2D(width, height);
 		this._rt.texture.minFilter = TEXTURE_FILTER.NEAREST;
 		this._rt.texture.magFilter = TEXTURE_FILTER.NEAREST;
@@ -36,7 +38,6 @@ export default class GBuffer extends Buffer {
 			ifRender: createIfRenderFunction(undefined)
 		};
 
-		this._renderStates = null;
 		this._fixedRenderStates = {
 			scene: null,
 			lights: null,
@@ -90,6 +91,9 @@ export default class GBuffer extends Buffer {
 	render(renderer, composer, scene, camera) {
 		if (!this.needRender()) return;
 
+		const cameraJitter = composer.$cameraJitter;
+		const enableCameraJitter = this.enableCameraJitter && cameraJitter.accumulating();
+
 		renderer.setRenderTarget(this._rt);
 		renderer.setClearColor(0, 0, 0, 0);
 		renderer.clear(true, true, false);
@@ -99,19 +103,17 @@ export default class GBuffer extends Buffer {
 		const renderStates = scene.getRenderStates(camera);
 		const renderQueue = scene.getRenderQueue(camera);
 
-		if (this.cameraNear > 0 || this.cameraFar > 0) {
-			this._renderStates = this._getFixedRenderStates(renderStates);
-		} else {
-			this._renderStates = renderStates;
-		}
+		const fixedRenderStates = this._getFixedRenderStates(renderStates);
+
+		enableCameraJitter && cameraJitter.jitterProjectionMatrix(fixedRenderStates.camera, this._rt.width, this._rt.height);
 
 		renderer.beginRender();
 
 		const layers = this.layers;
 		for (let i = 0, l = layers.length; i < l; i++) {
 			const renderQueueLayer = renderQueue.getLayer(layers[i]);
-			renderer.renderRenderableList(renderQueueLayer.opaque, this._renderStates, renderOptions);
-			renderer.renderRenderableList(renderQueueLayer.transparent, this._renderStates, renderOptions);
+			renderer.renderRenderableList(renderQueueLayer.opaque, fixedRenderStates, renderOptions);
+			renderer.renderRenderableList(renderQueueLayer.transparent, fixedRenderStates, renderOptions);
 		}
 
 		renderer.endRender();
@@ -122,7 +124,7 @@ export default class GBuffer extends Buffer {
 	}
 
 	getCurrentRenderStates() {
-		return this._renderStates;
+		return this._fixedRenderStates;
 	}
 
 	resize(width, height) {
@@ -156,7 +158,7 @@ export default class GBuffer extends Buffer {
 		outputCamera.viewMatrix = sourceCamera.viewMatrix;
 		outputCamera.rect = sourceCamera.rect;
 
-		// fix camera far & near
+		// fix camera far & near if needed
 
 		const fixedNear = this.cameraNear > 0 ? this.cameraNear : sourceCamera.near,
 			fixedFar = this.cameraFar > 0 ? this.cameraFar : sourceCamera.far;
@@ -165,10 +167,15 @@ export default class GBuffer extends Buffer {
 		outputCamera.far = fixedFar;
 
 		outputCamera.projectionMatrix.copy(sourceCamera.projectionMatrix);
-		outputCamera.projectionMatrix.elements[10] = -(fixedFar + fixedNear) / (fixedFar - fixedNear);
-		outputCamera.projectionMatrix.elements[14] = -2 * fixedFar * fixedNear / (fixedFar - fixedNear);
 
-		outputCamera.projectionViewMatrix.multiplyMatrices(outputCamera.projectionMatrix, outputCamera.viewMatrix);
+		if (this.cameraNear > 0 || this.cameraFar > 0) {
+			outputCamera.projectionMatrix.elements[10] = -(fixedFar + fixedNear) / (fixedFar - fixedNear);
+			outputCamera.projectionMatrix.elements[14] = -2 * fixedFar * fixedNear / (fixedFar - fixedNear);
+
+			outputCamera.projectionViewMatrix.multiplyMatrices(outputCamera.projectionMatrix, outputCamera.viewMatrix);
+		} else {
+			outputCamera.projectionViewMatrix.copy(sourceCamera.projectionViewMatrix);
+		}
 
 		return output;
 	}

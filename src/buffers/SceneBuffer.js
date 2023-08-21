@@ -7,6 +7,8 @@ export default class SceneBuffer extends Buffer {
 	constructor(width, height, options) {
 		super(width, height, options);
 
+		this.enableCameraJitter = true;
+
 		this._rt = new RenderTarget2D(width, height);
 		this._rt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 
@@ -83,6 +85,8 @@ export default class SceneBuffer extends Buffer {
 		const useMSAA = composer.$useMSAA;
 		const renderTarget = useMSAA ? this._mrt : this._rt;
 		const hasStencil = !!renderTarget._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
+		const cameraJitter = composer.$cameraJitter;
+		const enableCameraJitter = this.enableCameraJitter && cameraJitter.accumulating();
 
 		renderer.setRenderTarget(renderTarget);
 
@@ -97,7 +101,11 @@ export default class SceneBuffer extends Buffer {
 		const renderStates = scene.getRenderStates(camera);
 		const renderQueue = scene.getRenderQueue(camera);
 
+		enableCameraJitter && cameraJitter.jitterProjectionMatrix(renderStates.camera, this._rt.width, this._rt.height);
+
 		this.$renderScene(renderer, renderQueue, renderStates);
+
+		enableCameraJitter && cameraJitter.restoreProjectionMatrix(renderStates.camera);
 
 		if (useMSAA) {
 			renderer.setRenderTarget(this._rt);

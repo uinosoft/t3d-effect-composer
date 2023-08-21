@@ -46,6 +46,8 @@ export default class SSREffect extends Effect {
 		this.blurSize = 2;
 		this.depthRange = 1;
 
+		this.jitter = true;
+
 		this._ssrPass = new ShaderPostPass(ssrShader);
 
 		this._blurPass = new ShaderPostPass(blurShader);
@@ -94,6 +96,9 @@ export default class SSREffect extends Effect {
 		this._ssrPass.uniforms.eyeFadeEnd = this.eyeFadeEnd;
 		this._ssrPass.uniforms.minGlossiness = this.minGlossiness;
 		this._ssrPass.uniforms.nearZ = gBufferRenderStates.camera.near;
+
+		const cameraJitter = composer.$cameraJitter;
+		this._ssrPass.uniforms.jitterOffset = (this.jitter && cameraJitter.accumulating()) ? (cameraJitter.frame() * 0.5 / cameraJitter.totalFrame()) : 0;
 
 		if (this._ssrPass.material.defines.MAX_ITERATION != this.maxSteps || this._ssrPass.material.defines.MAX_BINARY_SEARCH_ITERATION != this.maxIteration) {
 			this._ssrPass.material.needsUpdate = true;
@@ -457,7 +462,7 @@ const ssrShader = {
 
 			// Get jitter
 			vec2 uv2 = v_Uv * viewportSize;
-			float jitter = fract((uv2.x + uv2.y) * 0.25);
+			float jitter = fract((uv2.x + uv2.y) * 0.25) + jitterOffset;
 
 			bool intersect = traceScreenSpaceRay(rayOrigin, rayDir, jitter, hitPixel, hitPoint, iterationCount);
 			// Is empty

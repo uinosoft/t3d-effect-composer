@@ -9,6 +9,7 @@
 		constructor(width, height, options) {
 			this.autoUpdate = true;
 			this.needsUpdate = true;
+			this.enableCameraJitter = false;
 		}
 		needRender() {
 			if (this.autoUpdate) return true;
@@ -34,11 +35,51 @@
 		}
 	}
 
+	// AccumulationBuffer is used to store the accumulation result of the previous frame.
+	// But it can not render to itself (render method is empty), need TAAEffect to help.
+	class AccumulationBuffer extends Buffer {
+		constructor(width, height, options) {
+			super(width, height, options);
+			this._prevRT = new t3d.RenderTarget2D(width, height);
+			this._prevRT.texture.generateMipmaps = false;
+			this._prevRT.texture.minFilter = t3d.TEXTURE_FILTER.NEAREST;
+			this._prevRT.texture.magFilter = t3d.TEXTURE_FILTER.NEAREST;
+			this._prevRT.detach(t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+			this._accumRT = new t3d.RenderTarget2D(width, height);
+			this._accumRT.texture.generateMipmaps = false;
+			this._accumRT.texture.minFilter = t3d.TEXTURE_FILTER.NEAREST;
+			this._accumRT.texture.magFilter = t3d.TEXTURE_FILTER.NEAREST;
+			this._accumRT.detach(t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+		}
+		swap() {
+			const tempRT = this._prevRT;
+			this._prevRT = this._accumRT;
+			this._accumRT = tempRT;
+		}
+		accumRT() {
+			return this._accumRT;
+		}
+		output() {
+			return this._prevRT;
+		}
+		resize(width, height) {
+			super.resize(width, height);
+			this._prevRT.resize(width, height);
+			this._accumRT.resize(width, height);
+		}
+		dispose() {
+			super.dispose();
+			this._prevRT.dispose();
+			this._accumRT.dispose();
+		}
+	}
+
 	class Effect {
 		constructor() {
 			this.name = '';
 			this.bufferDependencies = [];
 			this.active = true;
+			this.needCameraJitter = false;
 		}
 		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
 			console.error('Effect: .render() must be implemented in subclass.');
@@ -2077,6 +2118,7 @@
 			this._blurPass.material.defines.DEPTHTEX_ENABLED = 1;
 			this.blurSize = 1;
 			this.depthRange = 1;
+			this.jitter = true;
 			this._blendPass = new t3d.ShaderPostPass(multiplyShader);
 			this._blendPass.material.premultipliedAlpha = true;
 		}
@@ -2101,7 +2143,8 @@
 			projection$1.toArray(this._ssaoPass.uniforms.projection);
 			projectionInv$1.toArray(this._ssaoPass.uniforms.projectionInv);
 			viewInverseTranspose$1.toArray(this._ssaoPass.uniforms.viewInverseTranspose);
-			this._setKernelSize(_qualityMap[this.quality]);
+			const cameraJitter = composer.$cameraJitter;
+			this._setKernelSize(_qualityMap[this.quality], this.jitter && cameraJitter.accumulating() ? cameraJitter.frame() : 0);
 			this._ssaoPass.uniforms.radius = this.radius;
 			this._ssaoPass.uniforms.power = this.power;
 			this._ssaoPass.uniforms.bias = this.bias;
@@ -2175,8 +2218,10 @@
 				_kernels[code] = generateKernel(size, offset * size);
 			}
 			this._ssaoPass.uniforms.kernel = _kernels[code];
-			this._ssaoPass.material.defines.KERNEL_SIZE = size;
-			this._ssaoPass.material.needsUpdate = true;
+			if (this._ssaoPass.material.defines.KERNEL_SIZE !== size) {
+				this._ssaoPass.material.defines.KERNEL_SIZE = size;
+				this._ssaoPass.material.needsUpdate = true;
+			}
 		}
 		_setNoiseSize(size) {
 			if (this._noiseSize === size) return;
@@ -2205,7 +2250,7 @@
 	};
 
 	// https://en.wikipedia.org/wiki/Halton_sequence halton sequence.
-	function halton(index, base) {
+	function halton$1(index, base) {
 		let result = 0;
 		let f = 1 / base;
 		let i = index;
@@ -2222,10 +2267,10 @@
 	function generateKernel(size, offset = 0) {
 		const kernel = new Float32Array(size * 3);
 		for (let i = 0; i < size; i++) {
-			const phi = halton(i + offset, 2) * Math.PI * 2;
+			const phi = halton$1(i + offset, 2) * Math.PI * 2;
 
 			// rejecting samples that are close to tangent plane to avoid z-fighting artifacts
-			const cosTheta = 1.0 - (halton(i + offset, 3) * 0.85 + 0.15);
+			const cosTheta = 1.0 - (halton$1(i + offset, 3) * 0.85 + 0.15);
 			const sinTheta = Math.sqrt(1.0 - cosTheta * cosTheta);
 			const r = Math.random();
 
@@ -2460,6 +2505,7 @@
 
 			this.blurSize = 2;
 			this.depthRange = 1;
+			this.jitter = true;
 			this._ssrPass = new t3d.ShaderPostPass(ssrShader);
 			this._blurPass = new t3d.ShaderPostPass(blurShader);
 			this._blurPass.material.defines.NORMALTEX_ENABLED = 1;
@@ -2499,6 +2545,8 @@
 			this._ssrPass.uniforms.eyeFadeEnd = this.eyeFadeEnd;
 			this._ssrPass.uniforms.minGlossiness = this.minGlossiness;
 			this._ssrPass.uniforms.nearZ = gBufferRenderStates.camera.near;
+			const cameraJitter = composer.$cameraJitter;
+			this._ssrPass.uniforms.jitterOffset = this.jitter && cameraJitter.accumulating() ? cameraJitter.frame() * 0.5 / cameraJitter.totalFrame() : 0;
 			if (this._ssrPass.material.defines.MAX_ITERATION != this.maxSteps || this._ssrPass.material.defines.MAX_BINARY_SEARCH_ITERATION != this.maxIteration) {
 				this._ssrPass.material.needsUpdate = true;
 				this._ssrPass.material.defines.MAX_ITERATION = this.maxSteps;
@@ -2839,7 +2887,7 @@
 
 			// Get jitter
 			vec2 uv2 = v_Uv * viewportSize;
-			float jitter = fract((uv2.x + uv2.y) * 0.25);
+			float jitter = fract((uv2.x + uv2.y) * 0.25) + jitterOffset;
 
 			bool intersect = traceScreenSpaceRay(rayOrigin, rayDir, jitter, hitPixel, hitPoint, iterationCount);
 			// Is empty
@@ -2905,6 +2953,96 @@
 				vec3 finalColor = (color.rgb*colorMultiplier)+(SSR.rgb*reflectionMultiplier);
 				gl_FragColor =vec4(finalColor,color.a);
 			#endif
+				}
+		`
+	};
+
+	class TAAEffect extends Effect {
+		constructor() {
+			super();
+			this.needCameraJitter = true;
+			this.bufferDependencies = [{
+				key: 'AccumulationBuffer'
+			}];
+			this._accumPass = new t3d.ShaderPostPass(accumulateShader);
+			this._copyPass = new t3d.ShaderPostPass(copyShader);
+			this._reset = true;
+			this._accumulating = true;
+			this.onFinish = null;
+		}
+		reset() {
+			this._reset = true;
+		}
+		resize(width, height) {
+			this._reset = true;
+		}
+		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
+			const cameraJitter = composer.$cameraJitter;
+			if (this._reset) {
+				cameraJitter.reset();
+				this._reset = false;
+			}
+			const accumBuffer = composer.getBuffer('AccumulationBuffer');
+			if (cameraJitter.accumulating()) {
+				renderer.setRenderTarget(accumBuffer.output());
+				renderer.setClearColor(0, 0, 0, 0);
+				renderer.clear(true, false, false);
+				this._accumPass.uniforms.currTexture = inputRenderTarget.texture;
+				this._accumPass.uniforms.prevTexture = accumBuffer.accumRT().texture;
+				this._accumPass.uniforms.mixRatio = cameraJitter.frame() === 0 ? 0 : 0.9;
+				this._accumPass.render(renderer);
+				this._accumulating = true;
+			} else {
+				if (this._accumulating) {
+					this.onFinish && this.onFinish();
+					this._accumulating = false;
+				}
+			}
+			renderer.setRenderTarget(outputRenderTarget);
+			renderer.setClearColor(0, 0, 0, 0);
+			if (finish) {
+				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+			} else {
+				renderer.clear(true, true, false);
+			}
+			const copyPass = this._copyPass;
+			copyPass.uniforms.tDiffuse = accumBuffer.output().texture;
+			if (finish) {
+				copyPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
+				copyPass.renderStates.camera.rect.fromArray(composer._tempViewport);
+			}
+			copyPass.render(renderer);
+			if (finish) {
+				copyPass.material.transparent = false;
+				copyPass.renderStates.camera.rect.set(0, 0, 1, 1);
+			}
+			accumBuffer.swap();
+		}
+		dispose() {
+			super.dispose();
+			this._accumPass.dispose();
+			this._copyPass.dispose();
+		}
+	}
+	const accumulateShader = {
+		name: 'accum',
+		defines: {},
+		uniforms: {
+			mixRatio: 0.9
+		},
+		vertexShader: defaultVertexShader,
+		fragmentShader: `
+				uniform sampler2D currTexture;
+				uniform sampler2D prevTexture;
+
+				uniform float mixRatio;
+
+				varying vec2 v_Uv;
+
+				void main() {
+						vec4 texel1 = texture2D(currTexture, v_Uv);
+						vec4 texel2 = texture2D(prevTexture, v_Uv);
+						gl_FragColor = mix(texel1, texel2, mixRatio);
 				}
 		`
 	};
@@ -4249,6 +4387,7 @@
 	class GBuffer extends Buffer {
 		constructor(width, height, options) {
 			super(width, height, options);
+			this.enableCameraJitter = true;
 			this._rt = new t3d.RenderTarget2D(width, height);
 			this._rt.texture.minFilter = t3d.TEXTURE_FILTER.NEAREST;
 			this._rt.texture.magFilter = t3d.TEXTURE_FILTER.NEAREST;
@@ -4275,7 +4414,6 @@
 				getMaterial: createGetMaterialFunction$2(),
 				ifRender: createIfRenderFunction$2(undefined)
 			};
-			this._renderStates = null;
 			this._fixedRenderStates = {
 				scene: null,
 				lights: null,
@@ -4322,23 +4460,22 @@
 		}
 		render(renderer, composer, scene, camera) {
 			if (!this.needRender()) return;
+			const cameraJitter = composer.$cameraJitter;
+			const enableCameraJitter = this.enableCameraJitter && cameraJitter.accumulating();
 			renderer.setRenderTarget(this._rt);
 			renderer.setClearColor(0, 0, 0, 0);
 			renderer.clear(true, true, false);
 			const renderOptions = this._renderOptions;
 			const renderStates = scene.getRenderStates(camera);
 			const renderQueue = scene.getRenderQueue(camera);
-			if (this.cameraNear > 0 || this.cameraFar > 0) {
-				this._renderStates = this._getFixedRenderStates(renderStates);
-			} else {
-				this._renderStates = renderStates;
-			}
+			const fixedRenderStates = this._getFixedRenderStates(renderStates);
+			enableCameraJitter && cameraJitter.jitterProjectionMatrix(fixedRenderStates.camera, this._rt.width, this._rt.height);
 			renderer.beginRender();
 			const layers = this.layers;
 			for (let i = 0, l = layers.length; i < l; i++) {
 				const renderQueueLayer = renderQueue.getLayer(layers[i]);
-				renderer.renderRenderableList(renderQueueLayer.opaque, this._renderStates, renderOptions);
-				renderer.renderRenderableList(renderQueueLayer.transparent, this._renderStates, renderOptions);
+				renderer.renderRenderableList(renderQueueLayer.opaque, fixedRenderStates, renderOptions);
+				renderer.renderRenderableList(renderQueueLayer.transparent, fixedRenderStates, renderOptions);
 			}
 			renderer.endRender();
 		}
@@ -4346,7 +4483,7 @@
 			return this._rt;
 		}
 		getCurrentRenderStates() {
-			return this._renderStates;
+			return this._fixedRenderStates;
 		}
 		resize(width, height) {
 			super.resize(width, height);
@@ -4375,16 +4512,20 @@
 			outputCamera.viewMatrix = sourceCamera.viewMatrix;
 			outputCamera.rect = sourceCamera.rect;
 
-			// fix camera far & near
+			// fix camera far & near if needed
 
 			const fixedNear = this.cameraNear > 0 ? this.cameraNear : sourceCamera.near,
 				fixedFar = this.cameraFar > 0 ? this.cameraFar : sourceCamera.far;
 			outputCamera.near = fixedNear;
 			outputCamera.far = fixedFar;
 			outputCamera.projectionMatrix.copy(sourceCamera.projectionMatrix);
-			outputCamera.projectionMatrix.elements[10] = -(fixedFar + fixedNear) / (fixedFar - fixedNear);
-			outputCamera.projectionMatrix.elements[14] = -2 * fixedFar * fixedNear / (fixedFar - fixedNear);
-			outputCamera.projectionViewMatrix.multiplyMatrices(outputCamera.projectionMatrix, outputCamera.viewMatrix);
+			if (this.cameraNear > 0 || this.cameraFar > 0) {
+				outputCamera.projectionMatrix.elements[10] = -(fixedFar + fixedNear) / (fixedFar - fixedNear);
+				outputCamera.projectionMatrix.elements[14] = -2 * fixedFar * fixedNear / (fixedFar - fixedNear);
+				outputCamera.projectionViewMatrix.multiplyMatrices(outputCamera.projectionMatrix, outputCamera.viewMatrix);
+			} else {
+				outputCamera.projectionViewMatrix.copy(sourceCamera.projectionViewMatrix);
+			}
 			return output;
 		}
 	}
@@ -5101,6 +5242,7 @@
 	class SceneBuffer extends Buffer {
 		constructor(width, height, options) {
 			super(width, height, options);
+			this.enableCameraJitter = true;
 			this._rt = new t3d.RenderTarget2D(width, height);
 			this._rt.detach(t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 			this._mrt = new t3d.RenderTarget2D(width, height);
@@ -5163,6 +5305,8 @@
 			const useMSAA = composer.$useMSAA;
 			const renderTarget = useMSAA ? this._mrt : this._rt;
 			const hasStencil = !!renderTarget._attachments[t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
+			const cameraJitter = composer.$cameraJitter;
+			const enableCameraJitter = this.enableCameraJitter && cameraJitter.accumulating();
 			renderer.setRenderTarget(renderTarget);
 			if (composer.clearColor) {
 				renderer.setClearColor(...composer._tempClearColor);
@@ -5172,7 +5316,9 @@
 			renderer.clear(this.clearColor, this.clearDepth, this.clearStencil && hasStencil);
 			const renderStates = scene.getRenderStates(camera);
 			const renderQueue = scene.getRenderQueue(camera);
+			enableCameraJitter && cameraJitter.jitterProjectionMatrix(renderStates.camera, this._rt.width, this._rt.height);
 			this.$renderScene(renderer, renderQueue, renderStates);
+			enableCameraJitter && cameraJitter.restoreProjectionMatrix(renderStates.camera);
 			if (useMSAA) {
 				renderer.setRenderTarget(this._rt);
 				renderer.blitRenderTarget(this._mrt, this._rt, true, true, hasStencil);
@@ -5292,6 +5438,110 @@
 		}
 	}
 
+	class CameraJitter {
+		constructor(totalFrameCount = 30) {
+			this._enabled = false;
+			this._state = JITTER_STATE.DISABLED;
+			this._totalFrame = 0;
+			this._haltonSequenece = [];
+			this._frame = 0;
+			this._jitterMatrix = new t3d.Matrix4();
+			this._originMatrix = new t3d.Matrix4();
+			this.setTotalFrame(totalFrameCount);
+		}
+		setTotalFrame(count) {
+			this._totalFrame = count;
+			const haltonSequenece = [];
+			for (let i = 0; i < count; i++) {
+				haltonSequenece.push([halton(i, 2), halton(i, 3)]);
+			}
+			this._haltonSequence = haltonSequenece;
+		}
+		set enable(value) {
+			if (this._state === JITTER_STATE.DISABLED) {
+				if (value) {
+					this._frame = 0;
+					this._state = JITTER_STATE.ACCUMULATING;
+				}
+			} else if (this._state === JITTER_STATE.ACCUMULATING) {
+				if (!value) {
+					this._frame = 0;
+					this._state = JITTER_STATE.DISABLED;
+				}
+			} else if (this._state === JITTER_STATE.FINISHED) {
+				if (!value) {
+					this._frame = 0;
+					this._state = JITTER_STATE.DISABLED;
+				}
+			}
+		}
+		get enable() {
+			return this._state !== JITTER_STATE.DISABLED;
+		}
+		reset() {
+			if (this._state === JITTER_STATE.DISABLED) return;
+			if (this._state === JITTER_STATE.ACCUMULATING) {
+				this._frame = 0;
+			} else if (this._state === JITTER_STATE.FINISHED) {
+				this._state = JITTER_STATE.ACCUMULATING;
+			}
+		}
+		update() {
+			if (this._state !== JITTER_STATE.ACCUMULATING) return;
+			this._frame++;
+			if (this._frame >= this._totalFrame) {
+				this._state = JITTER_STATE.FINISHED;
+				this._frame = 0;
+			}
+		}
+		finished() {
+			return this._state === JITTER_STATE.FINISHED;
+		}
+		accumulating() {
+			return this._state === JITTER_STATE.ACCUMULATING;
+		}
+		frame() {
+			return this._frame;
+		}
+		totalFrame() {
+			return this._totalFrame;
+		}
+		jitterProjectionMatrix(cameraData, width, height) {
+			if (this._state !== JITTER_STATE.ACCUMULATING) return;
+			const jitter = this._haltonSequence[this._frame];
+			const jitterMatrix = this._jitterMatrix;
+			jitterMatrix.elements[12] = (jitter[0] * 2 - 1) / width;
+			jitterMatrix.elements[13] = (jitter[1] * 2 - 1) / height;
+			this._originMatrix.copy(cameraData.projectionMatrix);
+			cameraData.projectionMatrix.premultiply(jitterMatrix);
+			cameraData.projectionViewMatrix.multiplyMatrices(cameraData.projectionMatrix, cameraData.viewMatrix);
+		}
+		restoreProjectionMatrix(cameraData) {
+			if (this._state !== JITTER_STATE.ACCUMULATING) return;
+			cameraData.projectionMatrix.copy(this._originMatrix);
+			cameraData.projectionViewMatrix.multiplyMatrices(cameraData.projectionMatrix, cameraData.viewMatrix);
+		}
+	}
+	const JITTER_STATE = {
+		DISABLED: 1,
+		ACCUMULATING: 2,
+		FINISHED: 3
+	};
+
+	// Generate halton sequence
+	// https://en.wikipedia.org/wiki/Halton_sequence
+	function halton(index, base) {
+		let result = 0;
+		let f = 1 / base;
+		let i = index;
+		while (i > 0) {
+			result = result + f * (i % base);
+			i = Math.floor(i / base);
+			f = f / base;
+		}
+		return result;
+	}
+
 	class EffectComposer {
 		/**
 		 * @param {Number} width - The width of the actual rendering size.
@@ -5350,6 +5600,7 @@
 			this._copyPass = new t3d.ShaderPostPass(copyShader);
 			this._copyPass.material.premultipliedAlpha = true;
 			this._renderTargetCache = new RenderTargetCache(width, height);
+			this._cameraJitter = new CameraJitter();
 			this._effectList = [];
 			this._tempClearColor = [0, 0, 0, 1];
 			this._tempViewport = [0, 0, 1, 1];
@@ -5553,6 +5804,7 @@
 			if (postEffectEnable) {
 				this._tempBufferNames.add('SceneBuffer'); // Insert SceneBuffer first
 
+				let needCameraJitter = false;
 				this._effectList.forEach(item => {
 					if (item.effect.active) {
 						item.effect.bufferDependencies.forEach(({
@@ -5564,8 +5816,10 @@
 								this._bufferMap.get(key).attachManager.allocate(item.name, mask);
 							}
 						});
+						needCameraJitter = needCameraJitter || item.effect.needCameraJitter;
 					}
 				});
+				this._cameraJitter.enable = needCameraJitter;
 				this._tempBufferNames.forEach(name => {
 					this._bufferMap.get(name).render(renderer, this, scene, camera);
 				});
@@ -5588,6 +5842,7 @@
 				});
 				this._renderTargetCache.release(inputRT);
 				this._renderTargetCache.release(outputRT);
+				this._cameraJitter.update();
 			} else if (!!this._externalColorAttachment && !!this._externalDepthAttachment) {
 				const sceneBuffer = this._bufferMap.get('SceneBuffer');
 				sceneBuffer.render(renderer, this, scene, camera);
@@ -5644,6 +5899,9 @@
 
 		get $useMSAA() {
 			return (this._externalMSAA !== null ? this._externalMSAA : this.sceneMSAA) && this._samplerNumber > 1;
+		}
+		get $cameraJitter() {
+			return this._cameraJitter;
 		}
 	}
 	function sortByOrder(a, b) {
@@ -5908,6 +6166,7 @@
 		};
 	}
 
+	exports.AccumulationBuffer = AccumulationBuffer;
 	exports.BloomEffect = BloomEffect;
 	exports.BlurEdgeEffect = BlurEdgeEffect;
 	exports.Buffer = Buffer;
@@ -5936,6 +6195,7 @@
 	exports.SSRDebugger = SSRDebugger;
 	exports.SSREffect = SSREffect;
 	exports.SoftGlowEffect = SoftGlowEffect;
+	exports.TAAEffect = TAAEffect;
 	exports.TailingEffect = TailingEffect;
 	exports.VignettingEffect = VignettingEffect;
 	exports.additiveShader = additiveShader;

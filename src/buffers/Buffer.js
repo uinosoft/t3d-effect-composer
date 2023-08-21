@@ -3,6 +3,8 @@ export default class Buffer {
 	constructor(width, height, options) {
 		this.autoUpdate = true;
 		this.needsUpdate = true;
+
+		this.enableCameraJitter = false;
 	}
 
 	needRender() {

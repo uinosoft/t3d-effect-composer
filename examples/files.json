@@ -1,7 +1,8 @@
 {
 	"effect": [
 		"effect_features",
-		"effect_transparent"
+		"effect_transparent",
+		"effect_taa"
 	],
 	"layer": [
 		"layer_all",

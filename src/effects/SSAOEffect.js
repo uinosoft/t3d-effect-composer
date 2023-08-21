@@ -41,6 +41,7 @@ export default class SSAOEffect extends Effect {
 
 		this.blurSize = 1;
 		this.depthRange = 1;
+		this.jitter = true;
 
 		this._blendPass = new ShaderPostPass(multiplyShader);
 		this._blendPass.material.premultipliedAlpha = true;
@@ -72,7 +73,8 @@ export default class SSAOEffect extends Effect {
 		projectionInv.toArray(this._ssaoPass.uniforms.projectionInv);
 		viewInverseTranspose.toArray(this._ssaoPass.uniforms.viewInverseTranspose);
 
-		this._setKernelSize(_qualityMap[this.quality]);
+		const cameraJitter = composer.$cameraJitter;
+		this._setKernelSize(_qualityMap[this.quality], (this.jitter && cameraJitter.accumulating()) ? cameraJitter.frame() : 0);
 
 		this._ssaoPass.uniforms.radius = this.radius;
 		this._ssaoPass.uniforms.power = this.power;
@@ -164,8 +166,10 @@ export default class SSAOEffect extends Effect {
 		}
 
 		this._ssaoPass.uniforms.kernel = _kernels[code];
-		this._ssaoPass.material.defines.KERNEL_SIZE = size;
-		this._ssaoPass.material.needsUpdate = true;
+		if (this._ssaoPass.material.defines.KERNEL_SIZE !== size) {
+			this._ssaoPass.material.defines.KERNEL_SIZE = size;
+			this._ssaoPass.material.needsUpdate = true;
+		}
 	}
 
 	_setNoiseSize(size) {

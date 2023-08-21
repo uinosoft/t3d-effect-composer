@@ -1,4 +1,5 @@
 export { default as Buffer } from './buffers/Buffer.js';
+export { default as AccumulationBuffer } from './buffers/AccumulationBuffer.js';
 
 export { default as BloomEffect } from './effects/BloomEffect.js';
 export { default as ChromaticAberrationEffect } from './effects/ChromaticAberrationEffect.js';
@@ -9,6 +10,7 @@ export { default as FilmEffect } from './effects/FilmEffect.js';
 export { default as FXAAEffect } from './effects/FXAAEffect.js';
 export { default as SSAOEffect } from './effects/SSAOEffect.js';
 export { default as SSREffect } from './effects/SSREffect.js';
+export { default as TAAEffect } from './effects/TAAEffect.js';
 export { default as VignettingEffect } from './effects/VignettingEffect.js';
 export { default as BlurEdgeEffect } from './effects/BlurEdgeEffect.js';
 

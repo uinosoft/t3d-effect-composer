@@ -5,6 +5,8 @@ export default class Effect {
 
 		this.bufferDependencies = [];
 		this.active = true;
+
+		this.needCameraJitter = false;
 	}
 
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
