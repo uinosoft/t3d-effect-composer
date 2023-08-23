@@ -201,15 +201,25 @@
     });
 
     const controller = new OrbitControls(camera, canvas);
-    controller.screenSpacePanning = true;
+    controller.dampingFactor = 0.2;
+
+    let staticCount = -1;
 
     function loop(count) {
     	requestAnimationFrame(loop);
 
     	stats.begin();
 
+    	// Delay 10 frames to wait for the real static,
+    	// because of the dampingFactor of OrbitControls
     	if (controller.update()) {
+    		staticCount = 10;
     		taaReset();
+    	} else {
+    		staticCount--;
+    		if (staticCount > 0) {
+    			taaReset();
+    		}
     	}
     
     	scene.updateMatrix();
