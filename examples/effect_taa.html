@@ -17,9 +17,8 @@
 
 <body>
 	<div id="container"></div>
-	<div id="info">
-		TAA Effect, press 'i' to show Inspector <br />
-		"Low Poly Lake Scene" by <a href="https://sketchfab.com/Edwin3D" target="_blank" rel="noopener">EdwinRC</a>, <a href="http://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC Attribution</a>
+	<div id="info" class="dark">
+		TAA Effect, press 'i' to show Inspector
 	</div>
 </body>
 
@@ -86,11 +85,14 @@
     const loader = new GLTFLoader();
     console.time("GLTFLoader");
 
-    const modelUrl = "./resources/gltf/lowpoly_lake/scene.gltf";
+    const modelUrl = "./resources/gltf/lowpoly_smallcity/scene.gltf";
     loader.load(modelUrl).then(function (result) {
     	console.timeEnd("GLTFLoader");
 
     	const object = result.root;
+
+    	object.position.set(3, 3, 3);
+    	object.scale.set(0.01, 0.01, 0.01);
 
     	object.traverse((node) => {
     		if (node.material) {
@@ -104,14 +106,14 @@
     	taaReset();
     });
 
-    const ambientLight = new t3d.AmbientLight(0xffffff, 0.2);
+    const ambientLight = new t3d.AmbientLight(0xffffff, 0.1);
     scene.add(ambientLight);
 
-    const directionalLight = new t3d.DirectionalLight(0xffffff, 2);
-    directionalLight.position.set(-180, 180, -180);
+    const directionalLight = new t3d.DirectionalLight(0xffffff, 1.5);
+    directionalLight.position.set(-80, 80, 80);
     directionalLight.lookAt(new t3d.Vector3(), new t3d.Vector3(0, 1, 0));
-    directionalLight.shadow.windowSize = 50;
-    directionalLight.shadow.bias = -0.0008;
+    directionalLight.shadow.windowSize = 40;
+    directionalLight.shadow.bias = -0.0003;
     directionalLight.shadow.cameraNear = 1;
     directionalLight.shadow.cameraFar = 500;
     directionalLight.shadow.mapSize.set(1024, 1024);
@@ -119,7 +121,7 @@
     scene.add(directionalLight);
 
     const camera = new t3d.Camera();
-    camera.position.set(30, 20, 30);
+    camera.position.set(-20, 10, -20);
     camera.lookAt(new t3d.Vector3(0, 0, 0), new t3d.Vector3(0, 1, 0));
     camera.setPerspective((30 / 180) * Math.PI, width / height, 1, 1000);
     camera.add(sky_box);
@@ -153,7 +155,7 @@
     effectComposer.addBuffer('AccumulationBuffer', accumBuffer);
     effectComposer.addEffect('TAA', taaEffect, 1.5);
 
-    ssaoEffect.radius = 0.1;
+    ssaoEffect.radius = 0.2;
     ssaoEffect.active = true;
 
     // ssrEffect.active = true;
