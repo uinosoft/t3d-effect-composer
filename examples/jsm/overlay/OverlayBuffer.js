@@ -1,4 +1,4 @@
-import { RenderTarget2D, RenderBuffer, PIXEL_FORMAT, ATTACHMENT } from 't3d';
+import { RenderTarget2D, RenderBuffer, PIXEL_FORMAT, PIXEL_TYPE, ATTACHMENT } from 't3d';
 import { Buffer, RenderListMask } from 't3d-effect-composer';
 
 export class OverlayBuffer extends Buffer {
@@ -7,10 +7,11 @@ export class OverlayBuffer extends Buffer {
 		super(width, height, options);
 
 		this._rt = new RenderTarget2D(width, height);
+		this._rt.texture.type = options.highDynamicRange ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
 
 		this._mrt = new RenderTarget2D(width, height);
 		this._mrt.attach(
-			new RenderBuffer(width, height, PIXEL_FORMAT.RGBA8, options.samplerNumber),
+			new RenderBuffer(width, height, options.highDynamicRange ? PIXEL_FORMAT.RGBA16F : PIXEL_FORMAT.RGBA8, options.samplerNumber),
 			ATTACHMENT.COLOR_ATTACHMENT0
 		);
 		this._mrt.attach(

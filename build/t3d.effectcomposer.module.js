@@ -1,5 +1,5 @@
 // t3d-effect-composer
-import { RenderTarget2D, TEXTURE_FILTER, ATTACHMENT, PIXEL_FORMAT, ShaderPostPass, Matrix4, Texture2D, PIXEL_TYPE, TEXTURE_WRAP, Vector3, Color3, Vector2, Vector4, SHADING_TYPE, ShaderMaterial, RenderBuffer, DRAW_SIDE, BLEND_TYPE } from 't3d';
+import { RenderTarget2D, PIXEL_TYPE, TEXTURE_FILTER, ATTACHMENT, PIXEL_FORMAT, ShaderPostPass, Matrix4, Texture2D, TEXTURE_WRAP, Vector3, TEXEL_ENCODING_TYPE, Color3, Vector2, Vector4, SHADING_TYPE, ShaderMaterial, RenderBuffer, DRAW_SIDE, BLEND_TYPE } from 't3d';
 
 class Buffer {
 
@@ -49,17 +49,18 @@ class AccumulationBuffer extends Buffer {
 	constructor(width, height, options) {
 		super(width, height, options);
 
-		this._prevRT = new RenderTarget2D(width, height);
-		this._prevRT.texture.generateMipmaps = false;
-		this._prevRT.texture.minFilter = TEXTURE_FILTER.NEAREST;
-		this._prevRT.texture.magFilter = TEXTURE_FILTER.NEAREST;
-		this._prevRT.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+		function createSwapRenderTarget() {
+			const renderTarget = new RenderTarget2D(width, height);
+			renderTarget.texture.generateMipmaps = false;
+			renderTarget.texture.type = options.highDynamicRange ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
+			renderTarget.texture.minFilter = TEXTURE_FILTER.NEAREST;
+			renderTarget.texture.magFilter = TEXTURE_FILTER.NEAREST;
+			renderTarget.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+			return renderTarget;
+		}
 
-		this._accumRT = new RenderTarget2D(width, height);
-		this._accumRT.texture.generateMipmaps = false;
-		this._accumRT.texture.minFilter = TEXTURE_FILTER.NEAREST;
-		this._accumRT.texture.magFilter = TEXTURE_FILTER.NEAREST;
-		this._accumRT.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+		this._prevRT = createSwapRenderTarget();
+		this._accumRT = createSwapRenderTarget();
 	}
 
 	swap() {
@@ -1572,6 +1573,14 @@ const fxaaShader = {
     `
 };
 
+const ToneMappingType = {
+	None: 0,
+	Linear: 1,
+	Reinhard: 2,
+	Cineon: 3,
+	ACESFilmic: 4
+};
+
 function isDepthStencilAttachment(attachment) {
 	return attachment.format === PIXEL_FORMAT.DEPTH_STENCIL
 		|| attachment.format === PIXEL_FORMAT.DEPTH24_STENCIL8;
@@ -1676,7 +1685,7 @@ class ChromaticAberrationEffect extends Effect {
 
 		this.chromaFactor = 0.025;
 
-		this._mainPass = new ShaderPostPass(shader$3);
+		this._mainPass = new ShaderPostPass(shader$4);
 		this._mainPass.material.premultipliedAlpha = true;
 	}
 
@@ -1714,7 +1723,7 @@ class ChromaticAberrationEffect extends Effect {
 
 }
 
-const shader$3 = {
+const shader$4 = {
 	name: 'ec_chromatic_aberration',
 	defines: {},
 	uniforms: {
@@ -1755,7 +1764,7 @@ class ColorCorrectionEffect extends Effect {
 		this.gamma = 1;
 		this.saturation = 1.02;
 
-		this._mainPass = new ShaderPostPass(shader$2);
+		this._mainPass = new ShaderPostPass(shader$3);
 		this._mainPass.material.premultipliedAlpha = true;
 		this._mainPass.uniforms.contrast = 1.02;
 		this._mainPass.uniforms.saturation = 1.02;
@@ -1796,7 +1805,7 @@ class ColorCorrectionEffect extends Effect {
 
 }
 
-const shader$2 = {
+const shader$3 = {
 	name: 'ec_color_correction',
 	defines: {},
 	uniforms: {
@@ -2065,7 +2074,7 @@ class FilmEffect extends Effect {
 
 		this._time = 0;
 
-		this._mainPass = new ShaderPostPass(shader$1);
+		this._mainPass = new ShaderPostPass(shader$2);
 		this._mainPass.material.premultipliedAlpha = true;
 	}
 
@@ -2106,7 +2115,7 @@ class FilmEffect extends Effect {
 
 }
 
-const shader$1 = {
+const shader$2 = {
 	name: 'ec_film',
 	defines: {},
 	uniforms: {
@@ -3258,6 +3267,163 @@ const accumulateShader = {
             vec4 texel1 = texture2D(currTexture, v_Uv);
             vec4 texel2 = texture2D(prevTexture, v_Uv);
             gl_FragColor = mix(texel1, texel2, mixRatio);
+        }
+    `
+};
+
+// Tone Mapping normally deals with the conversion of HDR to LDR.
+class ToneMappingEffect extends Effect {
+
+	constructor() {
+		super();
+
+		this.toneMapping = ToneMappingType.Reinhard;
+		this.toneMappingExposure = 1;
+		this.outputColorSpace = TEXEL_ENCODING_TYPE.SRGB;
+
+		this._mainPass = new ShaderPostPass(shader$1);
+
+		this._toneMapping = null;
+		this._outputColorSpace = null;
+	}
+
+	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
+		renderer.setRenderTarget(outputRenderTarget);
+		renderer.setClearColor(0, 0, 0, 0);
+		if (finish) {
+			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
+		} else {
+			renderer.clear(true, true, false);
+		}
+
+		const mainPass = this._mainPass;
+		mainPass.uniforms.tDiffuse = inputRenderTarget.texture;
+		mainPass.uniforms.toneMappingExposure = this.toneMappingExposure;
+
+		if (this._toneMapping !== this.toneMapping || this._outputColorSpace !== this.outputColorSpace) {
+			this._toneMapping = this.toneMapping;
+			this._outputColorSpace = this.outputColorSpace;
+
+			mainPass.material.defines = {};
+
+			if (this._toneMapping === ToneMappingType.Linear) mainPass.material.defines.LINEAR_TONE_MAPPING = '';
+			if (this._toneMapping === ToneMappingType.Reinhard) mainPass.material.defines.REINHARD_TONE_MAPPING = '';
+			if (this._toneMapping === ToneMappingType.Cineon) mainPass.material.defines.CINEON_TONE_MAPPING = '';
+			if (this._toneMapping === ToneMappingType.ACESFilmic) mainPass.material.defines.ACES_FILMIC_TONE_MAPPING = '';
+
+			if (this._outputColorSpace === TEXEL_ENCODING_TYPE.SRGB) mainPass.material.defines.SRGB_COLOR_SPACE = '';
+
+			mainPass.material.needsUpdate = true;
+		}
+
+		if (finish) {
+			mainPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
+			mainPass.renderStates.camera.rect.fromArray(composer._tempViewport);
+		}
+		mainPass.render(renderer);
+		if (finish) {
+			mainPass.material.transparent = false;
+			mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
+		}
+	}
+
+	dispose() {
+		this._mainPass.dispose();
+	}
+
+}
+
+const shader$1 = {
+	name: 'ec_tone_mapping',
+	defines: {},
+	uniforms: {
+		tDiffuse: null,
+		toneMappingExposure: 1,
+	},
+	vertexShader: defaultVertexShader,
+	fragmentShader: `
+        uniform float toneMappingExposure;
+
+        uniform sampler2D tDiffuse;
+        varying vec2 v_Uv;
+
+        // exposure only
+        vec3 LinearToneMapping(vec3 color) {
+            return saturate(toneMappingExposure * color);
+        }
+
+        // source: https://www.cs.utah.edu/docs/techreports/2002/pdf/UUCS-02-001.pdf
+        vec3 ReinhardToneMapping(vec3 color) {
+            color *= toneMappingExposure;
+            return saturate(color / (vec3(1.0) + color));
+        }
+
+        // source: http://filmicworlds.com/blog/filmic-tonemapping-operators/
+        vec3 OptimizedCineonToneMapping(vec3 color) {
+            // optimized filmic operator by Jim Hejl and Richard Burgess-Dawson
+            color *= toneMappingExposure;
+            color = max(vec3(0.0), color - 0.004);
+            return pow((color * (6.2 * color + 0.5)) / (color * (6.2 * color + 1.7) + 0.06), vec3(2.2));
+        }
+
+        // source: https://github.com/selfshadow/ltc_code/blob/master/webgl/shaders/ltc/ltc_blit.fs
+        vec3 RRTAndODTFit(vec3 v) {
+            vec3 a = v * (v + 0.0245786) - 0.000090537;
+            vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081;
+            return a / b;
+        }
+
+        // this implementation of ACES is modified to accommodate a brighter viewing environment.
+        // the scale factor of 1/0.6 is subjective. see discussion in https://github.com/mrdoob/three.js/pull/19621.
+
+        vec3 ACESFilmicToneMapping(vec3 color) {
+            // sRGB => XYZ => D65_2_D60 => AP1 => RRT_SAT
+            const mat3 ACESInputMat = mat3(
+                vec3(0.59719, 0.07600, 0.02840), // transposed from source
+                vec3(0.35458, 0.90834, 0.13383),
+                vec3(0.04823, 0.01566, 0.83777)
+            );
+        
+            // ODT_SAT => XYZ => D60_2_D65 => sRGB
+            const mat3 ACESOutputMat = mat3(
+                vec3( 1.60475, -0.10208, -0.00327), // transposed from source
+                vec3(-0.53108,  1.10813, -0.07276),
+                vec3(-0.07367, -0.00605,  1.07602)
+            );
+        
+            color *= toneMappingExposure / 0.6;
+        
+            color = ACESInputMat * color;
+        
+            // Apply RRT and ODT
+            color = RRTAndODTFit(color);
+        
+            color = ACESOutputMat * color;
+        
+            // Clamp to [0, 1]
+            return saturate(color);
+        }
+
+        void main() {
+            gl_FragColor = texture2D(tDiffuse, v_Uv);
+
+            // tone mapping
+
+			#ifdef LINEAR_TONE_MAPPING
+				gl_FragColor.rgb = LinearToneMapping(gl_FragColor.rgb);
+			#elif defined(REINHARD_TONE_MAPPING)
+				gl_FragColor.rgb = ReinhardToneMapping(gl_FragColor.rgb);
+			#elif defined(CINEON_TONE_MAPPING)
+				gl_FragColor.rgb = OptimizedCineonToneMapping(gl_FragColor.rgb);
+			#elif defined(ACES_FILMIC_TONE_MAPPING)
+				gl_FragColor.rgb = ACESFilmicToneMapping(gl_FragColor.rgb);
+			#endif
+
+            // color space
+
+            #ifdef SRGB_COLOR_SPACE
+				gl_FragColor = LinearTosRGB(gl_FragColor);
+			#endif
         }
     `
 };
@@ -5450,6 +5616,7 @@ class ColorMarkBuffer extends Buffer {
 		for (let i = 0; i < options.maxColorAttachment; i++) {
 			const rt = new RenderTarget2D(width, height);
 			rt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+			rt.texture.type = options.highDynamicRange ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
 			if (!bufferMipmaps) {
 				rt.texture.generateMipmaps = false;
 				rt.texture.minFilter = TEXTURE_FILTER.LINEAR;
@@ -5461,7 +5628,7 @@ class ColorMarkBuffer extends Buffer {
 		for (let i = 0; i < options.maxColorAttachment; i++) {
 			const mrt = new RenderTarget2D(width, height);
 			mrt.attach(
-				new RenderBuffer(width, height, PIXEL_FORMAT.RGBA8, options.samplerNumber),
+				new RenderBuffer(width, height, options.highDynamicRange ? PIXEL_FORMAT.RGBA16F : PIXEL_FORMAT.RGBA8, options.samplerNumber),
 				ATTACHMENT.COLOR_ATTACHMENT0
 			);
 			mrt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
@@ -5901,9 +6068,11 @@ class SceneBuffer extends Buffer {
 
 class RenderTargetCache {
 
-	constructor(width, height) {
+	constructor(width, height, highDynamicRange = false) {
 		this._width = width;
 		this._height = height;
+
+		this._highDynamicRange = highDynamicRange;
 
 		this._map = new Map();
 	}
@@ -5927,6 +6096,7 @@ class RenderTargetCache {
 			const texture = renderTarget._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			texture.minFilter = TEXTURE_FILTER.LINEAR;
 			texture.magFilter = TEXTURE_FILTER.LINEAR;
+			texture.type = this._highDynamicRange ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
 			texture.format = PIXEL_FORMAT.RGBA;
 			texture.generateMipmaps = false;
 
@@ -6116,6 +6286,7 @@ class EffectComposer {
 	 * @param {Boolean} [options.webgl2=false] - Whether to support WebGL2 features. Turning on will improve the storage accuracy of GBuffer.
 	 * @param {Boolean} [options.bufferMipmaps=false] - Whether to generate mipmaps for buffers.
 	 * @param {Boolean} [options.floatColorBuffer=false] - Whether to support the EXT_color_buffer_float feature. Turning on will improve the storage accuracy of GBuffer.
+	 * @param {Boolean} [options.highDynamicRange=false] - Whether to use high dynamic range (HDR) rendering.
 	 * @param {Number} [options.samplerNumber=8] - MSAA sampling multiple.
 	 * @param {Number} [options.maxMarkAttachment=5] - Maximum number of mark attachments. Means that it supports up to N*4 effects that need to be marked.
 	 * @param {Number} [options.maxColorAttachment=5] - Maximum number of color buffer attachments.
@@ -6126,6 +6297,7 @@ class EffectComposer {
 		options.webgl2 = options.webgl2 || false;
 		options.bufferMipmaps = options.bufferMipmaps || false;
 		options.floatColorBuffer = options.floatColorBuffer || false;
+		options.highDynamicRange = options.highDynamicRange || false;
 		options.samplerNumber = options.samplerNumber || 8;
 		options.maxMarkAttachment = options.maxMarkAttachment || 5;
 		options.maxColorAttachment = options.maxColorAttachment || 5;
@@ -6153,7 +6325,8 @@ class EffectComposer {
 		// Noticed that sceneBuffer and markBuffer are sharing the same DepthRenderBuffer MSDepthRenderBuffer.
 
 		this._defaultColorTexture = new Texture2D();
-		this._defaultMSColorRenderBuffer = new RenderBuffer(width, height, PIXEL_FORMAT.RGBA8, options.samplerNumber);
+		this._defaultColorTexture.type = options.highDynamicRange ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
+		this._defaultMSColorRenderBuffer = new RenderBuffer(width, height, options.highDynamicRange ? PIXEL_FORMAT.RGBA16F : PIXEL_FORMAT.RGBA8, options.samplerNumber);
 		if (!options.bufferMipmaps) {
 			this._defaultColorTexture.generateMipmaps = false;
 			this._defaultColorTexture.minFilter = TEXTURE_FILTER.LINEAR;
@@ -6179,7 +6352,7 @@ class EffectComposer {
 		this._copyPass = new ShaderPostPass(copyShader);
 		this._copyPass.material.premultipliedAlpha = true;
 
-		this._renderTargetCache = new RenderTargetCache(width, height);
+		this._renderTargetCache = new RenderTargetCache(width, height, options.highDynamicRange);
 		this._cameraJitter = new CameraJitter();
 
 		this._effectList = [];
@@ -6869,4 +7042,4 @@ if (!ShaderPostPass.prototype.dispose) {
 	};
 }
 
-export { AccumulationBuffer, BloomEffect, BlurEdgeEffect, Buffer, ChromaticAberrationEffect, ColorCorrectionEffect, ColorMarkBufferDebugger, DOFEffect, Debugger, DefaultEffectComposer, Effect, EffectComposer, FXAAEffect, FilmEffect, GBufferDebugger, GhostingEffect, GlowEffect, InnerGlowEffect, MarkBufferDebugger, NonDepthMarkBufferDebugger, OutlineEffect, RadialTailingEffect, RenderLayer, RenderListMask, SSAODebugger, SSAOEffect, SSRDebugger, SSREffect, SoftGlowEffect, TAAEffect, TailingEffect, VignettingEffect, additiveShader, blurShader, channelShader, copyShader, defaultVertexShader, fxaaShader, highlightShader, horizontalBlurShader, isDepthStencilAttachment, maskShader, multiplyShader, seperableBlurShader, verticalBlurShader };
+export { AccumulationBuffer, BloomEffect, BlurEdgeEffect, Buffer, ChromaticAberrationEffect, ColorCorrectionEffect, ColorMarkBufferDebugger, DOFEffect, Debugger, DefaultEffectComposer, Effect, EffectComposer, FXAAEffect, FilmEffect, GBufferDebugger, GhostingEffect, GlowEffect, InnerGlowEffect, MarkBufferDebugger, NonDepthMarkBufferDebugger, OutlineEffect, RadialTailingEffect, RenderLayer, RenderListMask, SSAODebugger, SSAOEffect, SSRDebugger, SSREffect, SoftGlowEffect, TAAEffect, TailingEffect, ToneMappingEffect, ToneMappingType, VignettingEffect, additiveShader, blurShader, channelShader, copyShader, defaultVertexShader, fxaaShader, highlightShader, horizontalBlurShader, isDepthStencilAttachment, maskShader, multiplyShader, seperableBlurShader, verticalBlurShader };

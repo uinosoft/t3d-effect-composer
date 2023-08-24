@@ -11,6 +11,7 @@ export { default as FXAAEffect } from './effects/FXAAEffect.js';
 export { default as SSAOEffect } from './effects/SSAOEffect.js';
 export { default as SSREffect } from './effects/SSREffect.js';
 export { default as TAAEffect } from './effects/TAAEffect.js';
+export { default as ToneMappingEffect } from './effects/ToneMappingEffect.js';
 export { default as VignettingEffect } from './effects/VignettingEffect.js';
 export { default as BlurEdgeEffect } from './effects/BlurEdgeEffect.js';
 

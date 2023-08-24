@@ -2,7 +2,8 @@
 	"effect": [
 		"effect_features",
 		"effect_transparent",
-		"effect_taa"
+		"effect_taa",
+		"effect_tonemapping"
 	],
 	"layer": [
 		"layer_all",

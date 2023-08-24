@@ -1461,6 +1461,14 @@ export const fxaaShader = {
     `
 };
 
+export const ToneMappingType = {
+	None: 0,
+	Linear: 1,
+	Reinhard: 2,
+	Cineon: 3,
+	ACESFilmic: 4
+}
+
 export function isDepthStencilAttachment(attachment) {
 	return attachment.format === PIXEL_FORMAT.DEPTH_STENCIL
 		|| attachment.format === PIXEL_FORMAT.DEPTH24_STENCIL8;

@@ -1,5 +1,5 @@
 
-import { RenderTarget2D, TEXTURE_FILTER, ATTACHMENT } from 't3d';
+import { RenderTarget2D, TEXTURE_FILTER, PIXEL_TYPE, ATTACHMENT } from 't3d';
 import Buffer from './Buffer.js';
 
 // AccumulationBuffer is used to store the accumulation result of the previous frame.
@@ -9,17 +9,18 @@ export default class AccumulationBuffer extends Buffer {
 	constructor(width, height, options) {
 		super(width, height, options);
 
-		this._prevRT = new RenderTarget2D(width, height);
-		this._prevRT.texture.generateMipmaps = false;
-		this._prevRT.texture.minFilter = TEXTURE_FILTER.NEAREST;
-		this._prevRT.texture.magFilter = TEXTURE_FILTER.NEAREST;
-		this._prevRT.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+		function createSwapRenderTarget() {
+			const renderTarget = new RenderTarget2D(width, height);
+			renderTarget.texture.generateMipmaps = false;
+			renderTarget.texture.type = options.highDynamicRange ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
+			renderTarget.texture.minFilter = TEXTURE_FILTER.NEAREST;
+			renderTarget.texture.magFilter = TEXTURE_FILTER.NEAREST;
+			renderTarget.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+			return renderTarget;
+		}
 
-		this._accumRT = new RenderTarget2D(width, height);
-		this._accumRT.texture.generateMipmaps = false;
-		this._accumRT.texture.minFilter = TEXTURE_FILTER.NEAREST;
-		this._accumRT.texture.magFilter = TEXTURE_FILTER.NEAREST;
-		this._accumRT.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+		this._prevRT = createSwapRenderTarget();
+		this._accumRT = createSwapRenderTarget();
 	}
 
 	swap() {

@@ -18,7 +18,7 @@
 <body>
 	<div id="container"></div>
 	<div id="info" class="dark">
-		TAA Effect, press 'i' to show Inspector
+		Tone Mapping Effect, press 'i' to show Inspector
 	</div>
 </body>
 
@@ -40,10 +40,11 @@
     import * as t3d from "t3d";
     import { OrbitControls } from "t3d/examples/jsm/controls/OrbitControls.js";
     import { SkyBox } from "t3d/examples/jsm/objects/SkyBox.js";
+    import { PMREM } from 't3d/examples/jsm/PMREM.js';
     import { GLTFLoader } from "t3d/examples/jsm/loaders/glTF/GLTFLoader.js";
-    import { TextureCubeLoader } from "t3d/examples/jsm/loaders/TextureCubeLoader.js";
+    import { RGBELoader } from 't3d/examples/jsm/loaders/RGBELoader.js';
 
-    import { DefaultEffectComposer, TAAEffect, AccumulationBuffer } from "t3d-effect-composer";
+    import { DefaultEffectComposer, ToneMappingEffect, ToneMappingType } from "t3d-effect-composer";
 
     import { Inspector } from "./jsm/Inspector.js";
 
@@ -68,121 +69,88 @@
     const scene = new t3d.Scene();
     scene.environmentLightIntensity = 1;
 
-    const cube_texture = new TextureCubeLoader().load([
-    	"./resources/cube/BlueSky/posx.jpg",
-    	"./resources/cube/BlueSky/negx.jpg",
-    	"./resources/cube/BlueSky/posy.jpg",
-    	"./resources/cube/BlueSky/negy.jpg",
-    	"./resources/cube/BlueSky/posz.jpg",
-    	"./resources/cube/BlueSky/negz.jpg",
-    ], function() {
-    	taaReset();
-    });
-    scene.environment = cube_texture;
-
-    const sky_box = new SkyBox(cube_texture);
-
     const loader = new GLTFLoader();
-    console.time("GLTFLoader");
 
-    const modelUrl = "./resources/gltf/lowpoly_smallcity/scene.gltf";
-    loader.load(modelUrl).then(function (result) {
-    	console.timeEnd("GLTFLoader");
-
+    loader.load("./resources/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf").then(function (result) {
     	const object = result.root;
-
-    	object.position.set(3, 3, 3);
-    	object.scale.set(0.01, 0.01, 0.01);
-
-    	object.traverse((node) => {
-    		if (node.material) {
-    			node.castShadow = true;
-    			node.receiveShadow = true;
-    		}
-    	});
-
     	scene.add(object);
+    }).catch((e) => console.error(e));
 
-    	taaReset();
+    new RGBELoader().load("./resources/sky_hdr/royal_esplanade_1k.hdr", function(textureData) {
+    	let texture = new t3d.Texture2D();
+    	texture.image = { data: textureData.data, width: textureData.width, height: textureData.height };
+    	texture.type = textureData.type;
+    	if (textureData.generateMipmaps !== undefined) {
+    		texture.generateMipmaps = textureData.generateMipmaps;
+    	}
+    	if (textureData.minFilter !== undefined) {
+    		texture.minFilter = textureData.minFilter;
+    	}
+    	if (textureData.magFilter !== undefined) {
+    		texture.magFilter = textureData.magFilter;
+    	}
+    	texture.version++;
+
+    	texture = PMREM.prefilterEnvironmentMap(renderer, texture);
+
+    	scene.background = texture;
+    	scene.environment = texture;
+
+    	const sky_box = new SkyBox(texture);
+    	scene.add(sky_box);
     });
 
-    const ambientLight = new t3d.AmbientLight(0xffffff, 0.1);
+    const ambientLight = new t3d.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
 
-    const directionalLight = new t3d.DirectionalLight(0xffffff, 1.5);
-    directionalLight.position.set(-80, 80, 80);
+    const directionalLight = new t3d.DirectionalLight(0xffffff, 3);
+    directionalLight.position.set(8, 8, 8);
     directionalLight.lookAt(new t3d.Vector3(), new t3d.Vector3(0, 1, 0));
-    directionalLight.shadow.windowSize = 40;
-    directionalLight.shadow.bias = -0.0003;
-    directionalLight.shadow.cameraNear = 1;
-    directionalLight.shadow.cameraFar = 500;
-    directionalLight.shadow.mapSize.set(1024, 1024);
-    directionalLight.castShadow = true;
     scene.add(directionalLight);
 
     const camera = new t3d.Camera();
-    camera.position.set(-20, 10, -20);
+    camera.position.set(3, 1, 4);
     camera.lookAt(new t3d.Vector3(0, 0, 0), new t3d.Vector3(0, 1, 0));
     camera.setPerspective((30 / 180) * Math.PI, width / height, 1, 1000);
-    camera.add(sky_box);
     scene.add(camera);
 
-    const options = {
+    const effectComposer = new DefaultEffectComposer(width, height, {
     	samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
     	webgl2: renderer.capabilities.version > 1,
     	floatColorBuffer: !!renderer.capabilities.getExtension(
     		"EXT_color_buffer_float"
     	),
-    }
+    	highDynamicRange: true
+    });
+    effectComposer.sceneMSAA = true;
 
-    const effectComposer = new DefaultEffectComposer(width, height, options);
-    effectComposer.sceneMSAA = false;
+    const toneMappingEffect = new ToneMappingEffect();
+    toneMappingEffect.toneMapping = ToneMappingType.ACESFilmic;
+    toneMappingEffect.toneMappingExposure = 1;
+    toneMappingEffect.outputColorSpace = t3d.TEXEL_ENCODING_TYPE.SRGB;
+    effectComposer.addEffect('ToneMapping', toneMappingEffect, 199);
 
-    const sceneBuffer = effectComposer.getBuffer('SceneBuffer');
-    const gBuffer = effectComposer.getBuffer('GBuffer');
-    const fxaaEffect = effectComposer.getEffect('FXAA');
-    const ssaoEffect = effectComposer.getEffect('SSAO');
-    const ssrEffect = effectComposer.getEffect('SSR');
-
-    camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.SRGB;
-    sceneBuffer.setOutputEncoding(t3d.TEXEL_ENCODING_TYPE.SRGB);
-
-    const accumBuffer = new AccumulationBuffer(width, height, options);
-    const taaEffect = new TAAEffect();
-    taaEffect.onFinish = () => {
-    	sceneBuffer.autoUpdate = false;
-    	console.log('accumulation finished.');
-    };
-
-    effectComposer.addBuffer('AccumulationBuffer', accumBuffer);
-    effectComposer.addEffect('TAA', taaEffect, 1.5);
-
-    ssaoEffect.radius = 0.2;
-    ssaoEffect.active = true;
-
-    // ssrEffect.active = true;
-
-    function taaReset() {
-    	sceneBuffer.autoUpdate = true;
-    	taaEffect.reset();
-    }
+    const bloomEffect = effectComposer.getEffect('Bloom');
+    bloomEffect.strength = 1;
+    bloomEffect.blurSize = 1.27;
+    bloomEffect.threshold = 1.5;
 
     const gui = new GUI();
-    gui.add(taaEffect, 'active').name('taa').onChange(taaReset);
-    const ssaoFolder = gui.addFolder('ssao').onChange(taaReset);
-    ssaoFolder.add(ssaoEffect, 'active');
-    ssaoFolder.add(ssaoEffect, 'radius', 0, 1);
-    ssaoFolder.add(ssaoEffect, 'jitter');
-    const ssrFolder = gui.addFolder('ssr').onChange(taaReset);
-    ssrFolder.add(ssrEffect, 'active');
-    ssrFolder.add(ssrEffect, 'strength', 0, 1);
-    ssrFolder.add(ssrEffect, 'jitter');
-    ssrFolder.close();
-    const debugFolder = gui.addFolder('debug').onChange(taaReset);
-    debugFolder.add(sceneBuffer, 'enableCameraJitter').name('SceneBuffer Jitter');
-    debugFolder.add(gBuffer, 'enableCameraJitter').name('GBuffer Jitter');
-    debugFolder.add(fxaaEffect, 'active').name('fxaa');
-    debugFolder.close();
+    const toneMappingFolder = gui.addFolder('Tone Mapping');
+    toneMappingFolder.add(toneMappingEffect, 'toneMapping', ToneMappingType);
+    toneMappingFolder.add(toneMappingEffect, 'toneMappingExposure', 0, 10, 0.01);
+    toneMappingFolder.add(toneMappingEffect, 'outputColorSpace', {
+    	Linear: t3d.TEXEL_ENCODING_TYPE.LINEAR,
+    	SRGB: t3d.TEXEL_ENCODING_TYPE.SRGB,
+    });
+    const bloomFolder = gui.addFolder('Bloom');
+    bloomFolder.add(bloomEffect, 'active');
+    bloomFolder.add(bloomEffect, 'strength', 0, 5, 0.01);
+    bloomFolder.add(bloomEffect, 'blurSize', 0, 5, 0.01);
+    bloomFolder.add(bloomEffect, 'threshold', 0, 2, 0.01);
+    const lightFolder = gui.addFolder('Light');
+    lightFolder.add(directionalLight, 'intensity', 0, 10, 0.01);
+    lightFolder.close();
 
     const stats = new Stats();
     stats.dom.style.cssText = 'position:fixed;bottom:0;left:0;cursor:pointer;opacity:0.9;z-index:10000';
@@ -203,26 +171,13 @@
     });
 
     const controller = new OrbitControls(camera, canvas);
-    controller.dampingFactor = 0.2;
-
-    let staticCount = -1;
 
     function loop(count) {
     	requestAnimationFrame(loop);
 
     	stats.begin();
 
-    	// Delay 10 frames to wait for the real static,
-    	// because of the dampingFactor of OrbitControls
-    	if (controller.update()) {
-    		staticCount = 10;
-    		taaReset();
-    	} else {
-    		staticCount--;
-    		if (staticCount > 0) {
-    			taaReset();
-    		}
-    	}
+    	controller.update();
     
     	scene.updateMatrix();
     	scene.updateRenderStates(camera);
@@ -246,8 +201,6 @@
 
     	backRenderTarget.resize(width, height);
     	effectComposer.resize(width, height);
-
-    	taaReset();
     }
     window.addEventListener("resize", onWindowResize, false);
 </script>

@@ -1,10 +1,12 @@
-import { RenderTarget2D, ATTACHMENT, TEXTURE_FILTER, PIXEL_FORMAT } from 't3d';
+import { RenderTarget2D, ATTACHMENT, TEXTURE_FILTER, PIXEL_FORMAT, PIXEL_TYPE } from 't3d';
 
 export default class RenderTargetCache {
 
-	constructor(width, height) {
+	constructor(width, height, highDynamicRange = false) {
 		this._width = width;
 		this._height = height;
+
+		this._highDynamicRange = highDynamicRange;
 
 		this._map = new Map();
 	}
@@ -28,6 +30,7 @@ export default class RenderTargetCache {
 			const texture = renderTarget._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			texture.minFilter = TEXTURE_FILTER.LINEAR;
 			texture.magFilter = TEXTURE_FILTER.LINEAR;
+			texture.type = this._highDynamicRange ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
 			texture.format = PIXEL_FORMAT.RGBA;
 			texture.generateMipmaps = false;
 

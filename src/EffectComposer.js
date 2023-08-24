@@ -1,4 +1,4 @@
-import { Vector2, Texture2D, RenderBuffer, PIXEL_FORMAT, ShaderPostPass, TEXTURE_FILTER } from 't3d';
+import { Vector2, Texture2D, RenderBuffer, PIXEL_FORMAT, PIXEL_TYPE, ShaderPostPass, TEXTURE_FILTER } from 't3d';
 import GBuffer from './buffers/GBuffer.js';
 import NonDepthMarkBuffer from './buffers/NonDepthMarkBuffer.js';
 import MarkBuffer from './buffers/MarkBuffer.js';
@@ -17,6 +17,7 @@ export default class EffectComposer {
 	 * @param {Boolean} [options.webgl2=false] - Whether to support WebGL2 features. Turning on will improve the storage accuracy of GBuffer.
 	 * @param {Boolean} [options.bufferMipmaps=false] - Whether to generate mipmaps for buffers.
 	 * @param {Boolean} [options.floatColorBuffer=false] - Whether to support the EXT_color_buffer_float feature. Turning on will improve the storage accuracy of GBuffer.
+	 * @param {Boolean} [options.highDynamicRange=false] - Whether to use high dynamic range (HDR) rendering.
 	 * @param {Number} [options.samplerNumber=8] - MSAA sampling multiple.
 	 * @param {Number} [options.maxMarkAttachment=5] - Maximum number of mark attachments. Means that it supports up to N*4 effects that need to be marked.
 	 * @param {Number} [options.maxColorAttachment=5] - Maximum number of color buffer attachments.
@@ -27,6 +28,7 @@ export default class EffectComposer {
 		options.webgl2 = options.webgl2 || false;
 		options.bufferMipmaps = options.bufferMipmaps || false;
 		options.floatColorBuffer = options.floatColorBuffer || false;
+		options.highDynamicRange = options.highDynamicRange || false;
 		options.samplerNumber = options.samplerNumber || 8;
 		options.maxMarkAttachment = options.maxMarkAttachment || 5;
 		options.maxColorAttachment = options.maxColorAttachment || 5;
@@ -54,7 +56,8 @@ export default class EffectComposer {
 		// Noticed that sceneBuffer and markBuffer are sharing the same DepthRenderBuffer MSDepthRenderBuffer.
 
 		this._defaultColorTexture = new Texture2D();
-		this._defaultMSColorRenderBuffer = new RenderBuffer(width, height, PIXEL_FORMAT.RGBA8, options.samplerNumber);
+		this._defaultColorTexture.type = options.highDynamicRange ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
+		this._defaultMSColorRenderBuffer = new RenderBuffer(width, height, options.highDynamicRange ? PIXEL_FORMAT.RGBA16F : PIXEL_FORMAT.RGBA8, options.samplerNumber);
 		if (!options.bufferMipmaps) {
 			this._defaultColorTexture.generateMipmaps = false;
 			this._defaultColorTexture.minFilter = TEXTURE_FILTER.LINEAR;
@@ -80,7 +83,7 @@ export default class EffectComposer {
 		this._copyPass = new ShaderPostPass(copyShader);
 		this._copyPass.material.premultipliedAlpha = true;
 
-		this._renderTargetCache = new RenderTargetCache(width, height);
+		this._renderTargetCache = new RenderTargetCache(width, height, options.highDynamicRange);
 		this._cameraJitter = new CameraJitter();
 
 		this._effectList = [];
