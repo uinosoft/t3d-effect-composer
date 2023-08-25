@@ -82,7 +82,7 @@
 	const sky_box = new SkyBox(cube_texture);
 
 	const dracoLoader = new DRACOLoader();
-	DRACOLoader.setDecoderPath('libs/draco/');
+	dracoLoader.setDecoderPath('libs/draco/');
 
 	const loader = new GLTFLoader();
 	loader.setDRACOLoader(dracoLoader);
