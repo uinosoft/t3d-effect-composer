@@ -48,6 +48,8 @@ export class LensflareEffect extends Effect {
 
 			renderer.setRenderTarget(tempRT1);
 
+			renderer.beginRender();
+
 			elements.forEach(({ texture, color, scale, offset }) => {
 				const vecX = -screenX * 2;
 				const vecY = -screenY * 2;
@@ -63,6 +65,8 @@ export class LensflareEffect extends Effect {
 
 				renderer.renderRenderableItem(this._lensflarePass.renderQueueLayer.opaque[0], this._lensflarePass.renderStates, this._lensflarePass.renderConfig);
 			});
+
+			renderer.endRender();
 		});
 
 		renderer.setRenderTarget(outputRenderTarget);
