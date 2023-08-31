@@ -34,8 +34,7 @@ export default class GBuffer extends Buffer {
 		);
 
 		this._renderOptions = {
-			getMaterial: createGetMaterialFunction(),
-			ifRender: createIfRenderFunction(undefined)
+			getMaterial: createGetMaterialFunction()
 		};
 
 		this._fixedRenderStates = {
@@ -66,9 +65,9 @@ export default class GBuffer extends Buffer {
 
 	setIfRenderReplaceFunction(func) {
 		if (!!func) {
-			this._renderOptions.ifRender = createIfRenderFunction(func);
+			this._renderOptions.ifRender = func;
 		} else {
-			this._renderOptions.ifRender = createIfRenderFunction(undefined);
+			delete this._renderOptions.ifRender;
 		}
 	}
 
@@ -182,20 +181,6 @@ export default class GBuffer extends Buffer {
 
 }
 
-function createIfRenderFunction(func = defaultIfRenderReplaceFunction) {
-	return function(renderable) {
-		if (!func(renderable)) {
-			return false;
-		}
-
-		return !!renderable.geometry.getAttribute('a_Normal');
-	}
-}
-
-function defaultIfRenderReplaceFunction(renderable) {
-	return true;
-}
-
 function createGetMaterialFunction(func = defaultMaterialReplaceFunction) {
 	return function(renderable) {
 		const material = func(renderable);
@@ -286,7 +271,7 @@ const normalGlossinessShader = {
         #include <skinning_pars_vert>
         #include <normal_pars_vert>
         #include <uv_pars_vert>
-		#include <logdepthbuf_pars_vert>
+		#include <modelPos_pars_frag>
         void main() {
         	#include <uv_vert>
         	#include <begin_vert>
@@ -296,7 +281,7 @@ const normalGlossinessShader = {
         	#include <skinnormal_vert>
         	#include <normal_vert>
         	#include <pvm_vert>
-			#include <logdepthbuf_vert>
+			#include <modelPos_vert>
         }
     `,
 	fragmentShader: `
@@ -314,7 +299,7 @@ const normalGlossinessShader = {
             uniform sampler2D roughnessMap;
         #endif
 
-		#include <logdepthbuf_pars_frag>
+		#include <modelPos_pars_frag>
 
         void main() {
             #if defined(USE_DIFFUSE_MAP) && defined(ALPHATEST)
@@ -325,11 +310,16 @@ const normalGlossinessShader = {
 
 			#include <logdepthbuf_frag>
 
-            vec3 normal = normalize(v_Normal);
-
-			#ifdef DOUBLE_SIDED
-				normal = normal * (float(gl_FrontFacing) * 2.0 - 1.0);
-			#endif 
+			#ifdef FLAT_SHADED
+				vec3 fdx = dFdx(v_modelPos);
+				vec3 fdy = dFdy(v_modelPos);
+				vec3 normal = normalize(cross(fdx, fdy));
+			#else
+            	vec3 normal = normalize(v_Normal);
+				#ifdef DOUBLE_SIDED
+					normal = normal * (float(gl_FrontFacing) * 2.0 - 1.0);
+				#endif 
+			#endif
 
             float roughnessFactor = roughness;
             #ifdef USE_ROUGHNESSMAP

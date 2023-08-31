@@ -4561,8 +4561,7 @@
 			depthTexture.flipY = false;
 			this._rt.attach(depthTexture, t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 			this._renderOptions = {
-				getMaterial: createGetMaterialFunction$2(),
-				ifRender: createIfRenderFunction$2(undefined)
+				getMaterial: createGetMaterialFunction$2()
 			};
 			this._fixedRenderStates = {
 				scene: null,
@@ -4589,9 +4588,9 @@
 		}
 		setIfRenderReplaceFunction(func) {
 			if (!!func) {
-				this._renderOptions.ifRender = createIfRenderFunction$2(func);
+				this._renderOptions.ifRender = func;
 			} else {
-				this._renderOptions.ifRender = createIfRenderFunction$2(undefined);
+				delete this._renderOptions.ifRender;
 			}
 		}
 		setGeometryReplaceFunction(func) {
@@ -4679,17 +4678,6 @@
 			return output;
 		}
 	}
-	function createIfRenderFunction$2(func = defaultIfRenderReplaceFunction$2) {
-		return function (renderable) {
-			if (!func(renderable)) {
-				return false;
-			}
-			return !!renderable.geometry.getAttribute('a_Normal');
-		};
-	}
-	function defaultIfRenderReplaceFunction$2(renderable) {
-		return true;
-	}
 	function createGetMaterialFunction$2(func = defaultMaterialReplaceFunction$2) {
 		return function (renderable) {
 			const material = func(renderable);
@@ -4762,7 +4750,7 @@
 				#include <skinning_pars_vert>
 				#include <normal_pars_vert>
 				#include <uv_pars_vert>
-		#include <logdepthbuf_pars_vert>
+		#include <modelPos_pars_frag>
 				void main() {
 					#include <uv_vert>
 					#include <begin_vert>
@@ -4772,7 +4760,7 @@
 					#include <skinnormal_vert>
 					#include <normal_vert>
 					#include <pvm_vert>
-			#include <logdepthbuf_vert>
+			#include <modelPos_vert>
 				}
 		`,
 		fragmentShader: `
@@ -4790,7 +4778,7 @@
 						uniform sampler2D roughnessMap;
 				#endif
 
-		#include <logdepthbuf_pars_frag>
+		#include <modelPos_pars_frag>
 
 				void main() {
 						#if defined(USE_DIFFUSE_MAP) && defined(ALPHATEST)
@@ -4801,11 +4789,16 @@
 
 			#include <logdepthbuf_frag>
 
-						vec3 normal = normalize(v_Normal);
-
-			#ifdef DOUBLE_SIDED
-				normal = normal * (float(gl_FrontFacing) * 2.0 - 1.0);
-			#endif 
+			#ifdef FLAT_SHADED
+				vec3 fdx = dFdx(v_modelPos);
+				vec3 fdy = dFdy(v_modelPos);
+				vec3 normal = normalize(cross(fdx, fdy));
+			#else
+							vec3 normal = normalize(v_Normal);
+				#ifdef DOUBLE_SIDED
+					normal = normal * (float(gl_FrontFacing) * 2.0 - 1.0);
+				#endif 
+			#endif
 
 						float roughnessFactor = roughness;
 						#ifdef USE_ROUGHNESSMAP
