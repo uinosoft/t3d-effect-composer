@@ -308,8 +308,6 @@ const normalGlossinessShader = {
                 if(alpha < ALPHATEST) discard;
             #endif
 
-			#include <logdepthbuf_frag>
-
 			#ifdef FLAT_SHADED
 				vec3 fdx = dFdx(v_modelPos);
 				vec3 fdy = dFdy(v_modelPos);
