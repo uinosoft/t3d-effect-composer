@@ -3,7 +3,8 @@
 		"effect_features",
 		"effect_transparent",
 		"effect_taa",
-		"effect_tonemapping"
+		"effect_tonemapping",
+		"effect_ssao"
 	],
 	"layer": [
 		"layer_all",
