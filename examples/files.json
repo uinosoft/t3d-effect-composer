@@ -28,8 +28,8 @@
 		"advanced_rain",
 		"advanced_heightfog",
 		"advanced_sharpness",
-		"advanced_volume"
-
+		"advanced_volume",
+		"advanced_skyline"
 	],
 	"debugger": [
 		"debugger_uv"
