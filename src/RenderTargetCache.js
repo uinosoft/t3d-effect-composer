@@ -41,7 +41,7 @@ export default class RenderTargetCache {
 	}
 
 	release(renderTarget, level = 0) {
-		let list = this._map.get(level);
+		const list = this._map.get(level);
 		list.push(renderTarget);
 	}
 

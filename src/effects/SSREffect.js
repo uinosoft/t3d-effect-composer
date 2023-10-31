@@ -132,7 +132,7 @@ export default class SSREffect extends Effect {
 
 		// Step 3: blurY pass
 
-		renderer.setRenderTarget(!!inputRenderTarget ? tempRT1 : outputRenderTarget);
+		renderer.setRenderTarget(inputRenderTarget ? tempRT1 : outputRenderTarget);
 		renderer.clear(true, true, false);
 
 		this._blurPass.uniforms.direction = 1;
@@ -142,7 +142,7 @@ export default class SSREffect extends Effect {
 
 		// Step 4: blend pass
 
-		if (!!inputRenderTarget) {
+		if (inputRenderTarget) {
 			renderer.setRenderTarget(outputRenderTarget);
 			renderer.setClearColor(0, 0, 0, 0);
 			if (finish) {

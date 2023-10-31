@@ -1,4 +1,4 @@
-import { Mesh, Geometry, Buffer, Attribute,  BasicMaterial, Vector3, VERTEX_COLOR, DRAW_MODE } from 't3d';
+import { Mesh, Geometry, Buffer, Attribute, BasicMaterial, Vector3, VERTEX_COLOR, DRAW_MODE } from 't3d';
 
 export class DecalHelper extends Mesh {
 
@@ -20,7 +20,7 @@ export class DecalHelper extends Mesh {
 		indices.push(
 			0, 1, 1, 2, 2, 3, 3, 0, // near
 			4, 5, 5, 6, 6, 7, 7, 4, // far
-			0, 4, 1, 5, 2, 6, 3, 7  // side
+			0, 4, 1, 5, 2, 6, 3, 7 // side
 		);
 
 		geometry.addAttribute('a_Position', new Attribute(new Buffer(new Float32Array(vertices), 3)));

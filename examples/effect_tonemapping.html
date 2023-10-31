@@ -30,39 +30,37 @@
 {
 	"imports": {
 		"t3d": "./libs/t3d/build/t3d.module.js",
-		"t3d/examples/jsm/": "./libs/t3d/examples/jsm/",
+		"t3d/addons/": "./libs/t3d/examples/jsm/",
 		"t3d-effect-composer": "../build/t3d.effectcomposer.module.js"
 	}
 }
 </script>
 
 <script type="module">
-    import * as t3d from "t3d";
-    import { OrbitControls } from "t3d/examples/jsm/controls/OrbitControls.js";
-    import { SkyBox } from "t3d/examples/jsm/objects/SkyBox.js";
-    import { PMREM } from 't3d/examples/jsm/PMREM.js';
-    import { GLTFLoader } from "t3d/examples/jsm/loaders/glTF/GLTFLoader.js";
-    import { RGBELoader } from 't3d/examples/jsm/loaders/RGBELoader.js';
+    import * as t3d from 't3d';
+    import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
+    import { SkyBox } from 't3d/addons/objects/SkyBox.js';
+    import { PMREM } from 't3d/addons/PMREM.js';
+    import { GLTFLoader } from 't3d/addons/loaders/glTF/GLTFLoader.js';
+    import { RGBELoader } from 't3d/addons/loaders/RGBELoader.js';
 
-    import { EffectComposer, ToneMappingEffect, ToneMappingType } from "t3d-effect-composer";
+    import { EffectComposer, ToneMappingEffect, ToneMappingType } from 't3d-effect-composer';
+    import UnrealBloomEffect from './jsm/bloom/UnrealBloomEffect.js';
+    import { Inspector } from './jsm/Inspector.js';
 
-    import UnrealBloomEffect from "./jsm/bloom/UnrealBloomEffect.js";
-
-    import { Inspector } from "./jsm/Inspector.js";
-
-    import { GUI } from "./libs/lil-gui.esm.min.js";
-    import Stats from "./libs/stats.module.js";
+    import { GUI } from './libs/lil-gui.esm.min.js';
+    import Stats from './libs/stats.module.js';
 
     let width = window.innerWidth || 2;
     let height = window.innerHeight || 2;
 
-    const canvas = document.createElement("canvas");
+    const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     document.body.appendChild(canvas);
 
     const contextParams = { antialias: false, alpha: false, stencil: true };
-    const gl = canvas.getContext("webgl2", contextParams) || canvas.getContext("webgl", contextParams);
+    const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
     const renderer = new t3d.WebGLRenderer(gl);
     const backRenderTarget = new t3d.RenderTargetBack(canvas);
 
@@ -73,12 +71,12 @@
 
     const loader = new GLTFLoader();
 
-    loader.load("./resources/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf").then(function (result) {
+    loader.load('./resources/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf').then(function(result) {
     	const object = result.root;
     	scene.add(object);
-    }).catch((e) => console.error(e));
+    }).catch(e => console.error(e));
 
-    new RGBELoader().load("./resources/sky_hdr/royal_esplanade_1k.hdr", function(textureData) {
+    new RGBELoader().load('./resources/sky_hdr/royal_esplanade_1k.hdr', function(textureData) {
     	let texture = new t3d.Texture2D();
     	texture.image = { data: textureData.data, width: textureData.width, height: textureData.height };
     	texture.type = textureData.type;
@@ -120,7 +118,7 @@
     	samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
     	webgl2: renderer.capabilities.version > 1,
     	floatColorBuffer: !!renderer.capabilities.getExtension(
-    		"EXT_color_buffer_float"
+    		'EXT_color_buffer_float'
     	),
     	highDynamicRange: true
     });
@@ -143,8 +141,8 @@
     toneMappingFolder.add(toneMappingEffect, 'toneMappingExposure', 0, 10, 0.01);
     toneMappingFolder.add(toneMappingEffect, 'outputColorSpace', {
     	Linear: t3d.TEXEL_ENCODING_TYPE.LINEAR,
-    	SRGB: t3d.TEXEL_ENCODING_TYPE.SRGB,
-    });
+    	SRGB: t3d.TEXEL_ENCODING_TYPE.SRGB
+});
     const bloomFolder = gui.addFolder('Bloom');
     bloomFolder.add(bloomEffect, 'active');
     bloomFolder.add(bloomEffect, 'strength', 0, 1, 0.01);
@@ -161,11 +159,11 @@
     document.body.appendChild(stats.dom);
 
     let inspector;
-    document.addEventListener("keydown", (e) => {
+    document.addEventListener('keydown', e => {
     	if (e.keyCode === 73) {
     		if (!inspector) {
     			inspector = new Inspector(effectComposer, GUI);
-    			inspector.gui.domElement.classList.add("top-left-corner");
+    			inspector.gui.domElement.classList.add('top-left-corner');
     		} else {
     			inspector.destroy();
     			inspector = null;
@@ -205,7 +203,7 @@
     	backRenderTarget.resize(width, height);
     	effectComposer.resize(width, height);
     }
-    window.addEventListener("resize", onWindowResize, false);
+    window.addEventListener('resize', onWindowResize, false);
 </script>
 
 </html>

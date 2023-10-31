@@ -181,4 +181,4 @@ const downSampleShader = {
 				texture2D(tDiffuse, v_Uv + d.zw)) * bright * 0.25;
 		}
 	`
-}
+};

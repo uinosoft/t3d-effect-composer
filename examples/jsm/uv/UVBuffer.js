@@ -26,7 +26,7 @@ export class UVBuffer extends Buffer {
 			ifRender: renderable => {
 				return !!renderable.geometry.getAttribute('a_Uv');
 			}
-		}
+		};
 
 		this.layers = [0];
 	}
@@ -167,4 +167,4 @@ const uvShader = {
             gl_FragColor = vec4(color.rgb, 1.);
         }
     `
-}
+};

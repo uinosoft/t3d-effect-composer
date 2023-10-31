@@ -70,8 +70,8 @@ export class HeightFogEffect extends Effect {
 
 		if (this.enableFlow) {
 			this._fogPass.uniforms.noiseTexture = this.noiseTexture;
-			this._fogPass.material.uniforms['flowOffset'][0] += this.flowSpeed.x * deltaTime / 10.;
-			this._fogPass.material.uniforms['flowOffset'][1] += this.flowSpeed.y * deltaTime / 10.;
+			this._fogPass.material.uniforms['flowOffset'][0] += this.flowSpeed.x * deltaTime / 10.0;
+			this._fogPass.material.uniforms['flowOffset'][1] += this.flowSpeed.y * deltaTime / 10.0;
 			this._fogPass.material.uniforms['flowStrength'] = this.flowStrength;
 		}
 

@@ -1,7 +1,6 @@
 /**
  * LUT Shader
  */
-
 export const LUTShader = {
 	name: 'ec_lut',
 

@@ -93,7 +93,7 @@ const accumulateShader = {
 	name: 'accum',
 	defines: {},
 	uniforms: {
-		mixRatio: 0.9,
+		mixRatio: 0.9
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `

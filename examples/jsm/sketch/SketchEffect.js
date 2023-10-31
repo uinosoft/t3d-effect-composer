@@ -108,7 +108,7 @@ const mixShader = {
 	uniforms: {
 		sketch: null,
 		diffuse: null,
-		color: [0, 0, 0],
+		color: [0, 0, 0]
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `

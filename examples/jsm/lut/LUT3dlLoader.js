@@ -8,18 +8,18 @@ import {
 	PIXEL_FORMAT,
 	PIXEL_TYPE,
 	TEXTURE_WRAP,
-	TEXTURE_FILTER,
-} from "t3d";
+	TEXTURE_FILTER
+} from 't3d';
 
 export class LUT3dlLoader extends Loader {
 
 	load(url, onLoad, onProgress, onError) {
 		const loader = new FileLoader(this.manager);
 		loader.setPath(this.path);
-		loader.setResponseType("text");
+		loader.setResponseType('text');
 		loader.load(
 			url,
-			(text) => {
+			text => {
 				try {
 					onLoad(this.parse(text));
 				} catch (e) {
@@ -40,8 +40,8 @@ export class LUT3dlLoader extends Loader {
 	parse(str) {
 		// remove empty lines and comment lints
 		str = str
-			.replace(/^#.*?(\n|\r)/gm, "")
-			.replace(/^\s*?(\n|\r)/gm, "")
+			.replace(/^#.*?(\n|\r)/gm, '')
+			.replace(/^\s*?(\n|\r)/gm, '')
 			.trim();
 
 		const lines = str.split(/[\n\r]+/g);
@@ -50,13 +50,13 @@ export class LUT3dlLoader extends Loader {
 		const gridLines = lines[0]
 			.trim()
 			.split(/\s+/g)
-			.map((e) => parseFloat(e));
+			.map(e => parseFloat(e));
 		const gridStep = gridLines[1] - gridLines[0];
 		const size = gridLines.length;
 
 		for (let i = 1, l = gridLines.length; i < l; i++) {
 			if (gridStep !== gridLines[i] - gridLines[i - 1]) {
-				throw new Error("LUT3dlLoader: Inconsistent grid size not supported.");
+				throw new Error('LUT3dlLoader: Inconsistent grid size not supported.');
 			}
 		}
 
@@ -130,7 +130,7 @@ export class LUT3dlLoader extends Loader {
 		return {
 			size,
 			texture,
-			texture3D,
+			texture3D
 		};
 	}
 

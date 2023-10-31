@@ -27,7 +27,7 @@
     {
         "imports": {
             "t3d": "./libs/t3d/build/t3d.module.js",
-            "t3d/examples/jsm/": "./libs/t3d/examples/jsm/",
+            "t3d/addons/": "./libs/t3d/examples/jsm/",
             "t3d-effect-composer": "../build/t3d.effectcomposer.module.js"
         }
     }
@@ -35,8 +35,8 @@
 
 <script type="module">
     import * as t3d from 't3d';
-    import { OrbitControls } from 't3d/examples/jsm/controls/OrbitControls.js';
-    import { Texture2DLoader } from 't3d/examples/jsm/loaders/Texture2DLoader.js';
+    import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
+    import { Texture2DLoader } from 't3d/addons/loaders/Texture2DLoader.js';
 
     import { DefaultEffectComposer, OutlineEffect } from 't3d-effect-composer';
     import { OverlayBuffer } from './jsm/overlay/OverlayBuffer.js';
@@ -53,7 +53,7 @@
     document.body.appendChild(canvas);
 
     const contextParams = { antialias: true, alpha: false };
-    const gl = canvas.getContext("webgl2", contextParams) || canvas.getContext("webgl", contextParams);
+    const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
     const renderer = new t3d.WebGLRenderer(gl);
     const backRenderTarget = new t3d.RenderTargetBack(canvas);
 
@@ -62,7 +62,7 @@
     const options = {
     	samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
     	webgl2: renderer.capabilities.version > 1,
-    	floatColorBuffer: !!renderer.capabilities.getExtension("EXT_color_buffer_float")
+    	floatColorBuffer: !!renderer.capabilities.getExtension('EXT_color_buffer_float')
     };
 
     const effectComposer = new DefaultEffectComposer(width, height, options);
@@ -148,7 +148,7 @@
     outlineEffect.color.setRGB(1, 0, 0);
     outlineEffect.active = false;
     effectComposer.addEffect('Outline', outlineEffect, 20);
-    const outlineFolder = layersFolder.addFolder("Outline");
+    const outlineFolder = layersFolder.addFolder('Outline');
     outlineFolder.close();
     outlineFolder.add(outlineEffect, 'active');
     outlineFolder.add(outlineEffect, 'thickness', 0, 2, 0.01);
@@ -156,12 +156,12 @@
 
     const glowEffect = effectComposer.getEffect('Glow');
     glowEffect.active = true;
-    const glowFolder = layersFolder.addFolder("Glow");
+    const glowFolder = layersFolder.addFolder('Glow');
     glowFolder.close();
     glowFolder.add(glowEffect, 'active');
     glowFolder.add(glowEffect, 'strength', 0, 2, 0.01);
-    glowFolder.add(glowEffect, "threshold").min(0).max(1).step(0.01);
-    glowFolder.add(glowEffect, "smoothWidth").min(0).max(1).step(0.01);
+    glowFolder.add(glowEffect, 'threshold').min(0).max(1).step(0.01);
+    glowFolder.add(glowEffect, 'smoothWidth').min(0).max(1).step(0.01);
 
     const controller = new OrbitControls(camera, canvas);
 
@@ -190,7 +190,7 @@
     	backRenderTarget.resize(width, height);
     	effectComposer.resize(width, height);
     }
-    window.addEventListener("resize", onWindowResize, false);
+    window.addEventListener('resize', onWindowResize, false);
 </script>
 
 </html>

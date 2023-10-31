@@ -22,7 +22,7 @@
     {
         "imports": {
             "t3d": "./libs/t3d/build/t3d.module.js",
-            "t3d/examples/jsm/": "./libs/t3d/examples/jsm/",
+            "t3d/addons/": "./libs/t3d/examples/jsm/",
             "t3d-effect-composer": "../build/t3d.effectcomposer.module.js"
         }
     }
@@ -30,9 +30,9 @@
 
 <script type="module">
     import * as t3d from 't3d';
-    import { OrbitControls } from 't3d/examples/jsm/controls/OrbitControls.js';
-    import { SkyBox } from 't3d/examples/jsm/objects/SkyBox.js';
-    import { TextureCubeLoader } from 't3d/examples/jsm/loaders/TextureCubeLoader.js';
+    import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
+    import { SkyBox } from 't3d/addons/objects/SkyBox.js';
+    import { TextureCubeLoader } from 't3d/addons/loaders/TextureCubeLoader.js';
 
     import { DefaultEffectComposer, MarkBufferDebugger, ColorMarkBufferDebugger, RenderListMask } from 't3d-effect-composer';
 
@@ -48,7 +48,7 @@
     document.body.appendChild(canvas);
 
     const contextParams = { antialias: true, alpha: false, stencil: true };
-    const gl = canvas.getContext("webgl2", contextParams) || canvas.getContext("webgl", contextParams);
+    const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
     const renderer = new t3d.WebGLRenderer(gl);
     const backRenderTarget = new t3d.RenderTargetBack(canvas);
 
@@ -57,7 +57,7 @@
     const effectComposer = new DefaultEffectComposer(width, height, {
     	samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
     	webgl2: renderer.capabilities.version > 1,
-    	floatColorBuffer: !!renderer.capabilities.getExtension("EXT_color_buffer_float")
+    	floatColorBuffer: !!renderer.capabilities.getExtension('EXT_color_buffer_float')
     });
     effectComposer.sceneMSAA = true;
 
@@ -65,12 +65,12 @@
     scene.environmentLightIntensity = 0.2;
 
     const cube_texture = new TextureCubeLoader().load([
-    	"./resources/cube/BlueSky/posx.jpg",
-    	"./resources/cube/BlueSky/negx.jpg",
-    	"./resources/cube/BlueSky/posy.jpg",
-    	"./resources/cube/BlueSky/negy.jpg",
-    	"./resources/cube/BlueSky/posz.jpg",
-    	"./resources/cube/BlueSky/negz.jpg"
+    	'./resources/cube/BlueSky/posx.jpg',
+    	'./resources/cube/BlueSky/negx.jpg',
+    	'./resources/cube/BlueSky/posy.jpg',
+    	'./resources/cube/BlueSky/negy.jpg',
+    	'./resources/cube/BlueSky/posz.jpg',
+    	'./resources/cube/BlueSky/negz.jpg'
     ]);
     scene.environment = cube_texture;
 
@@ -201,21 +201,21 @@
     const glowFolder = layersFolder.addFolder('Glow');
     glowFolder.close();
     glowFolder.add(glowEffect, 'active');
-    glowFolder.add(glowEffect, "strength", 0, 2, 0.01);
-    glowFolder.add(glowEffect, "threshold", 0, 1, 0.01);
-    glowFolder.add(glowEffect, "radius", 0, 1, 0.01);
-    glowFolder.add(glowEffect, "smoothWidth", 0, 1, 0.01);
+    glowFolder.add(glowEffect, 'strength', 0, 2, 0.01);
+    glowFolder.add(glowEffect, 'threshold', 0, 1, 0.01);
+    glowFolder.add(glowEffect, 'radius', 0, 1, 0.01);
+    glowFolder.add(glowEffect, 'smoothWidth', 0, 1, 0.01);
 
     const softGlowFolder = layersFolder.addFolder('SoftGlow');
     softGlowFolder.close();
     softGlowFolder.add(softGlowEffect, 'active');
-    softGlowFolder.add(softGlowEffect, "blendRate", 0, 1, 0.01);
-    softGlowFolder.add(softGlowEffect, "strength", 0, 2, 0.01);
-    softGlowFolder.add(softGlowEffect, "blurSize", 0, 1, 0.01);
+    softGlowFolder.add(softGlowEffect, 'blendRate', 0, 1, 0.01);
+    softGlowFolder.add(softGlowEffect, 'strength', 0, 2, 0.01);
+    softGlowFolder.add(softGlowEffect, 'blurSize', 0, 1, 0.01);
 
-    const statsFolder = gui.addFolder("Stats");
+    const statsFolder = gui.addFolder('Stats');
     statsFolder.close();
-    let statsInfo = effectComposer.getStats();
+    const statsInfo = effectComposer.getStats();
     statsFolder.add(statsInfo, 'fboCache').disable().listen();
     statsFolder.add(statsInfo, 'markBuffers').disable().listen();
     statsFolder.add(statsInfo, 'colorMarkBuffers').disable().listen();
@@ -241,7 +241,7 @@
     const controlFolder = gui.addFolder('Detail Controls');
     controlFolder.close();
     for (let i = 0; i < num; i++) {
-    	controlFolder.add(cubes[0][i].effects, "Glow", 0, 2, 0.01).name('glow' + i).onChange(value => {
+    	controlFolder.add(cubes[0][i].effects, 'Glow', 0, 2, 0.01).name('glow' + i).onChange(value => {
     		cubes[1][i].effects.Glow = value;
     		cubes[2][i].effects.SoftGlow = value;
     		cubes[3][i].effects.SoftGlow = value;
@@ -289,7 +289,7 @@
     	backRenderTarget.resize(width, height);
     	effectComposer.resize(width, height);
     }
-    window.addEventListener("resize", onWindowResize, false);
+    window.addEventListener('resize', onWindowResize, false);
 </script>
 
 </html>

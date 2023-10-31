@@ -22,7 +22,7 @@
     {
         "imports": {
             "t3d": "./libs/t3d/build/t3d.module.js",
-            "t3d/examples/jsm/": "./libs/t3d/examples/jsm/",
+            "t3d/addons/": "./libs/t3d/examples/jsm/",
             "t3d-effect-composer": "../build/t3d.effectcomposer.module.js"
         }
     }
@@ -30,9 +30,9 @@
 
 <script type="module">
     import * as t3d from 't3d';
-    import { OrbitControls } from 't3d/examples/jsm/controls/OrbitControls.js';
-    import { SkyBox } from 't3d/examples/jsm/objects/SkyBox.js';
-    import { TextureCubeLoader } from 't3d/examples/jsm/loaders/TextureCubeLoader.js';
+    import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
+    import { SkyBox } from 't3d/addons/objects/SkyBox.js';
+    import { TextureCubeLoader } from 't3d/addons/loaders/TextureCubeLoader.js';
 
     import { DefaultEffectComposer, MarkBufferDebugger, ColorMarkBufferDebugger, RenderListMask } from 't3d-effect-composer';
 
@@ -48,7 +48,7 @@
     document.body.appendChild(canvas);
 
     const contextParams = { antialias: true, alpha: false, stencil: true };
-    const gl = canvas.getContext("webgl2", contextParams) || canvas.getContext("webgl", contextParams);
+    const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
     const renderer = new t3d.WebGLRenderer(gl);
     const backRenderTarget = new t3d.RenderTargetBack(canvas);
 
@@ -57,7 +57,7 @@
     const effectComposer = new DefaultEffectComposer(width, height, {
     	samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
     	webgl2: renderer.capabilities.version > 1,
-    	floatColorBuffer: !!renderer.capabilities.getExtension("EXT_color_buffer_float")
+    	floatColorBuffer: !!renderer.capabilities.getExtension('EXT_color_buffer_float')
     });
     effectComposer.sceneMSAA = true;
     console.log(effectComposer);
@@ -66,12 +66,12 @@
     scene.environmentLightIntensity = 0.2;
 
     const cube_texture = new TextureCubeLoader().load([
-    	"./resources/cube/BlueSky/posx.jpg",
-    	"./resources/cube/BlueSky/negx.jpg",
-    	"./resources/cube/BlueSky/posy.jpg",
-    	"./resources/cube/BlueSky/negy.jpg",
-    	"./resources/cube/BlueSky/posz.jpg",
-    	"./resources/cube/BlueSky/negz.jpg"
+    	'./resources/cube/BlueSky/posx.jpg',
+    	'./resources/cube/BlueSky/negx.jpg',
+    	'./resources/cube/BlueSky/posy.jpg',
+    	'./resources/cube/BlueSky/negy.jpg',
+    	'./resources/cube/BlueSky/posz.jpg',
+    	'./resources/cube/BlueSky/negz.jpg'
     ]);
     scene.environment = cube_texture;
 
@@ -197,52 +197,52 @@
     innerGlowFolder.addColor({ color: [1, 1, 1] }, 'color').onChange(value => {
     	innerGlowEffect.color.fromArray(value);
     });
-    innerGlowFolder.add(innerGlowEffect, "strength", 0, 2, 0.01);
-    innerGlowFolder.add(innerGlowEffect, "stride", 0, 20, 1);
+    innerGlowFolder.add(innerGlowEffect, 'strength', 0, 2, 0.01);
+    innerGlowFolder.add(innerGlowEffect, 'stride', 0, 20, 1);
 
     const glowEffect = effectComposer.getEffect('Glow');
     glowEffect.active = true;
     const glowFolder = layersFolder.addFolder('Glow');
     glowFolder.close();
     glowFolder.add(glowEffect, 'active');
-    glowFolder.add(glowEffect, "strength", 0, 2, 0.01);
-    glowFolder.add(glowEffect, "threshold", 0, 1, 0.01);
-    glowFolder.add(glowEffect, "radius", 0, 1, 0.01);
-    glowFolder.add(glowEffect, "smoothWidth", 0, 1, 0.01);
+    glowFolder.add(glowEffect, 'strength', 0, 2, 0.01);
+    glowFolder.add(glowEffect, 'threshold', 0, 1, 0.01);
+    glowFolder.add(glowEffect, 'radius', 0, 1, 0.01);
+    glowFolder.add(glowEffect, 'smoothWidth', 0, 1, 0.01);
 
     const softGlowEffect = effectComposer.getEffect('SoftGlow');
     softGlowEffect.active = true;
     const softGlowFolder = layersFolder.addFolder('SoftGlow');
     softGlowFolder.close();
     softGlowFolder.add(softGlowEffect, 'active');
-    softGlowFolder.add(softGlowEffect, "blendRate", 0, 1, 0.01);
-    softGlowFolder.add(softGlowEffect, "strength", 0, 2, 0.01);
-    softGlowFolder.add(softGlowEffect, "blurSize", 0, 1, 0.01);
+    softGlowFolder.add(softGlowEffect, 'blendRate', 0, 1, 0.01);
+    softGlowFolder.add(softGlowEffect, 'strength', 0, 2, 0.01);
+    softGlowFolder.add(softGlowEffect, 'blurSize', 0, 1, 0.01);
 
     const tailingEffect = effectComposer.getEffect('Tailing');
     tailingEffect.active = true;
     const tailingFolder = layersFolder.addFolder('Tailing');
     tailingFolder.close();
     tailingFolder.add(tailingEffect, 'active');
-    tailingFolder.add(tailingEffect, "strength", 0, 2, 0.01);
+    tailingFolder.add(tailingEffect, 'strength', 0, 2, 0.01);
 
     const radialTailingEffect = effectComposer.getEffect('RadialTailing');
     radialTailingEffect.active = true;
     const radialTailingFolder = layersFolder.addFolder('RadialTailing');
     radialTailingFolder.close();
     radialTailingFolder.add(radialTailingEffect, 'active');
-    radialTailingFolder.add(radialTailingEffect, "strength", 0, 2, 0.01);
+    radialTailingFolder.add(radialTailingEffect, 'strength', 0, 2, 0.01);
 
     const ghostingEffect = effectComposer.getEffect('Ghosting');
     ghostingEffect.active = true;
     const ghostingFolder = layersFolder.addFolder('Ghosting');
     ghostingFolder.close();
     ghostingFolder.add(ghostingEffect, 'active');
-    ghostingFolder.add(ghostingEffect, "strength", 0, 2, 0.01);
+    ghostingFolder.add(ghostingEffect, 'strength', 0, 2, 0.01);
 
-    const statsFolder = gui.addFolder("Stats");
+    const statsFolder = gui.addFolder('Stats');
     statsFolder.close();
-    let statsInfo = effectComposer.getStats();
+    const statsInfo = effectComposer.getStats();
     statsFolder.add(statsInfo, 'fboCache').disable().listen();
     statsFolder.add(statsInfo, 'markBuffers').disable().listen();
     statsFolder.add(statsInfo, 'colorMarkBuffers').disable().listen();
@@ -306,7 +306,7 @@
     	backRenderTarget.resize(width, height);
     	effectComposer.resize(width, height);
     }
-    window.addEventListener("resize", onWindowResize, false);
+    window.addEventListener('resize', onWindowResize, false);
 </script>
 
 </html>

@@ -27,7 +27,7 @@ export class OverlayBuffer extends Buffer {
 	}
 
 	setGeometryReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._renderOptions.getGeometry = func;
 		} else {
 			delete this._renderOptions.getGeometry;

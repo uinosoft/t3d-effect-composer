@@ -47,8 +47,8 @@ export default class RainEffect extends Effect {
 		this._rainPass.uniforms.size = this.size;
 		this._rainPass.uniforms.density = this.density;
 		this._rainPass.uniforms.strength = this.strength;
-		this._rainPass.uniforms.viewportSize[0] =  inputRenderTarget.width;
-		this._rainPass.uniforms.viewportSize[1] =  inputRenderTarget.height;
+		this._rainPass.uniforms.viewportSize[0] = inputRenderTarget.width;
+		this._rainPass.uniforms.viewportSize[1] = inputRenderTarget.height;
 
 		this._rainPass.render(renderer);
 
@@ -173,7 +173,7 @@ const rainCoverShader = {
 		depthTexture: null,
 		rainCoverTexture: null,
 		coverDensity: 1.,
-		coverSize: 1,
+		coverSize: 1
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `

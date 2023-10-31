@@ -7,7 +7,7 @@ export default class VolumeEffect extends Effect {
 		super();
 		this.bufferDependencies = [
 			{ key: 'GBuffer' },
-			{ key: 'ThicknessBuffer' },
+			{ key: 'ThicknessBuffer' }
 		];
 
 		// the id of the volume to render,
@@ -287,4 +287,4 @@ const volumeShader = {
         gl_FragColor = vec4(mixColor, diffuseColor.a); 
     }
 	`
-}
+};

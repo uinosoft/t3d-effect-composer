@@ -57,7 +57,7 @@ export default class ThicknessBuffer extends Buffer {
 	}
 
 	setGeometryReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._frontRenderOptions.getGeometry = func;
 			this._backRenderOptions.getGeometry = func;
 		} else {
@@ -126,7 +126,7 @@ function defaultIfRenderFunction(renderable) {
 		return false;
 	}
 
-	if (!!renderable.object.effects['volume']) {
+	if (renderable.object.effects['volume']) {
 		return true;
 	}
 
@@ -136,7 +136,7 @@ function defaultIfRenderFunction(renderable) {
 const thicknessShader = {
 	name: 'ec_thickness',
 	uniforms: {
-		volumeid: 0,
+		volumeid: 0
 	},
 	vertexShader: `
         #include <common_vert>

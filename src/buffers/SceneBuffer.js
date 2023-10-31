@@ -56,7 +56,7 @@ export default class SceneBuffer extends Buffer {
 	}
 
 	setIfRenderReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._sceneRenderOptions.ifRender = func;
 		} else {
 			delete this._sceneRenderOptions.ifRender;
@@ -64,7 +64,7 @@ export default class SceneBuffer extends Buffer {
 	}
 
 	setGeometryReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._sceneRenderOptions.getGeometry = func;
 		} else {
 			delete this._sceneRenderOptions.getGeometry;
@@ -157,7 +157,7 @@ export default class SceneBuffer extends Buffer {
 
 		const overlayLayer = renderQueue.getLayer(1);
 		if (overlayLayer && (overlayLayer.opaqueCount + overlayLayer.transparentCount) > 0) {
-			renderer.clear(false, true, false);  // TODO Forcing clear depth may cause bugs
+			renderer.clear(false, true, false); // TODO Forcing clear depth may cause bugs
 
 			renderer.beginRender();
 

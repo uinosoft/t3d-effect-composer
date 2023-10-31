@@ -15,9 +15,7 @@
     "url": "https://github.com/uinosoft/t3d-effect-composer"
   },
   "files": [
-    "build/t3d.effectcomposer.js",
-    "build/t3d.effectcomposer.min.js",
-    "build/t3d.effectcomposer.module.js",
+    "build",
     "examples/jsm",
     "LICENSE",
     "package.json",
@@ -34,18 +32,6 @@
     "canvas",
     "html5"
   ],
-  "directories": {
-    "example": "examples"
-  },
-  "eslintConfig": {
-    "root": true,
-    "extends": [
-      "./tools/.eslintrc.cjs"
-    ],
-    "plugins": [
-      "html"
-    ]
-  },
   "author": "uino",
   "license": "BSD-3-Clause",
   "devDependencies": {
@@ -55,6 +41,7 @@
     "@rollup/plugin-terser": "^0.4.0",
     "eslint": "^8.22.0",
     "eslint-plugin-html": "^7.1.0",
+    "eslint-plugin-import": "^2.29.0",
     "rollup": "^3.15.0"
   },
   "peerDependencies": {
@@ -62,7 +49,9 @@
   },
   "scripts": {
     "build": "rollup -c",
-    "eslint": "eslint src",
-    "eslint-fix": "eslint src --fix"
+    "lint": "eslint src",
+    "lint-fix": "eslint src --fix",
+    "lint-addons": "eslint examples/jsm",
+    "lint-examples": "eslint examples --ext .html"
   }
 }

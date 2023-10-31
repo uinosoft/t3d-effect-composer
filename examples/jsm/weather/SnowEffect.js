@@ -1,4 +1,4 @@
-import { ShaderPostPass, ATTACHMENT, Color3  } from 't3d';
+import { ShaderPostPass, ATTACHMENT, Color3 } from 't3d';
 import { Effect, defaultVertexShader, fxaaShader } from 't3d-effect-composer';
 
 export default class SnowEffect extends Effect {
@@ -45,8 +45,8 @@ export default class SnowEffect extends Effect {
 		this._snowPass.uniforms.angle = this.angle;
 		this._snowPass.uniforms.density = this.density;
 		this._snowPass.uniforms.strength = this.strength;
-		this._snowPass.uniforms.viewportSize[0] =  inputRenderTarget.width;
-		this._snowPass.uniforms.viewportSize[1] =  inputRenderTarget.height;
+		this._snowPass.uniforms.viewportSize[0] = inputRenderTarget.width;
+		this._snowPass.uniforms.viewportSize[1] = inputRenderTarget.height;
 
 		this._snowPass.render(renderer);
 

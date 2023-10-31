@@ -152,4 +152,4 @@ const radialTailingShader = {
 			gl_FragColor = blurResult * t;
 		}
     `
-}
+};

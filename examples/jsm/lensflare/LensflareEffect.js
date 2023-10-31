@@ -40,7 +40,7 @@ export class LensflareEffect extends Effect {
 			renderer.setClearColor(0, 0, 0, 0);
 			renderer.clear(true, true, true);
 			this._clipPass.uniforms.tDiffuse = lensflareBuffer.output().texture;
-			this._clipPass.uniforms.clipRect[0] = ((screenX - scaleX)  * 0.5 + 0.5);
+			this._clipPass.uniforms.clipRect[0] = ((screenX - scaleX) * 0.5 + 0.5);
 			this._clipPass.uniforms.clipRect[1] = ((screenY - scaleY) * 0.5 + 0.5);
 			this._clipPass.uniforms.clipRect[2] = scaleX;
 			this._clipPass.uniforms.clipRect[3] = scaleY;

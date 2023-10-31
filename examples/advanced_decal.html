@@ -61,7 +61,7 @@
     {
         "imports": {
             "t3d": "./libs/t3d/build/t3d.module.js",
-            "t3d/examples/jsm/": "./libs/t3d/examples/jsm/",
+            "t3d/addons/": "./libs/t3d/examples/jsm/",
             "t3d-effect-composer": "../build/t3d.effectcomposer.module.js"
         }
     }
@@ -69,10 +69,10 @@
 
 <script type="module">
 	import * as t3d from 't3d';
-	import { OrbitControls } from 't3d/examples/jsm/controls/OrbitControls.js';
-	import { SkyBox } from 't3d/examples/jsm/objects/SkyBox.js';
-	import { Texture2DLoader } from 't3d/examples/jsm/loaders/Texture2DLoader.js';
-	import { TextureCubeLoader } from 't3d/examples/jsm/loaders/TextureCubeLoader.js';
+	import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
+	import { SkyBox } from 't3d/addons/objects/SkyBox.js';
+	import { Texture2DLoader } from 't3d/addons/loaders/Texture2DLoader.js';
+	import { TextureCubeLoader } from 't3d/addons/loaders/TextureCubeLoader.js';
 
 	import { DefaultEffectComposer, RenderListMask, OutlineEffect } from 't3d-effect-composer';
 	import { Decal } from './jsm/decal/Decal.js';
@@ -90,14 +90,14 @@
 	document.body.appendChild(canvas);
 
 	const contextParams = { antialias: true, alpha: false, stencil: true };
-	const gl = canvas.getContext("webgl2", contextParams) || canvas.getContext("webgl", contextParams);
+	const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
 	const renderer = new t3d.WebGLRenderer(gl);
 	const backRenderTarget = new t3d.RenderTargetBack(canvas);
 
 	const effectComposer = new DefaultEffectComposer(width, height, {
 		samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
 		webgl2: renderer.capabilities.version > 1,
-		floatColorBuffer: !!renderer.capabilities.getExtension("EXT_color_buffer_float")
+		floatColorBuffer: !!renderer.capabilities.getExtension('EXT_color_buffer_float')
 	});
 	// effectComposer.getEffect('ColorCorrection').active = true;
 	effectComposer.sceneMSAA = true;
@@ -108,12 +108,12 @@
 	// Textures
 
 	const cube_texture = new TextureCubeLoader().load([
-		"./resources/cube/BlueSky/posx.jpg",
-		"./resources/cube/BlueSky/negx.jpg",
-		"./resources/cube/BlueSky/posy.jpg",
-		"./resources/cube/BlueSky/negy.jpg",
-		"./resources/cube/BlueSky/posz.jpg",
-		"./resources/cube/BlueSky/negz.jpg"
+		'./resources/cube/BlueSky/posx.jpg',
+		'./resources/cube/BlueSky/negx.jpg',
+		'./resources/cube/BlueSky/posy.jpg',
+		'./resources/cube/BlueSky/negy.jpg',
+		'./resources/cube/BlueSky/posz.jpg',
+		'./resources/cube/BlueSky/negz.jpg'
 	]);
 	scene.environment = cube_texture;
 
@@ -153,7 +153,7 @@
 	}
 
 	function videoPlayCallback() {
-		video.addEventListener('play', function () {
+		video.addEventListener('play', function() {
 			this.currentTime = 3;
 		});
 
@@ -165,7 +165,7 @@
 					videoTexture.version++;
 				}
 			}
-		}
+		};
 	}
 
 	// Decal
@@ -393,7 +393,7 @@
 		backRenderTarget.resize(width, height);
 		effectComposer.resize(width, height);
 	}
-	window.addEventListener("resize", onWindowResize, false);
+	window.addEventListener('resize', onWindowResize, false);
 </script>
 
 </html>

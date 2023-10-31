@@ -177,7 +177,7 @@ const innerGlowXShader = {
 			gl_FragColor = vec4(col,col,col,col);
 		}
     `
-}
+};
 
 const innerGlowYShader = {
 	name: 'ec_innerglow_y',
@@ -259,7 +259,7 @@ const innerGlowYShader = {
 			gl_FragColor = vec4(maskTexel.x * glo, 1.);
 		}
     `
-}
+};
 
 const tintShader = {
 	name: 'ec_tint',
@@ -283,4 +283,4 @@ const tintShader = {
             gl_FragColor = color;
         }
     `
-}
+};

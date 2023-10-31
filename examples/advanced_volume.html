@@ -28,7 +28,7 @@
     {
         "imports": {
             "t3d": "./libs/t3d/build/t3d.module.js",
-            "t3d/examples/jsm/": "./libs/t3d/examples/jsm/",
+            "t3d/addons/": "./libs/t3d/examples/jsm/",
             "t3d-effect-composer": "../build/t3d.effectcomposer.module.js"
         }
     }
@@ -36,14 +36,15 @@
 
 <script type="module">
     import * as t3d from 't3d';
-    import { OrbitControls } from 't3d/examples/jsm/controls/OrbitControls.js';
-    import { Texture2DLoader } from 't3d/examples/jsm/loaders/Texture2DLoader.js';
+    import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
+    import { Texture2DLoader } from 't3d/addons/loaders/Texture2DLoader.js';
+    import { TGALoader } from 't3d/addons/loaders/TGALoader.js';
+
     import { DefaultEffectComposer } from 't3d-effect-composer';
     import ThicknessBuffer from './jsm/volume/ThicknessBuffer.js';
     import VolumeEffect from './jsm/volume/VolumeEffect.js';
 
     import { GUI } from './libs/lil-gui.esm.min.js';
-    import { TGALoader } from '../../../examples/libs/t3d/examples/jsm/loaders/TGALoader.js';
 
     let width = window.innerWidth || 2;
     let height = window.innerHeight || 2;
@@ -54,14 +55,14 @@
     document.body.appendChild(canvas);
 
     const contextParams = { antialias: true, alpha: false };
-    const gl = canvas.getContext("webgl2", contextParams) || canvas.getContext("webgl", contextParams);
+    const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
     const renderer = new t3d.WebGLRenderer(gl);
     const backRenderTarget = new t3d.RenderTargetBack(canvas);
 
     const options = {
     	samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
     	webgl2: renderer.capabilities.version > 1,
-    	floatColorBuffer: !!renderer.capabilities.getExtension("EXT_color_buffer_float")
+    	floatColorBuffer: !!renderer.capabilities.getExtension('EXT_color_buffer_float')
     };
 
     const effectComposer = new DefaultEffectComposer(width, height, options);
@@ -212,7 +213,7 @@
     	backRenderTarget.resize(width, height);
     	effectComposer.resize(width, height);
     }
-    window.addEventListener("resize", onWindowResize, false);
+    window.addEventListener('resize', onWindowResize, false);
 </script>
 
 </html>

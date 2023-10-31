@@ -139,4 +139,4 @@ const ghostingShader = {
 			gl_FragColor = blurred * clamp(dist, 0.0, 1.0);
 		}
     `
-}
+};

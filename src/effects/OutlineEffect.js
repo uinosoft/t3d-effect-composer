@@ -75,7 +75,7 @@ export default class OutlineEffect extends Effect {
 		} else {
 			renderer.clear(true, true, false);
 		}
-		this._blendPass.uniforms.colorTexture =  inputRenderTarget.texture;
+		this._blendPass.uniforms.colorTexture = inputRenderTarget.texture;
 		this._blendPass.uniforms.edgeTexture = tempRT2.texture;
 		this._blendPass.uniforms.maskTexture = markBuffer.output(attachIndex)._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 		this._blendPass.uniforms.strength = this.strength;
@@ -175,4 +175,4 @@ const blendShader = {
             gl_FragColor = color;
         }
     `
-}
+};

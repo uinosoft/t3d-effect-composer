@@ -31,7 +31,7 @@ export default class NonDepthMarkBuffer extends Buffer {
 			this._mrts.push(mrt);
 		}
 
-		this._state = { attachIndex: 0, attachInfo: { count: 0, keys: [], masks: [] }};
+		this._state = { attachIndex: 0, attachInfo: { count: 0, keys: [], masks: [] } };
 
 		const attachManager = new BufferAttachManager(4);
 
@@ -51,7 +51,7 @@ export default class NonDepthMarkBuffer extends Buffer {
 	}
 
 	setIfRenderReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._opacityRenderOptions.ifRender = createIfRenderFunction(func, this._state, RenderListMask.OPAQUE);
 			this._transparentRenderOptions.ifRender = createIfRenderFunction(func, this._state, RenderListMask.TRANSPARENT);
 		} else {
@@ -61,7 +61,7 @@ export default class NonDepthMarkBuffer extends Buffer {
 	}
 
 	setGeometryReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._opacityRenderOptions.getGeometry = func;
 			this._transparentRenderOptions.getGeometry = func;
 		} else {
@@ -71,7 +71,7 @@ export default class NonDepthMarkBuffer extends Buffer {
 	}
 
 	setMaterialReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._opacityRenderOptions.getMaterial = createGetMaterialFunction(func, this._state, this.attachManager, RenderListMask.OPAQUE);
 			this._transparentRenderOptions.getMaterial = createGetMaterialFunction(func, this._state, this.attachManager, RenderListMask.TRANSPARENT);
 		} else {
@@ -86,7 +86,7 @@ export default class NonDepthMarkBuffer extends Buffer {
 		const attachCount = this.attachManager.attachCount();
 
 		if (attachCount > this._rts.length) {
-			console.error('XXMarkBuffer: attachCount<' + attachCount + '> bigger then options.maxMarkAttachment<' + this._rts.length + '>.')
+			console.error('XXMarkBuffer: attachCount<' + attachCount + '> bigger then options.maxMarkAttachment<' + this._rts.length + '>.');
 		}
 
 		for (let attachIndex = 0; attachIndex < attachCount; attachIndex++) {
@@ -109,7 +109,8 @@ export default class NonDepthMarkBuffer extends Buffer {
 			this._state.attachIndex = attachIndex;
 			this.attachManager.getAttachInfo(attachIndex, this._state.attachInfo);
 
-			let attachMask = 0, attachMasks = this._state.attachInfo.masks, maskLength = this._state.attachInfo.count;
+			let attachMask = 0;
+			const attachMasks = this._state.attachInfo.masks, maskLength = this._state.attachInfo.count;
 			for (let i = 0; i < maskLength; i++) {
 				attachMask |= attachMasks[i];
 			}
@@ -173,13 +174,13 @@ function createIfRenderFunction(func = defaultIfRenderReplaceFunction, state, re
 
 		for (let i = 0; i < state.attachInfo.count; i++) {
 			const key = state.attachInfo.keys[i];
-			if (!!renderable.object.effects[key]) {
+			if (renderable.object.effects[key]) {
 				mask |= state.attachInfo.masks[i];
 			}
 		}
 
 		return mask & renderMask;
-	}
+	};
 }
 
 function defaultIfRenderReplaceFunction(renderable) {
@@ -203,7 +204,7 @@ function createGetMaterialFunction(func = defaultMaterialReplaceFunction, state,
 		}
 
 		return material;
-	}
+	};
 }
 
 const materialMap = new Map();

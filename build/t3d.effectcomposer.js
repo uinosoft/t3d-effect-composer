@@ -469,7 +469,7 @@
 				// FXAA 3.11 implementation by NVIDIA, ported to WebGL by Agost Biro (biro@archilogic.com)
 				
 				//----------------------------------------------------------------------------------
-				// File:				es3-kepler\FXAA\assets\shaders/FXAA_DefaultES.frag
+				// File:				es3-kepler/FXAA/assets/shaders/FXAA_DefaultES.frag
 				// SDK Version: v3.00
 				// Email:			 gameworks@nvidia.com
 				// Site:				http://developer.nvidia.com/
@@ -2169,7 +2169,7 @@
 
 			// Step 3: blurY pass
 
-			renderer.setRenderTarget(!!inputRenderTarget ? tempRT1 : outputRenderTarget);
+			renderer.setRenderTarget(inputRenderTarget ? tempRT1 : outputRenderTarget);
 			renderer.clear(true, true, false);
 			this._blurPass.uniforms.direction = 1;
 			this._blurPass.uniforms.tDiffuse = tempRT2.texture;
@@ -2177,7 +2177,7 @@
 
 			// Step 4: blend pass
 
-			if (!!inputRenderTarget) {
+			if (inputRenderTarget) {
 				renderer.setRenderTarget(outputRenderTarget);
 				renderer.setClearColor(0, 0, 0, 0);
 				if (finish) {
@@ -2568,7 +2568,7 @@
 
 			// Step 3: blurY pass
 
-			renderer.setRenderTarget(!!inputRenderTarget ? tempRT1 : outputRenderTarget);
+			renderer.setRenderTarget(inputRenderTarget ? tempRT1 : outputRenderTarget);
 			renderer.clear(true, true, false);
 			this._blurPass.uniforms.direction = 1;
 			this._blurPass.uniforms.tDiffuse = tempRT2.texture;
@@ -2576,7 +2576,7 @@
 
 			// Step 4: blend pass
 
-			if (!!inputRenderTarget) {
+			if (inputRenderTarget) {
 				renderer.setRenderTarget(outputRenderTarget);
 				renderer.setClearColor(0, 0, 0, 0);
 				if (finish) {
@@ -4574,21 +4574,21 @@
 			this.cameraFar = -1;
 		}
 		setIfRenderReplaceFunction(func) {
-			if (!!func) {
+			if (func) {
 				this._renderOptions.ifRender = func;
 			} else {
 				delete this._renderOptions.ifRender;
 			}
 		}
 		setGeometryReplaceFunction(func) {
-			if (!!func) {
+			if (func) {
 				this._renderOptions.getGeometry = func;
 			} else {
 				delete this._renderOptions.getGeometry;
 			}
 		}
 		setMaterialReplaceFunction(func) {
-			if (!!func) {
+			if (func) {
 				this._renderOptions.getMaterial = createGetMaterialFunction$2(func);
 			} else {
 				this._renderOptions.getMaterial = createGetMaterialFunction$2();
@@ -4899,7 +4899,7 @@
 			this.layers = [0];
 		}
 		setIfRenderReplaceFunction(func) {
-			if (!!func) {
+			if (func) {
 				this._opacityRenderOptions.ifRender = createIfRenderFunction$1(func, this._state, RenderListMask.OPAQUE);
 				this._transparentRenderOptions.ifRender = createIfRenderFunction$1(func, this._state, RenderListMask.TRANSPARENT);
 			} else {
@@ -4908,7 +4908,7 @@
 			}
 		}
 		setGeometryReplaceFunction(func) {
-			if (!!func) {
+			if (func) {
 				this._opacityRenderOptions.getGeometry = func;
 				this._transparentRenderOptions.getGeometry = func;
 			} else {
@@ -4917,7 +4917,7 @@
 			}
 		}
 		setMaterialReplaceFunction(func) {
-			if (!!func) {
+			if (func) {
 				this._opacityRenderOptions.getMaterial = createGetMaterialFunction$1(func, this._state, this.attachManager, RenderListMask.OPAQUE);
 				this._transparentRenderOptions.getMaterial = createGetMaterialFunction$1(func, this._state, this.attachManager, RenderListMask.TRANSPARENT);
 			} else {
@@ -4947,8 +4947,8 @@
 				const renderQueue = scene.getRenderQueue(camera);
 				this._state.attachIndex = attachIndex;
 				this.attachManager.getAttachInfo(attachIndex, this._state.attachInfo);
-				let attachMask = 0,
-					attachMasks = this._state.attachInfo.masks,
+				let attachMask = 0;
+				const attachMasks = this._state.attachInfo.masks,
 					maskLength = this._state.attachInfo.count;
 				for (let i = 0; i < maskLength; i++) {
 					attachMask |= attachMasks[i];
@@ -4999,7 +4999,7 @@
 			let mask = 0;
 			for (let i = 0; i < state.attachInfo.count; i++) {
 				const key = state.attachInfo.keys[i];
-				if (!!renderable.object.effects[key]) {
+				if (renderable.object.effects[key]) {
 					mask |= state.attachInfo.masks[i];
 				}
 			}
@@ -5160,21 +5160,21 @@
 			this.layers = [0];
 		}
 		setIfRenderReplaceFunction(func) {
-			if (!!func) {
+			if (func) {
 				this._renderOptions.ifRender = createIfRenderFunction(func, this._state);
 			} else {
 				this._renderOptions.ifRender = createIfRenderFunction(undefined, this._state);
 			}
 		}
 		setGeometryReplaceFunction(func) {
-			if (!!func) {
+			if (func) {
 				this._renderOptions.getGeometry = func;
 			} else {
 				delete this._renderOptions.getGeometry;
 			}
 		}
 		setMaterialReplaceFunction(func) {
-			if (!!func) {
+			if (func) {
 				this._renderOptions.getMaterial = createGetMaterialFunction(func, this._state);
 			} else {
 				this._renderOptions.getMaterial = createGetMaterialFunction(undefined, this._state);
@@ -5274,7 +5274,7 @@
 			if (!renderable.object.effects) {
 				return false;
 			}
-			if (!!renderable.object.effects[state.key]) {
+			if (renderable.object.effects[state.key]) {
 				return true;
 			}
 			return false;
@@ -5410,14 +5410,14 @@
 			this.needsUpdate = true;
 		}
 		setIfRenderReplaceFunction(func) {
-			if (!!func) {
+			if (func) {
 				this._sceneRenderOptions.ifRender = func;
 			} else {
 				delete this._sceneRenderOptions.ifRender;
 			}
 		}
 		setGeometryReplaceFunction(func) {
-			if (!!func) {
+			if (func) {
 				this._sceneRenderOptions.getGeometry = func;
 			} else {
 				delete this._sceneRenderOptions.getGeometry;
@@ -5536,7 +5536,7 @@
 			}
 		}
 		release(renderTarget, level = 0) {
-			let list = this._map.get(level);
+			const list = this._map.get(level);
 			list.push(renderTarget);
 		}
 		resize(width, height) {
@@ -5828,9 +5828,9 @@
 				mDepthAttachment = defaultMSDepthRenderBuffer;
 			}
 			this._bufferMap.forEach(buffer => {
-				if (!!buffer.syncAttachments) {
+				if (buffer.syncAttachments) {
 					buffer.syncAttachments(sceneColorAttachment, sceneDepthAttachment, sceneMColorAttachment, sceneMDepthAttachment);
-				} else if (!!buffer.syncDepthAttachments) {
+				} else if (buffer.syncDepthAttachments) {
 					buffer.syncDepthAttachments(depthAttachment, mDepthAttachment);
 				}
 			});
@@ -5914,7 +5914,7 @@
 			camera.rect.set(0, 0, 1, 1);
 			renderStates.camera.rect.set(0, 0, 1, 1);
 			this._bufferMap.forEach(buffer => {
-				if (!!buffer.attachManager) {
+				if (buffer.attachManager) {
 					buffer.attachManager.reset();
 				}
 			});
@@ -5946,7 +5946,7 @@
 							mask
 						}) => {
 							this._tempBufferNames.add(key);
-							if (!!this._bufferMap.get(key).attachManager) {
+							if (this._bufferMap.get(key).attachManager) {
 								this._bufferMap.get(key).attachManager.allocate(item.name, mask);
 							}
 						});
@@ -6285,6 +6285,7 @@
 			},
 			get: function () {
 				console.error('EffectComposer.customRenderLayers has been removed, use SceneBuffer.renderLayers instead.');
+				return [];
 			}
 		}
 	});

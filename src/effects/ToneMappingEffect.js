@@ -69,7 +69,7 @@ const shader = {
 	defines: {},
 	uniforms: {
 		tDiffuse: null,
-		toneMappingExposure: 1,
+		toneMappingExposure: 1
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `

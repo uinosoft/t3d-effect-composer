@@ -158,4 +158,4 @@ const tailingShader = {
 			gl_FragColor = blurResult * t;
 		}
     `
-}
+};

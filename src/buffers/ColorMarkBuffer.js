@@ -1,7 +1,7 @@
 import { RenderTarget2D, RenderBuffer, ATTACHMENT, PIXEL_FORMAT, PIXEL_TYPE, DRAW_SIDE, ShaderMaterial, TEXTURE_FILTER } from 't3d';
 import { isDepthStencilAttachment, RenderListMask } from '../Utils.js';
 import BufferAttachManager from './BufferAttachManager.js';
-import Buffer from './Buffer';
+import Buffer from './Buffer.js';
 
 export default class ColorMarkBuffer extends Buffer {
 
@@ -48,7 +48,7 @@ export default class ColorMarkBuffer extends Buffer {
 	}
 
 	setIfRenderReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._renderOptions.ifRender = createIfRenderFunction(func, this._state);
 		} else {
 			this._renderOptions.ifRender = createIfRenderFunction(undefined, this._state);
@@ -56,7 +56,7 @@ export default class ColorMarkBuffer extends Buffer {
 	}
 
 	setGeometryReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._renderOptions.getGeometry = func;
 		} else {
 			delete this._renderOptions.getGeometry;
@@ -64,7 +64,7 @@ export default class ColorMarkBuffer extends Buffer {
 	}
 
 	setMaterialReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._renderOptions.getMaterial = createGetMaterialFunction(func, this._state);
 		} else {
 			this._renderOptions.getMaterial = createGetMaterialFunction(undefined, this._state);
@@ -108,7 +108,7 @@ export default class ColorMarkBuffer extends Buffer {
 		const attachCount = this.attachManager.attachCount();
 
 		if (attachCount > this._rts.length) {
-			console.error('ColorMarkBuffer: attachCount<' + attachCount + '> bigger then options.maxColorAttachment<' + this._rts.length + '>.')
+			console.error('ColorMarkBuffer: attachCount<' + attachCount + '> bigger then options.maxColorAttachment<' + this._rts.length + '>.');
 		}
 
 		for (let attachIndex = 0; attachIndex < attachCount; attachIndex++) {
@@ -189,12 +189,12 @@ function createIfRenderFunction(func = defaultIfRenderReplaceFunction, state) {
 			return false;
 		}
 
-		if (!!renderable.object.effects[state.key]) {
+		if (renderable.object.effects[state.key]) {
 			return true;
 		}
 
 		return false;
-	}
+	};
 }
 
 function defaultIfRenderReplaceFunction(renderable) {
@@ -210,7 +210,7 @@ function createGetMaterialFunction(func = defaultMaterialReplaceFunction, state)
 		material.uniforms.strength = renderable.object.effects[state.key] || 0;
 
 		return material;
-	}
+	};
 }
 
 const materialMap = new Map();
@@ -248,7 +248,7 @@ const colorShader = {
 	name: 'ec_color',
 	defines: {},
 	uniforms: {
-		strength: 1,
+		strength: 1
 	},
 	vertexShader: `
         #include <common_vert>

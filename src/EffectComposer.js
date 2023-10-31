@@ -189,9 +189,9 @@ export default class EffectComposer {
 		}
 
 		this._bufferMap.forEach(buffer => {
-			if (!!buffer.syncAttachments) {
+			if (buffer.syncAttachments) {
 				buffer.syncAttachments(sceneColorAttachment, sceneDepthAttachment, sceneMColorAttachment, sceneMDepthAttachment);
-			} else if (!!buffer.syncDepthAttachments) {
+			} else if (buffer.syncDepthAttachments) {
 				buffer.syncDepthAttachments(depthAttachment, mDepthAttachment);
 			}
 		});
@@ -287,7 +287,7 @@ export default class EffectComposer {
 		renderStates.camera.rect.set(0, 0, 1, 1);
 
 		this._bufferMap.forEach(buffer => {
-			if (!!buffer.attachManager) {
+			if (buffer.attachManager) {
 				buffer.attachManager.reset();
 			}
 		});
@@ -324,7 +324,7 @@ export default class EffectComposer {
 				if (item.effect.active) {
 					item.effect.bufferDependencies.forEach(({ key, mask }) => {
 						this._tempBufferNames.add(key);
-						if (!!this._bufferMap.get(key).attachManager) {
+						if (this._bufferMap.get(key).attachManager) {
 							this._bufferMap.get(key).attachManager.allocate(item.name, mask);
 						}
 					});

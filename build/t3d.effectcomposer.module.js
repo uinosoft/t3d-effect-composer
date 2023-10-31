@@ -502,7 +502,7 @@ const fxaaShader = {
         // FXAA 3.11 implementation by NVIDIA, ported to WebGL by Agost Biro (biro@archilogic.com)
         
         //----------------------------------------------------------------------------------
-        // File:        es3-kepler\FXAA\assets\shaders/FXAA_DefaultES.frag
+        // File:        es3-kepler/FXAA/assets/shaders/FXAA_DefaultES.frag
         // SDK Version: v3.00
         // Email:       gameworks@nvidia.com
         // Site:        http://developer.nvidia.com/
@@ -2295,7 +2295,7 @@ class SSAOEffect extends Effect {
 
 		// Step 3: blurY pass
 
-		renderer.setRenderTarget(!!inputRenderTarget ? tempRT1 : outputRenderTarget);
+		renderer.setRenderTarget(inputRenderTarget ? tempRT1 : outputRenderTarget);
 		renderer.clear(true, true, false);
 
 		this._blurPass.uniforms.direction = 1;
@@ -2305,7 +2305,7 @@ class SSAOEffect extends Effect {
 
 		// Step 4: blend pass
 
-		if (!!inputRenderTarget) {
+		if (inputRenderTarget) {
 			renderer.setRenderTarget(outputRenderTarget);
 			renderer.setClearColor(0, 0, 0, 0);
 			if (finish) {
@@ -2743,7 +2743,7 @@ class SSREffect extends Effect {
 
 		// Step 3: blurY pass
 
-		renderer.setRenderTarget(!!inputRenderTarget ? tempRT1 : outputRenderTarget);
+		renderer.setRenderTarget(inputRenderTarget ? tempRT1 : outputRenderTarget);
 		renderer.clear(true, true, false);
 
 		this._blurPass.uniforms.direction = 1;
@@ -2753,7 +2753,7 @@ class SSREffect extends Effect {
 
 		// Step 4: blend pass
 
-		if (!!inputRenderTarget) {
+		if (inputRenderTarget) {
 			renderer.setRenderTarget(outputRenderTarget);
 			renderer.setClearColor(0, 0, 0, 0);
 			if (finish) {
@@ -3238,7 +3238,7 @@ const accumulateShader = {
 	name: 'accum',
 	defines: {},
 	uniforms: {
-		mixRatio: 0.9,
+		mixRatio: 0.9
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
@@ -3324,7 +3324,7 @@ const shader$1 = {
 	defines: {},
 	uniforms: {
 		tDiffuse: null,
-		toneMappingExposure: 1,
+		toneMappingExposure: 1
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
@@ -3654,7 +3654,7 @@ class OutlineEffect extends Effect {
 		} else {
 			renderer.clear(true, true, false);
 		}
-		this._blendPass.uniforms.colorTexture =  inputRenderTarget.texture;
+		this._blendPass.uniforms.colorTexture = inputRenderTarget.texture;
 		this._blendPass.uniforms.edgeTexture = tempRT2.texture;
 		this._blendPass.uniforms.maskTexture = markBuffer.output(attachIndex)._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 		this._blendPass.uniforms.strength = this.strength;
@@ -4930,7 +4930,7 @@ class GBuffer extends Buffer {
 	}
 
 	setIfRenderReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._renderOptions.ifRender = func;
 		} else {
 			delete this._renderOptions.ifRender;
@@ -4938,7 +4938,7 @@ class GBuffer extends Buffer {
 	}
 
 	setGeometryReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._renderOptions.getGeometry = func;
 		} else {
 			delete this._renderOptions.getGeometry;
@@ -4946,7 +4946,7 @@ class GBuffer extends Buffer {
 	}
 
 	setMaterialReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._renderOptions.getMaterial = createGetMaterialFunction$2(func);
 		} else {
 			this._renderOptions.getMaterial = createGetMaterialFunction$2();
@@ -5056,7 +5056,7 @@ function createGetMaterialFunction$2(func = defaultMaterialReplaceFunction$2) {
 		material.side = renderable.material.side;
 
 		return material;
-	}
+	};
 }
 
 const materialMap$2 = new Map();
@@ -5295,7 +5295,7 @@ class NonDepthMarkBuffer extends Buffer {
 			this._mrts.push(mrt);
 		}
 
-		this._state = { attachIndex: 0, attachInfo: { count: 0, keys: [], masks: [] }};
+		this._state = { attachIndex: 0, attachInfo: { count: 0, keys: [], masks: [] } };
 
 		const attachManager = new BufferAttachManager(4);
 
@@ -5315,7 +5315,7 @@ class NonDepthMarkBuffer extends Buffer {
 	}
 
 	setIfRenderReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._opacityRenderOptions.ifRender = createIfRenderFunction$1(func, this._state, RenderListMask.OPAQUE);
 			this._transparentRenderOptions.ifRender = createIfRenderFunction$1(func, this._state, RenderListMask.TRANSPARENT);
 		} else {
@@ -5325,7 +5325,7 @@ class NonDepthMarkBuffer extends Buffer {
 	}
 
 	setGeometryReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._opacityRenderOptions.getGeometry = func;
 			this._transparentRenderOptions.getGeometry = func;
 		} else {
@@ -5335,7 +5335,7 @@ class NonDepthMarkBuffer extends Buffer {
 	}
 
 	setMaterialReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._opacityRenderOptions.getMaterial = createGetMaterialFunction$1(func, this._state, this.attachManager, RenderListMask.OPAQUE);
 			this._transparentRenderOptions.getMaterial = createGetMaterialFunction$1(func, this._state, this.attachManager, RenderListMask.TRANSPARENT);
 		} else {
@@ -5373,7 +5373,8 @@ class NonDepthMarkBuffer extends Buffer {
 			this._state.attachIndex = attachIndex;
 			this.attachManager.getAttachInfo(attachIndex, this._state.attachInfo);
 
-			let attachMask = 0, attachMasks = this._state.attachInfo.masks, maskLength = this._state.attachInfo.count;
+			let attachMask = 0;
+			const attachMasks = this._state.attachInfo.masks, maskLength = this._state.attachInfo.count;
 			for (let i = 0; i < maskLength; i++) {
 				attachMask |= attachMasks[i];
 			}
@@ -5437,13 +5438,13 @@ function createIfRenderFunction$1(func = defaultIfRenderReplaceFunction$1, state
 
 		for (let i = 0; i < state.attachInfo.count; i++) {
 			const key = state.attachInfo.keys[i];
-			if (!!renderable.object.effects[key]) {
+			if (renderable.object.effects[key]) {
 				mask |= state.attachInfo.masks[i];
 			}
 		}
 
 		return mask & renderMask;
-	}
+	};
 }
 
 function defaultIfRenderReplaceFunction$1(renderable) {
@@ -5467,7 +5468,7 @@ function createGetMaterialFunction$1(func = defaultMaterialReplaceFunction$1, st
 		}
 
 		return material;
-	}
+	};
 }
 
 const materialMap$1 = new Map();
@@ -5625,7 +5626,7 @@ class ColorMarkBuffer extends Buffer {
 	}
 
 	setIfRenderReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._renderOptions.ifRender = createIfRenderFunction(func, this._state);
 		} else {
 			this._renderOptions.ifRender = createIfRenderFunction(undefined, this._state);
@@ -5633,7 +5634,7 @@ class ColorMarkBuffer extends Buffer {
 	}
 
 	setGeometryReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._renderOptions.getGeometry = func;
 		} else {
 			delete this._renderOptions.getGeometry;
@@ -5641,7 +5642,7 @@ class ColorMarkBuffer extends Buffer {
 	}
 
 	setMaterialReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._renderOptions.getMaterial = createGetMaterialFunction(func, this._state);
 		} else {
 			this._renderOptions.getMaterial = createGetMaterialFunction(undefined, this._state);
@@ -5766,12 +5767,12 @@ function createIfRenderFunction(func = defaultIfRenderReplaceFunction, state) {
 			return false;
 		}
 
-		if (!!renderable.object.effects[state.key]) {
+		if (renderable.object.effects[state.key]) {
 			return true;
 		}
 
 		return false;
-	}
+	};
 }
 
 function defaultIfRenderReplaceFunction(renderable) {
@@ -5787,7 +5788,7 @@ function createGetMaterialFunction(func = defaultMaterialReplaceFunction, state)
 		material.uniforms.strength = renderable.object.effects[state.key] || 0;
 
 		return material;
-	}
+	};
 }
 
 const materialMap = new Map();
@@ -5825,7 +5826,7 @@ const colorShader = {
 	name: 'ec_color',
 	defines: {},
 	uniforms: {
-		strength: 1,
+		strength: 1
 	},
 	vertexShader: `
         #include <common_vert>
@@ -5926,7 +5927,7 @@ class SceneBuffer extends Buffer {
 	}
 
 	setIfRenderReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._sceneRenderOptions.ifRender = func;
 		} else {
 			delete this._sceneRenderOptions.ifRender;
@@ -5934,7 +5935,7 @@ class SceneBuffer extends Buffer {
 	}
 
 	setGeometryReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._sceneRenderOptions.getGeometry = func;
 		} else {
 			delete this._sceneRenderOptions.getGeometry;
@@ -6027,7 +6028,7 @@ class SceneBuffer extends Buffer {
 
 		const overlayLayer = renderQueue.getLayer(1);
 		if (overlayLayer && (overlayLayer.opaqueCount + overlayLayer.transparentCount) > 0) {
-			renderer.clear(false, true, false);  // TODO Forcing clear depth may cause bugs
+			renderer.clear(false, true, false); // TODO Forcing clear depth may cause bugs
 
 			renderer.beginRender();
 
@@ -6081,7 +6082,7 @@ class RenderTargetCache {
 	}
 
 	release(renderTarget, level = 0) {
-		let list = this._map.get(level);
+		const list = this._map.get(level);
 		list.push(renderTarget);
 	}
 
@@ -6432,9 +6433,9 @@ class EffectComposer {
 		}
 
 		this._bufferMap.forEach(buffer => {
-			if (!!buffer.syncAttachments) {
+			if (buffer.syncAttachments) {
 				buffer.syncAttachments(sceneColorAttachment, sceneDepthAttachment, sceneMColorAttachment, sceneMDepthAttachment);
-			} else if (!!buffer.syncDepthAttachments) {
+			} else if (buffer.syncDepthAttachments) {
 				buffer.syncDepthAttachments(depthAttachment, mDepthAttachment);
 			}
 		});
@@ -6530,7 +6531,7 @@ class EffectComposer {
 		renderStates.camera.rect.set(0, 0, 1, 1);
 
 		this._bufferMap.forEach(buffer => {
-			if (!!buffer.attachManager) {
+			if (buffer.attachManager) {
 				buffer.attachManager.reset();
 			}
 		});
@@ -6567,7 +6568,7 @@ class EffectComposer {
 				if (item.effect.active) {
 					item.effect.bufferDependencies.forEach(({ key, mask }) => {
 						this._tempBufferNames.add(key);
-						if (!!this._bufferMap.get(key).attachManager) {
+						if (this._bufferMap.get(key).attachManager) {
 							this._bufferMap.get(key).attachManager.allocate(item.name, mask);
 						}
 					});
@@ -7001,6 +7002,7 @@ Object.defineProperties(EffectComposer.prototype, {
 		},
 		get: function() {
 			console.error('EffectComposer.customRenderLayers has been removed, use SceneBuffer.renderLayers instead.');
+			return [];
 		}
 	}
 });

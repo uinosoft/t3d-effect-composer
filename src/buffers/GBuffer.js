@@ -1,5 +1,5 @@
 import { RenderTarget2D, Texture2D, ATTACHMENT, PIXEL_FORMAT, PIXEL_TYPE, TEXTURE_FILTER, SHADING_TYPE, ShaderMaterial, Vector3, Matrix4, Vector4 } from 't3d';
-import Buffer from './Buffer';
+import Buffer from './Buffer.js';
 
 export default class GBuffer extends Buffer {
 
@@ -64,7 +64,7 @@ export default class GBuffer extends Buffer {
 	}
 
 	setIfRenderReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._renderOptions.ifRender = func;
 		} else {
 			delete this._renderOptions.ifRender;
@@ -72,7 +72,7 @@ export default class GBuffer extends Buffer {
 	}
 
 	setGeometryReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._renderOptions.getGeometry = func;
 		} else {
 			delete this._renderOptions.getGeometry;
@@ -80,7 +80,7 @@ export default class GBuffer extends Buffer {
 	}
 
 	setMaterialReplaceFunction(func) {
-		if (!!func) {
+		if (func) {
 			this._renderOptions.getMaterial = createGetMaterialFunction(func);
 		} else {
 			this._renderOptions.getMaterial = createGetMaterialFunction();
@@ -190,7 +190,7 @@ function createGetMaterialFunction(func = defaultMaterialReplaceFunction) {
 		material.side = renderable.material.side;
 
 		return material;
-	}
+	};
 }
 
 const materialMap = new Map();

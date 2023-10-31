@@ -5,7 +5,7 @@ export default class SnowEffect extends Mesh {
 	constructor(maxCount = 50000) {
 		const positionAttribute = new Attribute(new Buffer(_positionArray, 3));
 
-		let instanceIndices = [];
+		const instanceIndices = [];
 		for (let r = 0; r < maxCount; r++) instanceIndices.push(r);
 		const instanceIndicesAttribute = new Attribute(new Buffer(new Float32Array(instanceIndices), 1));
 		instanceIndicesAttribute.divisor = 1;
@@ -53,9 +53,9 @@ const snowShader = {
 	uniforms: {
 		opacity: 1.0,
 		particleColor: [0.7434, 0.7434, 0.7434],
-		cameraPositiona: [1.0, 100., 0.0],
+		cameraPositiona: [1.0, 100.0, 0.0],
 		width: 1.0,
-		time: 1.0,
+		time: 1.0
 	},
 
 	vertexShader: `

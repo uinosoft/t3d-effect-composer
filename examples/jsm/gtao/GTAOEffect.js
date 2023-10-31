@@ -38,7 +38,7 @@ export default class GTAOEffect extends Effect {
 
 		// Step 1: gtao pass
 
-		renderer.setRenderTarget(!!inputRenderTarget ? tempRT1 : outputRenderTarget);
+		renderer.setRenderTarget(inputRenderTarget ? tempRT1 : outputRenderTarget);
 		renderer.setClearColor(1, 1, 1, 1);
 		renderer.clear(true, true, false);
 
@@ -68,7 +68,7 @@ export default class GTAOEffect extends Effect {
 
 		// Step 2: blend pass
 
-		if (!!inputRenderTarget) {
+		if (inputRenderTarget) {
 			renderer.setRenderTarget(outputRenderTarget);
 			renderer.setClearColor(0, 0, 0, 0);
 			if (finish) {
@@ -150,7 +150,7 @@ const GTAOShader = {
 		cameraFar: 500,
 		projectionInv: new Float32Array(16),
 		viewInv: new Float32Array(16),
-		texSize: [1024, 1024],
+		texSize: [1024, 1024]
 	},
 
 	vertexShader: defaultVertexShader,
@@ -252,4 +252,4 @@ const GTAOShader = {
 			gl_FragColor = vec4(gtao.xyz, 1.0);
 		}
     `
-}
+};

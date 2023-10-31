@@ -30,36 +30,35 @@
 {
 	"imports": {
 		"t3d": "./libs/t3d/build/t3d.module.js",
-		"t3d/examples/jsm/": "./libs/t3d/examples/jsm/",
+		"t3d/addons/": "./libs/t3d/examples/jsm/",
 		"t3d-effect-composer": "../build/t3d.effectcomposer.module.js"
 	}
 }
 </script>
 
 <script type="module">
-    import * as t3d from "t3d";
-    import { OrbitControls } from "t3d/examples/jsm/controls/OrbitControls.js";
-    import { SkyBox } from "t3d/examples/jsm/objects/SkyBox.js";
-    import { GLTFLoader } from "t3d/examples/jsm/loaders/glTF/GLTFLoader.js";
-    import { TextureCubeLoader } from "t3d/examples/jsm/loaders/TextureCubeLoader.js";
+    import * as t3d from 't3d';
+    import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
+    import { SkyBox } from 't3d/addons/objects/SkyBox.js';
+    import { GLTFLoader } from 't3d/addons/loaders/glTF/GLTFLoader.js';
+    import { TextureCubeLoader } from 't3d/addons/loaders/TextureCubeLoader.js';
 
-    import { DefaultEffectComposer, TAAEffect, AccumulationBuffer } from "t3d-effect-composer";
+    import { DefaultEffectComposer, TAAEffect, AccumulationBuffer } from 't3d-effect-composer';
+    import { Inspector } from './jsm/Inspector.js';
 
-    import { Inspector } from "./jsm/Inspector.js";
-
-    import { GUI } from "./libs/lil-gui.esm.min.js";
-    import Stats from "./libs/stats.module.js";
+    import { GUI } from './libs/lil-gui.esm.min.js';
+    import Stats from './libs/stats.module.js';
 
     let width = window.innerWidth || 2;
     let height = window.innerHeight || 2;
 
-    const canvas = document.createElement("canvas");
+    const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     document.body.appendChild(canvas);
 
     const contextParams = { antialias: false, alpha: false, stencil: true };
-    const gl = canvas.getContext("webgl2", contextParams) || canvas.getContext("webgl", contextParams);
+    const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
     const renderer = new t3d.WebGLRenderer(gl);
     const backRenderTarget = new t3d.RenderTargetBack(canvas);
 
@@ -69,13 +68,13 @@
     scene.environmentLightIntensity = 1;
 
     const cube_texture = new TextureCubeLoader().load([
-    	"./resources/cube/BlueSky/posx.jpg",
-    	"./resources/cube/BlueSky/negx.jpg",
-    	"./resources/cube/BlueSky/posy.jpg",
-    	"./resources/cube/BlueSky/negy.jpg",
-    	"./resources/cube/BlueSky/posz.jpg",
-    	"./resources/cube/BlueSky/negz.jpg",
-    ], function() {
+    	'./resources/cube/BlueSky/posx.jpg',
+    	'./resources/cube/BlueSky/negx.jpg',
+    	'./resources/cube/BlueSky/posy.jpg',
+    	'./resources/cube/BlueSky/negy.jpg',
+    	'./resources/cube/BlueSky/posz.jpg',
+    	'./resources/cube/BlueSky/negz.jpg'
+], function() {
     	taaReset();
     });
     scene.environment = cube_texture;
@@ -83,18 +82,18 @@
     const sky_box = new SkyBox(cube_texture);
 
     const loader = new GLTFLoader();
-    console.time("GLTFLoader");
+    console.time('GLTFLoader');
 
-    const modelUrl = "./resources/gltf/lowpoly_smallcity/scene.gltf";
-    loader.load(modelUrl).then(function (result) {
-    	console.timeEnd("GLTFLoader");
+    const modelUrl = './resources/gltf/lowpoly_smallcity/scene.gltf';
+    loader.load(modelUrl).then(function(result) {
+    	console.timeEnd('GLTFLoader');
 
     	const object = result.root;
 
     	object.position.set(3, 3, 3);
     	object.scale.set(0.01, 0.01, 0.01);
 
-    	object.traverse((node) => {
+    	object.traverse(node => {
     		if (node.material) {
     			node.castShadow = true;
     			node.receiveShadow = true;
@@ -131,9 +130,9 @@
     	samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
     	webgl2: renderer.capabilities.version > 1,
     	floatColorBuffer: !!renderer.capabilities.getExtension(
-    		"EXT_color_buffer_float"
-    	),
-    }
+    		'EXT_color_buffer_float'
+    	)
+    };
 
     const effectComposer = new DefaultEffectComposer(width, height, options);
     effectComposer.sceneMSAA = false;
@@ -190,11 +189,11 @@
     document.body.appendChild(stats.dom);
 
     let inspector;
-    document.addEventListener("keydown", (e) => {
+    document.addEventListener('keydown', e => {
     	if (e.keyCode === 73) {
     		if (!inspector) {
     			inspector = new Inspector(effectComposer, GUI);
-    			inspector.gui.domElement.classList.add("top-left-corner");
+    			inspector.gui.domElement.classList.add('top-left-corner');
     		} else {
     			inspector.destroy();
     			inspector = null;
@@ -249,7 +248,7 @@
 
     	taaReset();
     }
-    window.addEventListener("resize", onWindowResize, false);
+    window.addEventListener('resize', onWindowResize, false);
 </script>
 
 </html>

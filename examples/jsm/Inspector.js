@@ -5,111 +5,111 @@ class Inspector {
 	constructor(effectComposer, GUI, options = {}) {
 		options.postEffect = (options.postEffect !== undefined) ? options.postEffect : true;
 
-		const gui = new GUI({ title: "Effect Composer Inspector" });
+		const gui = new GUI({ title: 'Effect Composer Inspector' });
 
 		// Post Effects
 
 		if (options.postEffect) {
 			const postEffectFolder = gui.addFolder('Post Effects');
 
-			postEffectFolder.add(effectComposer, "sceneMSAA");
+			postEffectFolder.add(effectComposer, 'sceneMSAA');
 
 			const ssaoEffect = effectComposer.getEffect('SSAO');
-			const ssaoFolder = postEffectFolder.addFolder("SSAO");
+			const ssaoFolder = postEffectFolder.addFolder('SSAO');
 			ssaoFolder.close();
-			ssaoFolder.add(ssaoEffect, "active");
-			ssaoFolder.add(ssaoEffect, "radius").min(0).max(5).step(0.01);
-			ssaoFolder.add(ssaoEffect, "power").min(0).max(5).step(1);
-			ssaoFolder.add(ssaoEffect, "bias").min(0).max(1).step(0.0001);
-			ssaoFolder.add(ssaoEffect, "intensity").min(0).max(2).step(0.1);
-			ssaoFolder.add(ssaoEffect, "quality", ['Low', 'Medium', 'High', 'Ultra']);
-			ssaoFolder.add(ssaoEffect, "blurSize").min(0).max(3).step(0.01);
-			ssaoFolder.add(ssaoEffect, "depthRange").min(0).max(3).step(0.01);
-			ssaoFolder.add(ssaoEffect, "autoSampleWeight");
+			ssaoFolder.add(ssaoEffect, 'active');
+			ssaoFolder.add(ssaoEffect, 'radius').min(0).max(5).step(0.01);
+			ssaoFolder.add(ssaoEffect, 'power').min(0).max(5).step(1);
+			ssaoFolder.add(ssaoEffect, 'bias').min(0).max(1).step(0.0001);
+			ssaoFolder.add(ssaoEffect, 'intensity').min(0).max(2).step(0.1);
+			ssaoFolder.add(ssaoEffect, 'quality', ['Low', 'Medium', 'High', 'Ultra']);
+			ssaoFolder.add(ssaoEffect, 'blurSize').min(0).max(3).step(0.01);
+			ssaoFolder.add(ssaoEffect, 'depthRange').min(0).max(3).step(0.01);
+			ssaoFolder.add(ssaoEffect, 'autoSampleWeight');
 
 			const ssrEffect = effectComposer.getEffect('SSR');
-			const ssrFolder = postEffectFolder.addFolder("SSR");
+			const ssrFolder = postEffectFolder.addFolder('SSR');
 			ssrFolder.close();
-			ssrFolder.add(ssrEffect, "active");
-			ssrFolder.add(ssrEffect, "pixelStride", 1, 100, 1);
-			ssrFolder.add(ssrEffect, "maxIteration", 1, 10, 1);
-			ssrFolder.add(ssrEffect, "maxSteps", 20, 200, 1);
-			ssrFolder.add(ssrEffect, "maxRayDistance", 1, 1000, 0.01);
-			ssrFolder.add(ssrEffect, "enablePixelStrideZCutoff");
-			ssrFolder.add(ssrEffect, "pixelStrideZCutoff", 1, 300, 1);
-			ssrFolder.add(ssrEffect, "screenEdgeFadeStart", 0, 1, 0.01);
-			ssrFolder.add(ssrEffect, "eyeFadeStart", 0, 1, 0.01);
-			ssrFolder.add(ssrEffect, "eyeFadeEnd", 0, 1, 0.01);
-			ssrFolder.add(ssrEffect, "minGlossiness", 0, 1, 0.01);
-			ssrFolder.add(ssrEffect, "strength", 0, 1, 0.01);
-			ssrFolder.add(ssrEffect, "mixType", [0, 1]);
+			ssrFolder.add(ssrEffect, 'active');
+			ssrFolder.add(ssrEffect, 'pixelStride', 1, 100, 1);
+			ssrFolder.add(ssrEffect, 'maxIteration', 1, 10, 1);
+			ssrFolder.add(ssrEffect, 'maxSteps', 20, 200, 1);
+			ssrFolder.add(ssrEffect, 'maxRayDistance', 1, 1000, 0.01);
+			ssrFolder.add(ssrEffect, 'enablePixelStrideZCutoff');
+			ssrFolder.add(ssrEffect, 'pixelStrideZCutoff', 1, 300, 1);
+			ssrFolder.add(ssrEffect, 'screenEdgeFadeStart', 0, 1, 0.01);
+			ssrFolder.add(ssrEffect, 'eyeFadeStart', 0, 1, 0.01);
+			ssrFolder.add(ssrEffect, 'eyeFadeEnd', 0, 1, 0.01);
+			ssrFolder.add(ssrEffect, 'minGlossiness', 0, 1, 0.01);
+			ssrFolder.add(ssrEffect, 'strength', 0, 1, 0.01);
+			ssrFolder.add(ssrEffect, 'mixType', [0, 1]);
 
 			const colorCorrectionEffect = effectComposer.getEffect('ColorCorrection');
-			const colorCorrectionFolder = postEffectFolder.addFolder("ColorCorrection");
+			const colorCorrectionFolder = postEffectFolder.addFolder('ColorCorrection');
 			colorCorrectionFolder.close();
-			colorCorrectionFolder.add(colorCorrectionEffect, "active");
-			colorCorrectionFolder.add(colorCorrectionEffect, "brightness").min(0).max(0.5).step(0.01);
-			colorCorrectionFolder.add(colorCorrectionEffect, "contrast").min(1).max(1.5).step(0.01);
-			colorCorrectionFolder.add(colorCorrectionEffect, "exposure").min(0).max(1).step(0.1);
-			colorCorrectionFolder.add(colorCorrectionEffect, "gamma").min(0).max(1).step(0.1);
-			colorCorrectionFolder.add(colorCorrectionEffect, "saturation").min(-1).max(5);
+			colorCorrectionFolder.add(colorCorrectionEffect, 'active');
+			colorCorrectionFolder.add(colorCorrectionEffect, 'brightness').min(0).max(0.5).step(0.01);
+			colorCorrectionFolder.add(colorCorrectionEffect, 'contrast').min(1).max(1.5).step(0.01);
+			colorCorrectionFolder.add(colorCorrectionEffect, 'exposure').min(0).max(1).step(0.1);
+			colorCorrectionFolder.add(colorCorrectionEffect, 'gamma').min(0).max(1).step(0.1);
+			colorCorrectionFolder.add(colorCorrectionEffect, 'saturation').min(-1).max(5);
 
 			const dofEffect = effectComposer.getEffect('DOF');
-			const dofFolder = postEffectFolder.addFolder("DOF");
+			const dofFolder = postEffectFolder.addFolder('DOF');
 			dofFolder.close();
-			dofFolder.add(dofEffect, "active");
-			dofFolder.add(dofEffect, "focalDepth", 0, 100);
-			dofFolder.add(dofEffect, "focalLength", 0, 100);
-			dofFolder.add(dofEffect, "fstop", 0, 1, 0.1);
-			dofFolder.add(dofEffect, "maxblur", 0, 1, 0.1);
-			dofFolder.add(dofEffect, "threshold", 0, 1, 0.1);
-			dofFolder.add(dofEffect, "gain", 0, 2, 0.1);
-			dofFolder.add(dofEffect, "bias", 0, 1, 0.001);
-			dofFolder.add(dofEffect, "dithering", 0, 0.001, 0.00001);
+			dofFolder.add(dofEffect, 'active');
+			dofFolder.add(dofEffect, 'focalDepth', 0, 100);
+			dofFolder.add(dofEffect, 'focalLength', 0, 100);
+			dofFolder.add(dofEffect, 'fstop', 0, 1, 0.1);
+			dofFolder.add(dofEffect, 'maxblur', 0, 1, 0.1);
+			dofFolder.add(dofEffect, 'threshold', 0, 1, 0.1);
+			dofFolder.add(dofEffect, 'gain', 0, 2, 0.1);
+			dofFolder.add(dofEffect, 'bias', 0, 1, 0.001);
+			dofFolder.add(dofEffect, 'dithering', 0, 0.001, 0.00001);
 
 			const bloomEffect = effectComposer.getEffect('Bloom');
-			const bloomFolder = postEffectFolder.addFolder("Bloom");
+			const bloomFolder = postEffectFolder.addFolder('Bloom');
 			bloomFolder.close();
-			bloomFolder.add(bloomEffect, "active");
-			bloomFolder.add(bloomEffect, "threshold").min(0).max(1).step(0.01);
-			bloomFolder.add(bloomEffect, "smoothWidth").min(0).max(1).step(0.01);
-			bloomFolder.add(bloomEffect, "blurSize").min(0).max(5).step(0.01);
-			bloomFolder.add(bloomEffect, "strength").min(0).max(2).step(0.01);
+			bloomFolder.add(bloomEffect, 'active');
+			bloomFolder.add(bloomEffect, 'threshold').min(0).max(1).step(0.01);
+			bloomFolder.add(bloomEffect, 'smoothWidth').min(0).max(1).step(0.01);
+			bloomFolder.add(bloomEffect, 'blurSize').min(0).max(5).step(0.01);
+			bloomFolder.add(bloomEffect, 'strength').min(0).max(2).step(0.01);
 
 			const fxaaEffect = effectComposer.getEffect('FXAA');
-			const fxaaFolder = postEffectFolder.addFolder("FXAA");
+			const fxaaFolder = postEffectFolder.addFolder('FXAA');
 			fxaaFolder.close();
-			fxaaFolder.add(fxaaEffect, "active");
+			fxaaFolder.add(fxaaEffect, 'active');
 
 			const chromaticAberrationEffect = effectComposer.getEffect('ChromaticAberration');
-			const chromaticAberrationFolder = postEffectFolder.addFolder("chromatic aberration");
+			const chromaticAberrationFolder = postEffectFolder.addFolder('chromatic aberration');
 			chromaticAberrationFolder.close();
-			chromaticAberrationFolder.add(chromaticAberrationEffect, "active");
-			chromaticAberrationFolder.add(chromaticAberrationEffect, "chromaFactor").min(0).max(1).step(0.0001);
+			chromaticAberrationFolder.add(chromaticAberrationEffect, 'active');
+			chromaticAberrationFolder.add(chromaticAberrationEffect, 'chromaFactor').min(0).max(1).step(0.0001);
 
 			const vignettingEffect = effectComposer.getEffect('Vignetting');
-			const vignettingFolder = postEffectFolder.addFolder("Vignetting");
+			const vignettingFolder = postEffectFolder.addFolder('Vignetting');
 			vignettingFolder.close();
-			vignettingFolder.add(vignettingEffect, "active");
-			vignettingFolder.addColor({ color: [0, 0, 0] }, "color").onChange(value => {
+			vignettingFolder.add(vignettingEffect, 'active');
+			vignettingFolder.addColor({ color: [0, 0, 0] }, 'color').onChange(value => {
 				vignettingEffect.color.fromArray(value);
 			});
-			vignettingFolder.add(vignettingEffect, "offset").min(0).max(5).step(0.1);
+			vignettingFolder.add(vignettingEffect, 'offset').min(0).max(5).step(0.1);
 
 			const blurEdgeEffect = effectComposer.getEffect('BlurEdge');
-			const blurEdgeFolder = postEffectFolder.addFolder("BlurEdge");
+			const blurEdgeFolder = postEffectFolder.addFolder('BlurEdge');
 			blurEdgeFolder.close();
-			blurEdgeFolder.add(blurEdgeEffect, "active");
-			blurEdgeFolder.add(blurEdgeEffect, "offset").min(0).max(5).step(0.1);
+			blurEdgeFolder.add(blurEdgeEffect, 'active');
+			blurEdgeFolder.add(blurEdgeEffect, 'offset').min(0).max(5).step(0.1);
 
 			const filmEffect = effectComposer.getEffect('Film');
-			const filmFolder = postEffectFolder.addFolder("Film");
+			const filmFolder = postEffectFolder.addFolder('Film');
 			filmFolder.close();
-			filmFolder.add(filmEffect, "active");
-			filmFolder.add(filmEffect, "noiseIntensity").min(0).max(1).step(0.01);
-			filmFolder.add(filmEffect, "scanlinesIntensity").min(0).max(1).step(0.01);
-			filmFolder.add(filmEffect, "scanlinesCount").min(0).max(3000).step(100);
-			filmFolder.add(filmEffect, "grayscale");
+			filmFolder.add(filmEffect, 'active');
+			filmFolder.add(filmEffect, 'noiseIntensity').min(0).max(1).step(0.01);
+			filmFolder.add(filmEffect, 'scanlinesIntensity').min(0).max(1).step(0.01);
+			filmFolder.add(filmEffect, 'scanlinesCount').min(0).max(3000).step(100);
+			filmFolder.add(filmEffect, 'grayscale');
 		}
 
 		// Debuggers
@@ -117,10 +117,11 @@ class Inspector {
 		const gBufferDebugger = new GBufferDebugger();
 		const ssaoDebugger = new SSAODebugger();
 		const ssrDebugger = new SSRDebugger();
-		const debuggerFolder = gui.addFolder("Debugger");
+		const debuggerFolder = gui.addFolder('Debugger');
 		debuggerFolder.close();
 
-		let debugDetailControl = null, gBufferTypes = ['Normal', 'Depth', 'Position', 'Glossiness'], debugTypes = ['Null', 'GBuffer', 'SSAO', 'SSR'];
+		const gBufferTypes = ['Normal', 'Depth', 'Position', 'Glossiness'], debugTypes = ['Null', 'GBuffer', 'SSAO', 'SSR'];
+		let debugDetailControl = null;
 		let debugMaskControl = null;
 		let nonDepthMarkBufferDebugger = null, markBufferDebugger = null, colorMarkBufferDebugger = null;
 
@@ -185,10 +186,10 @@ class Inspector {
 
 		// Stats
 
-		const statsFolder = gui.addFolder("Stats");
+		const statsFolder = gui.addFolder('Stats');
 		statsFolder.close();
 
-		let stats = effectComposer.getStats();
+		const stats = effectComposer.getStats();
 		statsFolder.add(stats, 'fboCache').disable().listen();
 		statsFolder.add(stats, 'markBuffers').disable().listen();
 		statsFolder.add(stats, 'colorMarkBuffers').disable().listen();
@@ -197,7 +198,7 @@ class Inspector {
 
 		const bufferUsage = stats.currentBufferUsage;
 
-		for (let key in bufferUsage) {
+		for (const key in bufferUsage) {
 			statsFolder.add(bufferUsage, key).disable().listen();
 		}
 
@@ -219,4 +220,4 @@ class Inspector {
 
 }
 
-export { Inspector }
+export { Inspector };
