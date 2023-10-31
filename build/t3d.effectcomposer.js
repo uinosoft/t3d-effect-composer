@@ -1814,18 +1814,8 @@
 			const gBufferRenderStates = gBuffer.getCurrentRenderStates();
 			this._mainPass.uniforms.tColor = inputRenderTarget.texture;
 			this._mainPass.uniforms.tDepth = gBuffer.output()._attachments[t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
-			let cameraNear = 0,
-				cameraFar = 0;
-			const projectionMatrix = gBufferRenderStates.camera.projectionMatrix;
-			if (_isPerspectiveMatrix(projectionMatrix)) {
-				cameraNear = projectionMatrix.elements[14] / (projectionMatrix.elements[10] - 1);
-				cameraFar = projectionMatrix.elements[14] / (projectionMatrix.elements[10] + 1);
-			} else {
-				cameraNear = (projectionMatrix.elements[14] + 1) / projectionMatrix.elements[10];
-				cameraFar = (projectionMatrix.elements[14] - 1) / projectionMatrix.elements[10];
-			}
-			this._mainPass.uniforms.znear = cameraNear;
-			this._mainPass.uniforms.zfar = cameraFar;
+			this._mainPass.uniforms.znear = gBufferRenderStates.camera.near;
+			this._mainPass.uniforms.zfar = gBufferRenderStates.camera.far;
 			this._mainPass.uniforms.focalDepth = this.focalDepth;
 			this._mainPass.uniforms.focalLength = this.focalLength;
 			this._mainPass.uniforms.fstop = this.fstop;
@@ -1847,9 +1837,6 @@
 		dispose() {
 			this._mainPass.dispose();
 		}
-	}
-	function _isPerspectiveMatrix(m) {
-		return m.elements[11] === -1.0;
 	}
 	const bokehShader = {
 		name: 'ec_bokeh',
