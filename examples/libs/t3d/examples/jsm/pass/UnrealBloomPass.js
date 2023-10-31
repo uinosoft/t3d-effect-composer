@@ -74,7 +74,7 @@ class UnrealBloomPass {
 		this.compositePass.uniforms.blurTexture5 = this.renderTargetsVertical[4].texture;
 
 		this.copyPass = new ShaderPostPass(CopyShader);
-		this.copyPass.material.blending =  BLEND_TYPE.ADD;
+		this.copyPass.material.blending = BLEND_TYPE.ADD;
 		this.copyPass.material.transparent = true;
 		this.copyPass.material.premultipliedAlpha = true;
 		this.copyPass.material.depthTest = false;
@@ -86,9 +86,9 @@ class UnrealBloomPass {
 	update(renderer, sceneRenderTarget, outputRenderTarget) {
 		// Step 1: highlight
 
-		renderer.renderPass.setRenderTarget(this.tempRenderTarget);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(this.tempRenderTarget);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 		this.highlightPass.uniforms.luminosityThreshold = this.threshold;
 		this.highlightPass.uniforms.tDiffuse = sceneRenderTarget.texture;
 		this.highlightPass.render(renderer);
@@ -101,41 +101,41 @@ class UnrealBloomPass {
 			this.separableBlurPasses[i].uniforms.colorTexture = inputRenderTarget.texture;
 			this.separableBlurPasses[i].uniforms.direction[0] = 1;
 			this.separableBlurPasses[i].uniforms.direction[1] = 0;
-			renderer.renderPass.setRenderTarget(this.renderTargetsHorizontal[i]);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
+			renderer.setRenderTarget(this.renderTargetsHorizontal[i]);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
 			this.separableBlurPasses[i].render(renderer);
 
 			this.separableBlurPasses[i].uniforms.colorTexture = this.renderTargetsHorizontal[i].texture;
 			this.separableBlurPasses[i].uniforms.direction[0] = 0;
 			this.separableBlurPasses[i].uniforms.direction[1] = 1;
-			renderer.renderPass.setRenderTarget(this.renderTargetsVertical[i]);
-			renderer.renderPass.setClearColor(0, 0, 0, 0);
-			renderer.renderPass.clear(true, true, false);
-			this.separableBlurPasses[i].render(renderer)
+			renderer.setRenderTarget(this.renderTargetsVertical[i]);
+			renderer.setClearColor(0, 0, 0, 0);
+			renderer.clear(true, true, false);
+			this.separableBlurPasses[i].render(renderer);
 			inputRenderTarget = this.renderTargetsVertical[i];
 		}
 
 		// Step 3: composite all the mips
 
-		renderer.renderPass.setRenderTarget(this.renderTargetsHorizontal[0]);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(this.renderTargetsHorizontal[0]);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 		this.compositePass.uniforms.bloomRadius = this.radius;
 		this.compositePass.uniforms.strength = this.strength;
 		this.compositePass.render(renderer);
 
 		// Step 4: blend it additively
 
-		renderer.renderPass.setRenderTarget(sceneRenderTarget);
+		renderer.setRenderTarget(sceneRenderTarget);
 		this.copyPass.uniforms.tDiffuse = this.renderTargetsHorizontal[0].texture;
 		this.copyPass.render(renderer);
 
 		// Step 5: color mapping  over the output render target
 
-		renderer.renderPass.setRenderTarget(outputRenderTarget);
-		renderer.renderPass.setClearColor(0, 0, 0, 0);
-		renderer.renderPass.clear(true, true, false);
+		renderer.setRenderTarget(outputRenderTarget);
+		renderer.setClearColor(0, 0, 0, 0);
+		renderer.clear(true, true, false);
 		this.toneMappingPass.uniforms.tDiffuse = sceneRenderTarget.texture;
 		this.toneMappingPass.uniforms.toneMappingExposure = this.toneMappingExposure;
 		this.toneMappingPass.render(renderer);
@@ -190,7 +190,7 @@ const seperableBlurShader = {
 		colorTexture: null,
 		invSize: [1 / 512, 1 / 512], // inverse texture size
 		direction: [0.5, 0.5],
-		gaussianCoefficients: [], // precomputed Gaussian Coefficients
+		gaussianCoefficients: [] // precomputed Gaussian Coefficients
 	},
 
 	vertexShader: `
@@ -227,8 +227,8 @@ const seperableBlurShader = {
 			}
 			gl_FragColor = vec4(diffuseSum / weightSum, 0.0);
 		}
-	`,
-}
+	`
+};
 
 const compositeShader = {
 	name: 'composite',
@@ -243,7 +243,7 @@ const compositeShader = {
 		blurTexture5: null,
 		bloomFactors: [1., 0.8, 0.6, 0.4, 0.2],
 		bloomRadius: 0.0,
-		strength: 1,
+		strength: 1
 	},
 
 	vertexShader: `
@@ -291,7 +291,8 @@ const compositeShader = {
 				factor4 * texture2D(blurTexture5, v_Uv));
 		}
 	`
-}
+};
+
 const toneMappingShader = {
 	name: 'toneMapping',
 
@@ -342,5 +343,6 @@ const toneMappingShader = {
 			gl_FragColor = LinearTosRGB(gl_FragColor);
 		}
 	`
-}
+};
+
 export { UnrealBloomPass };

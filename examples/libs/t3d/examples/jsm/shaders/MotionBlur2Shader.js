@@ -1,12 +1,11 @@
 const MotionBlur2Shader = {
-
 	name: 'motion_blur2',
 
 	uniforms: {
-		"tMotion": null,
-		"tColor": null,
-		"screenSize": [1024,  512],
-		"velocityFactor": 1.0,
+		'tMotion': null,
+		'tColor': null,
+		'screenSize': [1024, 512],
+		'velocityFactor': 1.0
 	},
 
 	vertexShader: `
@@ -58,7 +57,6 @@ const MotionBlur2Shader = {
 			gl_FragColor.a = result.a;
         }
     `
-
-}
+};
 
 export { MotionBlur2Shader };

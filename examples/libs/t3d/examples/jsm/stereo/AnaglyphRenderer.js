@@ -3,7 +3,7 @@ import {
 	RenderTarget2D,
 	Matrix4,
 	Matrix3,
-	ShaderPostPass,
+	ShaderPostPass
 } from 't3d';
 import { ForwardRenderer } from '../render/ForwardRenderer.js';
 
@@ -83,10 +83,10 @@ class AnaglyphRenderer extends ForwardRenderer {
 		this.clear(true, true, true);
 		this.renderScene(scene, cameraR);
 
-		if (!!this._renderTargetL.texture) {
+		if (this._renderTargetL.texture) {
 			this.updateRenderTargetMipmap(this._renderTargetL);
 		}
-		if (!!this._renderTargetR.texture) {
+		if (this._renderTargetR.texture) {
 			this.updateRenderTargetMipmap(this._renderTargetR);
 		}
 
@@ -251,6 +251,6 @@ const AnaglyphShader = {
 					max( colorL.a, colorR.a ) );
 		}
 		`
-}
+};
 
 export { AnaglyphRenderer };

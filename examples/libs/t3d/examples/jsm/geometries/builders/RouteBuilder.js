@@ -3,7 +3,7 @@ import { Vector3 } from 't3d';
 /**
  * RouteBuilder
  */
-var RouteBuilder = {
+const RouteBuilder = {
 
 	/**
 	 * @param {Object} frames
@@ -22,11 +22,11 @@ var RouteBuilder = {
 
 		// build vertex data
 
-		var positions = [];
-		var normals = [];
-		var uvs = [];
-		var uvs2 = [];
-		var indices = [];
+		const positions = [];
+		const normals = [];
+		const uvs = [];
+		const uvs2 = [];
+		const indices = [];
 
 		const frameLength = frames.points.length;
 		const lastIndex = frameLength - 1;
@@ -87,9 +87,9 @@ var RouteBuilder = {
 
 				tempPoint1.copy(longerOffset).normalize(Math.abs(sideOffset)).add(longEdge);
 
-				let _cos = tempPoint2.copy(longEdge).sub(tempPoint1).normalize().dot(frames.tangents[i]);
-				let _len = tempPoint2.copy(longEdge).sub(tempPoint1).getLength();
-				let _dist = _cos * _len * 2;
+				const _cos = tempPoint2.copy(longEdge).sub(tempPoint1).normalize().dot(frames.tangents[i]);
+				const _len = tempPoint2.copy(longEdge).sub(tempPoint1).getLength();
+				const _dist = _cos * _len * 2;
 
 				tempPoint2.copy(frames.tangents[i]).normalize(_dist).add(tempPoint1);
 
@@ -234,9 +234,9 @@ var RouteBuilder = {
 			);
 
 			uvs2.push(
-				uvDist2, side !== 'both'  ? (side !== 'right' ? -2 : 0) : -0.5,
-				uvDist2, side !== 'both'  ? (side !== 'left' ? 2 : 0) : 1.5,
-				uvDist2 + (1.5 * width / totalLength), side !== 'both'  ? 0 : 0.5
+				uvDist2, side !== 'both' ? (side !== 'right' ? -2 : 0) : -0.5,
+				uvDist2, side !== 'both' ? (side !== 'left' ? 2 : 0) : 1.5,
+				uvDist2 + (1.5 * width / totalLength), side !== 'both' ? 0 : 0.5
 			);
 
 			verticesCount += 3;
@@ -257,6 +257,6 @@ var RouteBuilder = {
 		};
 	}
 
-}
+};
 
 export { RouteBuilder };

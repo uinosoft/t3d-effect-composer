@@ -1,4 +1,4 @@
-import { Vector3, Box3, Triangle } from "t3d";
+import { Vector3, Box3, Triangle } from 't3d';
 
 class Octree {
 
@@ -100,14 +100,15 @@ class Octree {
 			}
 		}
 
-		let triangle;
+		let triangle = this.triangles.pop();
 
-		while (triangle = this.triangles.pop()) {
+		while (triangle) {
 			for (let i = 0; i < subTrees.length; i++) {
 				if (subTrees[i].box.intersectsTriangle(triangle)) {
 					subTrees[i].triangles.push(triangle);
 				}
 			}
+			triangle = this.triangles.pop();
 		}
 
 		for (let i = 0; i < subTrees.length; i++) {
@@ -164,7 +165,7 @@ class Octree {
 			}
 		}
 
-		return distance < 1e100 ? { distance: distance, triangle: triangle, position: position, target: triangle.belong  } : null;
+		return distance < 1e100 ? { distance: distance, triangle: triangle, position: position, target: triangle.belong } : null;
 	}
 
 }

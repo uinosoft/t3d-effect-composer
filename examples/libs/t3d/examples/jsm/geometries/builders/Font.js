@@ -64,13 +64,13 @@ function createPath(char, scale, offsetX, offsetY, data) {
 	if (glyph.o) {
 		const outline = glyph._cachedOutline || (glyph._cachedOutline = glyph.o.split(' '));
 
-		let currentPoint = [0, 0];
+		const currentPoint = [0, 0];
 
 		for (let i = 0, l = outline.length; i < l;) {
 			const action = outline[i++];
 
 			switch (action) {
-				case 'm': // move points
+				case 'm': { // move points
 					count++;
 
 					path[count] = new CurvePath3();
@@ -81,13 +81,12 @@ function createPath(char, scale, offsetX, offsetY, data) {
 					currentPoint[1] = y;
 
 					break;
-
-				case 'l': // line
-
+				}
+				case 'l': { // line
 					x = outline[i++] * scale + offsetX;
 					y = outline[i++] * scale + offsetY;
 
-					const lineCurve = new LineCurve2(new Vector2(currentPoint[0], currentPoint[1]), new Vector2(x, y))
+					const lineCurve = new LineCurve2(new Vector2(currentPoint[0], currentPoint[1]), new Vector2(x, y));
 
 					path[count].curves.push(lineCurve);
 
@@ -95,15 +94,14 @@ function createPath(char, scale, offsetX, offsetY, data) {
 					currentPoint[1] = y;
 
 					break;
-
-				case 'q': // quadraticCurve
-
+				}
+				case 'q': { // quadraticCurve
 					cpx = outline[i++] * scale + offsetX;
 					cpy = outline[i++] * scale + offsetY;
 					cpx1 = outline[i++] * scale + offsetX;
 					cpy1 = outline[i++] * scale + offsetY;
 
-					const quadraticBezierCurve = new QuadraticBezierCurve2(new Vector2(currentPoint[0], currentPoint[1]), new Vector2(cpx1, cpy1), new Vector2(cpx, cpy))
+					const quadraticBezierCurve = new QuadraticBezierCurve2(new Vector2(currentPoint[0], currentPoint[1]), new Vector2(cpx1, cpy1), new Vector2(cpx, cpy));
 
 					path[count].curves.push(quadraticBezierCurve);
 
@@ -111,9 +109,8 @@ function createPath(char, scale, offsetX, offsetY, data) {
 					currentPoint[1] = cpy;
 
 					break;
-
-				case 'b': // bezierCurve
-
+				}
+				case 'b': { // bezierCurve
 					cpx = outline[i++] * scale + offsetX;
 					cpy = outline[i++] * scale + offsetY;
 					cpx1 = outline[i++] * scale + offsetX;
@@ -121,7 +118,7 @@ function createPath(char, scale, offsetX, offsetY, data) {
 					cpx2 = outline[i++] * scale + offsetX;
 					cpy2 = outline[i++] * scale + offsetY;
 
-					const cubicBezierCurve = new CubicBezierCurve2(new Vector2(currentPoint[0], currentPoint[1]), new Vector2(cpx1, cpy1), new Vector2(cpx2, cpy2), new Vector2(cpx, cpy))
+					const cubicBezierCurve = new CubicBezierCurve2(new Vector2(currentPoint[0], currentPoint[1]), new Vector2(cpx1, cpy1), new Vector2(cpx2, cpy2), new Vector2(cpx, cpy));
 
 					path[count].curves.push(cubicBezierCurve);
 
@@ -129,6 +126,7 @@ function createPath(char, scale, offsetX, offsetY, data) {
 					currentPoint[1] = cpy;
 
 					break;
+				}
 			}
 		}
 	}
@@ -150,15 +148,15 @@ function getShapes(curvePaths, shapes = []) {
 		tmpShape = {
 			contour: vectorsToArray(tempPoints),
 			holes: []
-		}
+		};
 		shapes.push(tmpShape);
 		return shapes;
 	}
 
-	let holesFirst = !isClockWise(curvePaths[0].getPoints());
+	const holesFirst = !isClockWise(curvePaths[0].getPoints());
 
 	const newShapes = [];
-	let newShapeHoles = [];
+	const newShapeHoles = [];
 	let mainIdx = 0;
 	let tmpPoints;
 

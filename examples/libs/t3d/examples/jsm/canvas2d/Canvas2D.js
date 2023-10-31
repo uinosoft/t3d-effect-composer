@@ -16,8 +16,8 @@ class Canvas2D extends Mesh {
 		const geometry = new Geometry();
 		const buffer = new Buffer(new Float32Array(), 5);
 		buffer.usage = BUFFER_USAGE.DYNAMIC_DRAW;
-		geometry.addAttribute("a_Position", new Attribute(buffer, 3, 0));
-		geometry.addAttribute("a_Uv", new Attribute(buffer, 2, 3));
+		geometry.addAttribute('a_Position', new Attribute(buffer, 3, 0));
+		geometry.addAttribute('a_Uv', new Attribute(buffer, 2, 3));
 		geometry.setIndex(new Attribute(new Buffer(new Uint16Array([]), 1)));
 
 		super(geometry, []);
@@ -168,14 +168,14 @@ class Canvas2D extends Mesh {
 			vertices[vertexIndex++] = 1;
 
 			_x = x + w;
-			_y = y;
+			// _y = y;
 			vertices[vertexIndex++] = a * _x + c * _y + tx;
 			vertices[vertexIndex++] = b * _x + d * _y + ty;
 			vertices[vertexIndex++] = 0;
 			vertices[vertexIndex++] = 1;
 			vertices[vertexIndex++] = 1;
 
-			_x = x + w;
+			// _x = x + w;
 			_y = y + h;
 			vertices[vertexIndex++] = a * _x + c * _y + tx;
 			vertices[vertexIndex++] = b * _x + d * _y + ty;
@@ -184,7 +184,7 @@ class Canvas2D extends Mesh {
 			vertices[vertexIndex++] = 0;
 
 			_x = x;
-			_y = y + h;
+			// _y = y + h;
 			vertices[vertexIndex++] = a * _x + c * _y + tx;
 			vertices[vertexIndex++] = b * _x + d * _y + ty;
 			vertices[vertexIndex++] = 0;
@@ -321,11 +321,10 @@ function constant() {
 
 	const scaleFactor = this._scaleFactor;
 
-	let resultX, resultY, resultW, resultH;
-	resultX = curViewX;
-	resultY = curViewY;
-	resultW = curViewW;
-	resultH = curViewH;
+	const resultX = curViewX;
+	const resultY = curViewY;
+	const resultW = curViewW;
+	const resultH = curViewH;
 
 	this._resolutionSize.set(resultW / scaleFactor, resultH / scaleFactor);
 
@@ -345,7 +344,7 @@ function shrink() {
 	const resolutionRate = resolutionSize.x / resolutionSize.y;
 	const widthBigger = resolutionRate > screenRate;
 
-	let resultX, resultY, resultW, resultH;
+	let resultW, resultH;
 	if (widthBigger) {
 		resultW = curViewW;
 		resultH = Math.floor(resultW / resolutionRate);
@@ -353,8 +352,8 @@ function shrink() {
 		resultH = curViewH;
 		resultW = Math.floor(resultH * resolutionRate);
 	}
-	resultX = Math.floor((curViewW - resultW) / 2) + curViewX;
-	resultY = Math.floor((curViewH - resultH) / 2) + curViewY;
+	const resultX = Math.floor((curViewW - resultW) / 2) + curViewX;
+	const resultY = Math.floor((curViewH - resultH) / 2) + curViewY;
 
 	this.viewport.set(resultX, resultY, resultW, resultH);
 }
@@ -372,7 +371,7 @@ function expand() {
 	const resolutionRate = resolutionSize.x / resolutionSize.y;
 	const widthBigger = resolutionRate > screenRate;
 
-	let resultX, resultY, resultW, resultH;
+	let resultW, resultH;
 	if (widthBigger) {
 		resultH = curViewH;
 		resultW = Math.floor(resultH * resolutionRate);
@@ -380,8 +379,8 @@ function expand() {
 		resultW = curViewW;
 		resultH = Math.floor(resultW / resolutionRate);
 	}
-	resultX = Math.floor((curViewW - resultW) / 2) + curViewX;
-	resultY = Math.floor((curViewH - resultH) / 2) + curViewY;
+	const resultX = Math.floor((curViewW - resultW) / 2) + curViewX;
+	const resultY = Math.floor((curViewH - resultH) / 2) + curViewY;
 
 	this.viewport.set(resultX, resultY, resultW, resultH);
 }
