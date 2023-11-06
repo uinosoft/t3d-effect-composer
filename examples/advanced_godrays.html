@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>t3d-effect-composer godrays</title>
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <link type="text/css" rel="stylesheet" href="main.css">
+    <style>
+        .top-left-corner {
+            left: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="info">
+        Godrays Effect, press 'i' to show Inspector <br />
+        "Low Poly Forest Campfire" by 
+        <a href="https://sketchfab.com/Minzkraut" target="_blank" rel="noopener">Minzkraut</a>, 
+        <a href="http://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC Attribution</a>
+    </div>
+</body>
+<!-- Import maps polyfill -->
+<!-- Remove this when import maps will be widely supported -->
+<script async src="./libs/es-module-shims.js"></script>
+
+<script type="importmap">
+    {
+        "imports": {
+            "t3d": "./libs/t3d/build/t3d.module.js",
+            "t3d/addons/": "./libs/t3d/examples/jsm/",
+            "t3d-effect-composer": "../build/t3d.effectcomposer.module.js"
+        }
+    }
+</script>
+
+<script type="module">
+    import * as t3d from 't3d';
+    import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 't3d/addons/loaders/glTF/GLTFLoader.js';
+    import { Texture2DLoader } from 't3d/addons/loaders/Texture2DLoader.js';
+
+    import { DefaultEffectComposer } from 't3d-effect-composer';
+    import { GodRaysEffect } from './jsm/godrays/GodRaysEffect.js';
+    import { Inspector } from './jsm/Inspector.js';
+
+    import { GUI } from './libs/lil-gui.esm.min.js';
+    import Stats from './libs/stats.module.js';
+
+    let width = window.innerWidth || 2;
+    let height = window.innerHeight || 2;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    document.body.appendChild(canvas);
+
+    const contextParams = { antialias: false, alpha: false };
+    const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
+    const renderer = new t3d.WebGLRenderer(gl);
+    const backRenderTarget = new t3d.RenderTargetBack(canvas);
+
+    const shadowMapPass = new t3d.ShadowMapPass();
+
+    const effectComposer = new DefaultEffectComposer(width, height, {
+    	samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
+    	webgl2: renderer.capabilities.version > 1,
+    	floatColorBuffer: !!renderer.capabilities.getExtension('EXT_color_buffer_float')
+    });
+    effectComposer.sceneMSAA = false;
+
+    const scene = new t3d.Scene();
+
+    const camera = new t3d.Camera();
+    camera.position.set(-243.39, 121.13, -328.58);
+    camera.setPerspective(30 / 180 * Math.PI, width / height, 10, 1000);
+    scene.add(camera);
+
+    camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.SRGB;
+    effectComposer.getBuffer('SceneBuffer').setOutputEncoding(t3d.TEXEL_ENCODING_TYPE.SRGB);
+
+    const controller = new OrbitControls(camera, canvas);
+    controller.target.set(0, 20, 0);
+    controller.maxDistance = 800;
+
+    const loader = new GLTFLoader();
+    console.time('GLTFLoader');
+
+    loader.load('./resources/gltf/low_poly_forest_campfire.glb')
+    	.then(function(result) {
+    		console.timeEnd('GLTFLoader');
+
+    		const object = result.root;
+
+    		object.scale.set(5, 5, 5);
+
+    		object.traverse(node => {
+    			if (node.material) {
+    				node.castShadow = true;
+    				node.receiveShadow = true;
+    			}
+    		});
+
+    		scene.add(object);
+    	});
+
+    const plane_geometry = new t3d.PlaneGeometry(1000, 1000);
+    const plane_material = new t3d.PBRMaterial();
+    plane_material.diffuse.setHex(0x000000);
+    plane_material.roughness = 0.8;
+    plane_material.metalness = 0.2;
+    const plane = new t3d.Mesh(plane_geometry, plane_material);
+    plane.receiveShadow = true;
+    plane.position.y = -35;
+    scene.add(plane);
+
+    const ambientLight = new t3d.AmbientLight(0xffffff, 0.3);
+    scene.add(ambientLight);
+
+    const lightGroup = new t3d.Object3D();
+    const lightColor = new t3d.Color3(1, 0.88, 0.14);
+
+    scene.add(lightGroup);
+
+    const spotLight = new t3d.SpotLight(0xffffff, 0.5, 500, Math.PI / 6, 0.5);
+    spotLight.name = 'spot';
+    spotLight.color = lightColor;
+    spotLight.euler.y = Math.PI;
+    spotLight.castShadow = true;
+    spotLight.shadow.mapSize.set(1024, 1024);
+    spotLight.shadow.bias = -0.0003;
+    spotLight.shadow.normalBias = 0.2;
+    spotLight.shadow.cameraNear = 10;
+    lightGroup.add(spotLight);
+
+    const pointLight = new t3d.PointLight(0xffffff, 1, 300);
+    pointLight.name = 'point';
+    pointLight.color = lightColor;
+    pointLight.euler.y = Math.PI;
+    pointLight.castShadow = true;
+    pointLight.shadow.mapSize.set(1024, 1024);
+    pointLight.shadow.bias = -0.001;
+    pointLight.shadow.normalBias = 0.2;
+    pointLight.shadow.cameraNear = 0.1;
+    pointLight.visible = false;
+    lightGroup.add(pointLight);
+
+    const directionalLight = new t3d.DirectionalLight(0xffffff, 0.9);
+    directionalLight.name = 'directional';
+    directionalLight.color = lightColor;
+    directionalLight.euler.y = Math.PI;
+    directionalLight.castShadow = true;
+    directionalLight.shadow.windowSize = 200;
+    directionalLight.shadow.mapSize.set(1024, 1024);
+    directionalLight.shadow.bias = -0.001;
+    directionalLight.shadow.normalBias = 0.2;
+    directionalLight.shadow.cameraNear = 0.1;
+    directionalLight.visible = false;
+    lightGroup.add(directionalLight);
+
+    const godRaysEffect = new GodRaysEffect();
+    godRaysEffect.density = 0.01;
+    godRaysEffect.sphereCulling = true;
+    godRaysEffect.distanceAttenuation = 3.5;
+    godRaysEffect.raymarchSteps = 60;
+    godRaysEffect.edgeRadius = 5;
+
+    function switchLight(type) {
+    	lightGroup.children.forEach(light => {
+    		const isCurrent = light.name === type;
+    		if (isCurrent) {
+    			godRaysEffect.light = light;
+    		}
+    		light.visible = isCurrent;
+    	});
+    }
+
+    function setLightPosition(angle) {
+    	lightGroup.position.x = -Math.sin(angle / 180 * Math.PI) * 200;
+    	lightGroup.position.y = 150;
+    	lightGroup.position.z = -Math.cos(angle / 180 * Math.PI) * 200;
+    	lightGroup.lookAt(new t3d.Vector3(0, 26, 0), new t3d.Vector3(0, 1, 0));
+    }
+
+    function setLightColor(color) {
+    	lightColor.fromArray(color);
+    }
+
+    const lightParams = {
+    	type: 'spot',
+    	color: [1, 0.88, 0.14],
+    	angle: 220
+    };
+
+    switchLight(lightParams.type);
+    setLightColor(lightParams.color);
+    setLightPosition(lightParams.angle);
+
+    new Texture2DLoader().loadAsync('./resources/blueNoise.png')
+    	.then(texture => {
+    		texture.wrapS = texture.wrapT = t3d.TEXTURE_WRAP.REPEAT;
+    		godRaysEffect.blueNoise = texture;
+    		godRaysEffect.noiseScale.set(width / 470, height / 470).multiplyScalar(0.2);
+    	});
+
+    effectComposer.addEffect('godrays', godRaysEffect, 90);
+
+    const fxaaEffect = effectComposer.getEffect('FXAA');
+    fxaaEffect.active = true;
+
+    // gui
+
+    const gui = new GUI();
+    const godRaysFolder = gui.addFolder('God Rays');
+    godRaysFolder.add(godRaysEffect, 'active');
+    godRaysFolder.add(godRaysEffect, 'density', 0, 0.03);
+    godRaysFolder.add(godRaysEffect, 'maxDensity', 0, 1);
+    godRaysFolder.add(godRaysEffect, 'distanceAttenuation', 0, 5);
+    godRaysFolder.add(godRaysEffect, 'raymarchSteps', 1, 200, 1);
+    godRaysFolder.add(godRaysEffect, 'edgeStrength', 0, 10, 0.1);
+    godRaysFolder.add(godRaysEffect, 'edgeRadius', 0, 10, 0.1);
+    const blurFolder = gui.addFolder('Blur');
+    blurFolder.add(godRaysEffect, 'blur');
+    blurFolder.add({ blurKernelSize: 'SMALL' }, 'blurKernelSize', [
+    	'VERY_SMALL', 'SMALL', 'MEDIUM', 'LARGE', 'VERY_LARGE', 'HUGE'
+    ]).onChange(value => {
+    	godRaysEffect.setBlurKernelSize(value);
+    });
+    blurFolder.add(godRaysEffect, 'blurVariance', 0.001, 5.5, 0.001);
+    blurFolder.close();
+    const lightFolder = gui.addFolder('Light');
+    lightFolder.add(lightParams, 'type', [
+    	'spot', 'directional', 'point'
+    ]).onChange(switchLight);
+    lightFolder.addColor(lightParams, 'color').onChange(setLightColor);
+    lightFolder.add(lightParams, 'angle', 0, 360, 0.01).onChange(setLightPosition);
+    lightFolder.close();
+
+    const stats = new Stats();
+    stats.dom.style.cssText = 'position:fixed;bottom:0;left:0;cursor:pointer;opacity:0.9;z-index:10000';
+    stats.showPanel(0);
+    document.body.appendChild(stats.dom);
+
+    let inspector;
+    document.addEventListener('keydown', e => {
+    	if (e.keyCode === 73) {
+    		if (!inspector) {
+    			inspector = new Inspector(effectComposer, GUI);
+    			inspector.gui.domElement.classList.add('top-left-corner');
+    		} else {
+    			inspector.destroy();
+    			inspector = null;
+    		}
+    	}
+    });
+
+    function loop(count) {
+    	requestAnimationFrame(loop);
+    	stats.begin();
+
+    	controller.update();
+
+    	scene.updateMatrix();
+    	scene.updateRenderStates(camera);
+    	scene.updateRenderQueue(camera).getLayer(0);
+
+    	shadowMapPass.render(renderer, scene);
+
+    	renderer.setClearColor(0, 0, 0, 1);
+
+    	effectComposer.render(renderer, scene, camera, backRenderTarget);
+
+    	stats.end();
+    }
+    requestAnimationFrame(loop);
+
+    function onWindowResize() {
+    	width = window.innerWidth || 2;
+    	height = window.innerHeight || 2;
+
+    	camera.setPerspective(30 / 180 * Math.PI, width / height, 10, 1000);
+
+    	backRenderTarget.resize(width, height);
+    	effectComposer.resize(width, height);
+
+    	godRaysEffect.noiseScale.set(width / 470, height / 470).multiplyScalar(0.2);
+    }
+    window.addEventListener('resize', onWindowResize, false);
+</script>
+</html>

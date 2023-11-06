@@ -29,7 +29,8 @@
 		"advanced_heightfog",
 		"advanced_sharpness",
 		"advanced_volume",
-		"advanced_skyline"
+		"advanced_skyline",
+		"advanced_godrays"
 	],
 	"debugger": [
 		"debugger_uv"
