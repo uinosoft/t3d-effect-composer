@@ -35,185 +35,191 @@
 </script>
 
 <script type="module">
-    import * as t3d from 't3d';
-    import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
-    import { Texture2DLoader } from 't3d/addons/loaders/Texture2DLoader.js';
-    import { TGALoader } from 't3d/addons/loaders/TGALoader.js';
+	import * as t3d from 't3d';
+	import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
+	import { Texture2DLoader } from 't3d/addons/loaders/Texture2DLoader.js';
+	import { TGALoader } from 't3d/addons/loaders/TGALoader.js';
 
-    import { DefaultEffectComposer } from 't3d-effect-composer';
-    import ThicknessBuffer from './jsm/volume/ThicknessBuffer.js';
-    import VolumeEffect from './jsm/volume/VolumeEffect.js';
+	import { DefaultEffectComposer } from 't3d-effect-composer';
+	import ThicknessBuffer from './jsm/volume/ThicknessBuffer.js';
+	import VolumeEffect from './jsm/volume/VolumeEffect.js';
 
-    import { GUI } from './libs/lil-gui.esm.min.js';
+	import { GUI } from './libs/lil-gui.esm.min.js';
 
-    let width = window.innerWidth || 2;
-    let height = window.innerHeight || 2;
+	let width = window.innerWidth || 2;
+	let height = window.innerHeight || 2;
 
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    document.body.appendChild(canvas);
+	const canvas = document.createElement('canvas');
+	canvas.width = width;
+	canvas.height = height;
+	document.body.appendChild(canvas);
 
-    const contextParams = { antialias: true, alpha: false };
-    const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
-    const renderer = new t3d.WebGLRenderer(gl);
-    const backRenderTarget = new t3d.RenderTargetBack(canvas);
+	const contextParams = { antialias: true, alpha: false };
+	const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
+	const renderer = new t3d.WebGLRenderer(gl);
+	const backRenderTarget = new t3d.RenderTargetBack(canvas);
 
-    const options = {
-    	samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
-    	webgl2: renderer.capabilities.version > 1,
-    	floatColorBuffer: !!renderer.capabilities.getExtension('EXT_color_buffer_float')
-    };
+	const options = {
+		samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
+		webgl2: renderer.capabilities.version > 1,
+		floatColorBuffer: !!renderer.capabilities.getExtension('EXT_color_buffer_float')
+	};
 
-    const effectComposer = new DefaultEffectComposer(width, height, options);
-    effectComposer.getBuffer('SceneBuffer').setOutputEncoding(t3d.TEXEL_ENCODING_TYPE.GAMMA);
-    effectComposer.sceneMSAA = true;
-    effectComposer.getBuffer('GBuffer').setIfRenderReplaceFunction(function normalIfRenderFunction(renderable) {
-    	if (renderable.object.effects && renderable.object.effects['volume'] == 1) {
-    		return false;
-    	}
-    	return true;
-    });
+	const effectComposer = new DefaultEffectComposer(width, height, options);
+	effectComposer.getBuffer('SceneBuffer').setOutputEncoding(t3d.TEXEL_ENCODING_TYPE.GAMMA);
+	effectComposer.sceneMSAA = true;
+	effectComposer.getBuffer('GBuffer').setIfRenderReplaceFunction(function normalIfRenderFunction(renderable) {
+		if (renderable.object.effects && renderable.object.effects['volume'] == 1) {
+			return false;
+		}
+		return true;
+	});
 
-    const scene = new t3d.Scene();
+	const scene = new t3d.Scene();
 
-    const camera = new t3d.Camera();
-    camera.position.set(0, 30, 60);
-    camera.lookAt(new t3d.Vector3(0, 0, 0), new t3d.Vector3(0, 1, 0));
-    camera.setPerspective(45 / 180 * Math.PI, width / height, 0.1, 1000);
-    camera.gammaFactor = 2;
-    camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.GAMMA;
-    scene.add(camera);
+	const camera = new t3d.Camera();
+	camera.position.set(0, 30, 60);
+	camera.lookAt(new t3d.Vector3(0, 0, 0), new t3d.Vector3(0, 1, 0));
+	camera.setPerspective(45 / 180 * Math.PI, width / height, 0.1, 1000);
+	camera.gammaFactor = 2;
+	camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.GAMMA;
+	scene.add(camera);
 
-    const plane = new t3d.Mesh(new t3d.PlaneGeometry(100, 100, 10, 10), new t3d.BasicMaterial());
-    plane.material.diffuse.setHex(0x555555);
-    plane.material.side = t3d.DRAW_SIDE.DOUBLE;
-    plane.position.y = -10;
-    scene.add(plane);
-    
-    const thicknessBuffer = new ThicknessBuffer(width, height, options);
-    effectComposer.addBuffer('ThicknessBuffer', thicknessBuffer);
+	const plane = new t3d.Mesh(new t3d.PlaneGeometry(100, 100, 10, 10), new t3d.BasicMaterial());
+	plane.material.diffuse.setHex(0x555555);
+	plane.material.side = t3d.DRAW_SIDE.DOUBLE;
+	plane.position.y = -10;
+	scene.add(plane);
 
-    const platte = new Texture2DLoader().load('./resources/platte.png');
+	const thicknessBuffer = new ThicknessBuffer(width, height, options);
+	effectComposer.addBuffer('ThicknessBuffer', thicknessBuffer);
 
-    const volumeEffect = new VolumeEffect();
-    volumeEffect.enable = false;
-    volumeEffect.id = 1;
-    volumeEffect.colorRampTexture = platte;
-    effectComposer.addEffect('volumeEffect', volumeEffect, 99);
+	const platte = new Texture2DLoader().load('./resources/platte.png');
 
-    const material = new t3d.BasicMaterial();
-    material.opacity = 0.1;
-    material.transparent = true;
-    const shapes = new Map([
-    	['Box', new t3d.BoxGeometry(20, 20, 20)],
-    	['TorusKnot', new t3d.TorusKnotGeometry(5, 1.5)],
-    	['Cylinder', new t3d.CylinderGeometry(5, 5, 10, 20, 1)]
-    ]);
-    const textures = new Map();
+	const volumeEffect = new VolumeEffect();
+	volumeEffect.enable = false;
+	volumeEffect.id = 1;
+	volumeEffect.colorRampTexture = platte;
+	effectComposer.addEffect('volumeEffect', volumeEffect, 99);
 
-    Promise.all([
-    	new Texture2DLoader().loadAsync('./resources/heart.raw.png'),
-    	new Texture2DLoader().loadAsync('./resources/teapot.raw.png'),
-    	new TGALoader().loadAsync('./resources/perlworlnoise.tga')
-    ]).then(result => {
-    	result[0].format = t3d.PIXEL_FORMAT.ALPHA;
-    	result[0].generateMipmaps = false;
-    	result[0].minFilter = t3d.TEXTURE_FILTER.LINEAR;
-    	result[0].magFilter = t3d.TEXTURE_FILTER.LINEAR;
+	const material = new t3d.BasicMaterial();
+	material.opacity = 0.1;
+	material.transparent = true;
+	const shapes = new Map([
+		['Box', new t3d.BoxGeometry(20, 20, 20)],
+		['TorusKnot', new t3d.TorusKnotGeometry(5, 1.5)],
+		['Cylinder', new t3d.CylinderGeometry(5, 5, 10, 20, 1)]
+	]);
+	const textures = new Map();
 
-    	result[1].format = t3d.PIXEL_FORMAT.ALPHA;
-    	result[1].generateMipmaps = false;
-    	result[1].minFilter = t3d.TEXTURE_FILTER.LINEAR;
-    	result[1].magFilter = t3d.TEXTURE_FILTER.LINEAR;
-    
-    	const texture3d = new t3d.Texture3D();
-    	texture3d.image = {
-    		data: new Uint8Array(result[2].data),
-    		width: 128,
-    		height: 128,
-    		depth: 128
-    	};
-    	texture3d.magFilter = t3d.TEXTURE_FILTER.LINEAR;
-    	texture3d.minFilter = t3d.TEXTURE_FILTER.LINEAR;
-    	texture3d.wrapS = t3d.TEXTURE_WRAP.REPEAT;
-    	texture3d.wrapT = t3d.TEXTURE_WRAP.REPEAT;
-    	texture3d.wrapR = t3d.TEXTURE_WRAP.REPEAT;
-    	texture3d.format = t3d.PIXEL_FORMAT.RGBA;
-    	texture3d.internalFormat = t3d.PIXEL_FORMAT.RGA8;
-    	return [result[0], result[1], texture3d];
-    }).then(_textures => {
-    	textures.set('heart', _textures[0]);
-    	textures.set('teapot', _textures[1]);
-    	textures.set('perlworlnoise', _textures[2]);
-    }).then(() => {
-    	const volumeMesh = new t3d.Mesh(undefined, material);
-    	volumeMesh.effects = { volume: 1 };
-    	volumeMesh.volumeid = 1;
-    	scene.add(volumeMesh);
-    
-    	const params = {
-    		shape: 'Box',
-    		texture: 'heart',
-    		size: 10,
-    		offsetZ: 0
-    	};
+	let volumeMesh, params;
 
-    	function refreshVolumeObject() {
-    		const shape = shapes.get(params.shape);
-    		const texture = textures.get(params.texture);
+	Promise.all([
+		new Texture2DLoader().loadAsync('./resources/heart.raw.png'),
+		new Texture2DLoader().loadAsync('./resources/teapot.raw.png'),
+		new TGALoader().loadAsync('./resources/perlworlnoise.tga')
+	]).then(result => {
+		result[0].format = t3d.PIXEL_FORMAT.ALPHA;
+		result[0].generateMipmaps = false;
+		result[0].minFilter = t3d.TEXTURE_FILTER.LINEAR;
+		result[0].magFilter = t3d.TEXTURE_FILTER.LINEAR;
 
-    		volumeMesh.geometry = shape;
+		result[1].format = t3d.PIXEL_FORMAT.ALPHA;
+		result[1].generateMipmaps = false;
+		result[1].minFilter = t3d.TEXTURE_FILTER.LINEAR;
+		result[1].magFilter = t3d.TEXTURE_FILTER.LINEAR;
 
-    		volumeEffect.volumeTexture = texture;
-    		volumeEffect.enable = true;
+		const texture3d = new t3d.Texture3D();
+		texture3d.image = {
+			data: new Uint8Array(result[2].data),
+			width: 128,
+			height: 128,
+			depth: 128
+		};
+		texture3d.magFilter = t3d.TEXTURE_FILTER.LINEAR;
+		texture3d.minFilter = t3d.TEXTURE_FILTER.LINEAR;
+		texture3d.wrapS = t3d.TEXTURE_WRAP.REPEAT;
+		texture3d.wrapT = t3d.TEXTURE_WRAP.REPEAT;
+		texture3d.wrapR = t3d.TEXTURE_WRAP.REPEAT;
+		texture3d.format = t3d.PIXEL_FORMAT.RGBA;
+		texture3d.internalFormat = t3d.PIXEL_FORMAT.RGA8;
+		return [result[0], result[1], texture3d];
+	}).then(_textures => {
+		textures.set('heart', _textures[0]);
+		textures.set('teapot', _textures[1]);
+		textures.set('perlworlnoise', _textures[2]);
+	}).then(() => {
+		volumeMesh = new t3d.Mesh(undefined, material);
+		volumeMesh.effects = { volume: 1 };
+		volumeMesh.volumeid = 1;
+		scene.add(volumeMesh);
 
-    		const boxQuaternion = new t3d.Quaternion();
-    		const boxOffset = new t3d.Vector3(0, 0, params.offsetZ);
-    		const anchorSize = new t3d.Vector3(params.size, params.size, params.size);
+		params = {
+			shape: 'Box',
+			texture: 'heart',
+			size: 20,
+			offsetZ: 0
+		};
 
-    		volumeEffect.boxMatrix.transform(boxOffset, anchorSize, boxQuaternion);
-    	}
-    	refreshVolumeObject();
+		function refreshVolumeObject() {
+			volumeMesh.geometry = shapes.get(params.shape);
+			volumeEffect.volumeTexture = textures.get(params.texture);
+		}
 
-    	const gui = new GUI();
+		volumeEffect.enable = true;
+		refreshVolumeObject();
 
-    	gui.add(params, 'shape', Array.from(shapes.keys())).onChange(refreshVolumeObject);
-    	gui.add(params, 'texture', Array.from(textures.keys())).onChange(refreshVolumeObject);
-    	gui.add(params, 'size', 0.1, 20, 0.01).onChange(refreshVolumeObject);
-    	gui.add(params, 'offsetZ', -10, 10, 0.1).onChange(refreshVolumeObject);
-    	gui.add(volumeEffect, 'alphaCorrection', 0, 1, 0.01);
-    	gui.add(volumeEffect, 'opacity', 0, 1, 0.01);
-    	gui.add(volumeEffect, 'mixType', { normal: 0, additive: 1 });
-    	gui.add(material, 'colorWrite').name('showShape');
-    });
-    
-    const controller = new OrbitControls(camera, canvas);
+		const gui = new GUI();
 
-    function loop(count) {
-    	requestAnimationFrame(loop);
+		gui.add(params, 'shape', Array.from(shapes.keys())).onChange(refreshVolumeObject);
+		gui.add(params, 'texture', Array.from(textures.keys())).onChange(refreshVolumeObject);
+		gui.add(params, 'size', 0.1, 20, 0.01);
+		gui.add(params, 'offsetZ', -10, 10, 0.1);
+		gui.add(volumeEffect, 'alphaCorrection', 0, 1, 0.01);
+		gui.add(volumeEffect, 'opacity', 0, 1, 0.01);
+		gui.add(volumeEffect, 'mixType', { normal: 0, additive: 1 });
+		gui.add(material, 'colorWrite').name('showShape');
+	});
 
-    	controller.update();
+	const controller = new OrbitControls(camera, canvas);
 
-    	scene.updateMatrix();
-    	scene.updateRenderStates(camera);
-    	scene.updateRenderQueue(camera);
-    
-    	renderer.setClearColor(0.2, 0.2, 0.2, 1);
-    	effectComposer.render(renderer, scene, camera, backRenderTarget);
-    }
-    requestAnimationFrame(loop);
+	const offsetQuaternion = new t3d.Quaternion();
+	const offsetScale = new t3d.Vector3(1, 1, 1);
+	const offsetTranslation = new t3d.Vector3(0, 0, 0);
 
-    function onWindowResize() {
-    	width = window.innerWidth || 2;
-    	height = window.innerHeight || 2;
+	function loop(count) {
+		requestAnimationFrame(loop);
 
-    	camera.setPerspective(45 / 180 * Math.PI, width / height, 0.1, 1000);
+		controller.update();
 
-    	backRenderTarget.resize(width, height);
-    	effectComposer.resize(width, height);
-    }
-    window.addEventListener('resize', onWindowResize, false);
+		scene.updateMatrix();
+		scene.updateRenderStates(camera);
+		scene.updateRenderQueue(camera);
+
+		if (volumeMesh) {
+			offsetScale.set(params.size, params.size, params.size);
+			offsetTranslation.set(0, 0, params.offsetZ);
+
+			// BoxMatrix = MeshWorldMatrix * OffsetMatrix
+			volumeEffect.boxMatrix.transform(offsetTranslation, offsetScale, offsetQuaternion);
+			volumeEffect.boxMatrix.premultiply(volumeMesh.worldMatrix);
+		}
+
+		renderer.setClearColor(0.2, 0.2, 0.2, 1);
+		effectComposer.render(renderer, scene, camera, backRenderTarget);
+	}
+	requestAnimationFrame(loop);
+
+	function onWindowResize() {
+		width = window.innerWidth || 2;
+		height = window.innerHeight || 2;
+
+		camera.setPerspective(45 / 180 * Math.PI, width / height, 0.1, 1000);
+
+		backRenderTarget.resize(width, height);
+		effectComposer.resize(width, height);
+	}
+	window.addEventListener('resize', onWindowResize, false);
 </script>
 
 </html>

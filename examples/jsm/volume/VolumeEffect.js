@@ -31,8 +31,8 @@ export default class VolumeEffect extends Effect {
 		// 0: Normal, 1: Additive
 		this.mixType = 0;
 
-		// the box region of the volume in world space
-		// means the volume is rendered in the box region
+		// the box region matrix of the volume in world space
+		// means the volume data is rendered in the box region
 		this.boxMatrix = new Matrix4();
 
 		this._mainPass = new ShaderPostPass(volumeShader);
@@ -76,8 +76,8 @@ export default class VolumeEffect extends Effect {
 		mainPass.material.uniforms.opacity = this.opacity;
 		mainPass.material.uniforms.mixType = this.mixType;
 
-		this.boxMatrix.toArray(mainPass.material.uniforms.boxMatrix);
-
+		boxMatrixInverse.copy(this.boxMatrix).inverse();
+		boxMatrixInverse.toArray(mainPass.material.uniforms.boxMatrixInverse);
 		const isTexture3D = !!(this.volumeTexture && this.volumeTexture.isTexture3D);
 		if (isTexture3D !== mainPass.material.defines.TEXTURETYPE_3D) {
 			mainPass.material.defines.TEXTURETYPE_3D = isTexture3D;
@@ -103,6 +103,7 @@ export default class VolumeEffect extends Effect {
 const projection = new Matrix4();
 const ProjViewInverse = new Matrix4();
 const view = new Matrix4();
+const boxMatrixInverse = new Matrix4();
 
 const volumeShader = {
 	defines: {
@@ -123,7 +124,7 @@ const volumeShader = {
 		projection: new Float32Array(16),
 		ProjViewInverse: new Float32Array(16),
 		view: new Float32Array(16),
-		boxMatrix: new Float32Array(16),
+		boxMatrixInverse: new Float32Array(16),
 
 		cameraPos: [0, 0, 0],
 		near: 0.1,
@@ -146,8 +147,8 @@ const volumeShader = {
     uniform mat4 projection;
     uniform mat4 ProjViewInverse;
     uniform mat4 view;
-    uniform mat4 boxMatrix;
- 
+	uniform mat4 boxMatrixInverse;
+
     uniform float near;
     uniform float far;
     uniform float id;
@@ -164,9 +165,8 @@ const volumeShader = {
 
     vec4 getColor(float intensity) {
         // makes the volume looks brighter;
-    	intensity = min(0.46, intensity) / 0.46;
     	vec2 _uv = vec2(intensity, 0);
-        vec4 color = vec4(1.0);
+		vec4 color = texture2D(colorRampTexture, _uv);
     	float alpha = intensity;
     	if (alpha < 0.03) {
     		alpha = 0.01;
@@ -178,16 +178,17 @@ const volumeShader = {
         uniform sampler3D volumeTexture;
 
         vec4 sampleAs3DTexture(vec3 texCoord) {
-            // texCoord += vec3(0.5);
-            vec4 color = texture(volumeTexture, texCoord);
-            color.a = color.a / float(MAX_ITERATION);
-            return color;
+            texCoord += vec3(0.5);
+           
+            return getColor(texture(volumeTexture, texCoord).r);
         }
     #else 
         uniform sampler2D volumeTexture;
 
         // Acts like a texture3D using Z slices and trilinear filtering.
         vec4 sampleAs3DTexture( vec3 texCoord ) {
+			texCoord += vec3(0.5);
+
             vec2 uvL = texCoord.xy / vec2(ZSLICEX , ZSLICEY);
             texCoord.z = texCoord.z * float(ZSLICENUM) / float(ZSLICEX * ZSLICEY);
             float number = floor(texCoord.z * float(ZSLICEX * ZSLICEY));
@@ -241,9 +242,6 @@ const volumeShader = {
 
         vec3 point = boxFrontPos.xyz / boxFrontPos.w;
 
-        vec4 boxPosition = boxMatrix * vec4(0., 0., 0., 1.);
-        vec4 boxRange = boxMatrix * vec4(1., 1., 1., 0.);
-
         if(backDepth < frontDepth ||  frontDepth > backDepth){
             point = cameraPos;
             dist = length(cameraPos.xyz - boxBackPos.xyz / boxBackPos.w);
@@ -263,7 +261,7 @@ const volumeShader = {
                 break;
             }
   
-            vec3 rayPosObject = (point - boxPosition.xyz + vec3(boxRange.x, boxRange.y, boxRange.z) ) / (boxRange.xyz * 2.);
+			vec3 rayPosObject = (boxMatrixInverse * vec4(point ,1.0)).xyz;
 
             colorSum = sampleAs3DTexture(rayPosObject); 
             alphaSample = colorSum.a;
