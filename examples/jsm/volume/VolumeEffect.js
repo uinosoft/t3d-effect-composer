@@ -21,8 +21,14 @@ export default class VolumeEffect extends Effect {
 		// the color ramp texture
 		this.colorRampTexture = null;
 
-		// alphaCorrection is used to discard the transparent part of the volume
-		this.alphaCorrection = 0;
+		// unitDistanceOpacity is accumulated value of transparency per unit distance
+		this.unitDistanceOpacity = 1.0;
+
+		// whether data values affect opacity
+		this.valueAffectsOpacity = true;
+
+		// alphaThreshold is used to discard the transparent part of the volume
+		this.alphaThreshold = 0;
 
 		// the opacity of the volume
 		this.opacity = 1;
@@ -72,15 +78,22 @@ export default class VolumeEffect extends Effect {
 		mainPass.material.uniforms.colorRampTexture = this.colorRampTexture;
 		mainPass.material.uniforms.near = gBufferRenderStates.camera.near;
 		mainPass.material.uniforms.far = gBufferRenderStates.camera.far;
-		mainPass.material.uniforms.alphaCorrection = this.alphaCorrection;
-		mainPass.material.uniforms.opacity = this.opacity;
-		mainPass.material.uniforms.mixType = this.mixType;
 
+		mainPass.material.uniforms.unitDistanceOpacity = this.unitDistanceOpacity;
+		mainPass.material.uniforms.opacity = this.opacity;
+		mainPass.material.uniforms.alphaThreshold = this.alphaThreshold;
+		mainPass.material.uniforms.mixType = this.mixType;
 		boxMatrixInverse.copy(this.boxMatrix).inverse();
 		boxMatrixInverse.toArray(mainPass.material.uniforms.boxMatrixInverse);
+
 		const isTexture3D = !!(this.volumeTexture && this.volumeTexture.isTexture3D);
 		if (isTexture3D !== mainPass.material.defines.TEXTURETYPE_3D) {
 			mainPass.material.defines.TEXTURETYPE_3D = isTexture3D;
+			mainPass.material.needsUpdate = true;
+		}
+
+		if (this.valueAffectsOpacity !== mainPass.material.defines.VALUE_OPACITY) {
+			mainPass.material.defines.VALUE_OPACITY = this.valueAffectsOpacity;
 			mainPass.material.needsUpdate = true;
 		}
 
@@ -111,31 +124,40 @@ const volumeShader = {
 		ZSLICENUM: 256,
 		ZSLICEX: 16,
 		ZSLICEY: 16,
-		TEXTURETYPE_3D: false
+		TEXTURETYPE_3D: false,
+		VALUE_OPACITY: true
 	},
 	uniforms: {
-		volumeTexture: null,
+		id: 1,
+
 		depthTex: null,
 		backDepthTex: null,
 		frontDepthTex: null,
+
+		volumeTexture: null,
 		diffuseTex: null,
 		colorRampTexture: null,
-		id: 1,
+
 		projection: new Float32Array(16),
 		ProjViewInverse: new Float32Array(16),
 		view: new Float32Array(16),
-		boxMatrixInverse: new Float32Array(16),
 
 		cameraPos: [0, 0, 0],
 		near: 0.1,
 		far: 1000,
+
+		unitDistanceOpacity: 1.0,
 		opacity: 1,
-		mixType: 0
+		alphaThreshold: 0,
+		mixType: 0,
+		boxMatrixInverse: new Float32Array(16)
 	},
 
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
     precision highp sampler3D;
+
+	uniform float id;
 
     uniform sampler2D depthTex;
     uniform sampler2D backDepthTex;
@@ -147,16 +169,17 @@ const volumeShader = {
     uniform mat4 projection;
     uniform mat4 ProjViewInverse;
     uniform mat4 view;
-	uniform mat4 boxMatrixInverse;
-
+	
+	uniform vec3 cameraPos;
     uniform float near;
     uniform float far;
-    uniform float id;
-    uniform float alphaCorrection;
-    uniform float opacity;
+    
+	uniform float unitDistanceOpacity;
+	uniform float opacity;
+    uniform float alphaThreshold;
     uniform float mixType;
+	uniform mat4 boxMatrixInverse;
 
-    uniform vec3 cameraPos;
     varying vec2 v_Uv;
 
     float linearizeDepth(float depth) {
@@ -164,14 +187,8 @@ const volumeShader = {
     }
 
     vec4 getColor(float intensity) {
-        // makes the volume looks brighter;
-    	vec2 _uv = vec2(intensity, 0);
-		vec4 color = texture2D(colorRampTexture, _uv);
-    	float alpha = intensity;
-    	if (alpha < 0.03) {
-    		alpha = 0.01;
-    	}
-    	return vec4(color.r, color.g, color.b, alpha);
+		vec4 color = texture2D(colorRampTexture, vec2(intensity, 0.5));
+    	return vec4(color.rgb, intensity);
     }
 
     #ifdef TEXTURETYPE_3D
@@ -186,7 +203,7 @@ const volumeShader = {
         uniform sampler2D volumeTexture;
 
         // Acts like a texture3D using Z slices and trilinear filtering.
-        vec4 sampleAs3DTexture( vec3 texCoord ) {
+        vec4 sampleAs3DTexture(vec3 texCoord) {
 			texCoord += vec3(0.5);
 
             vec2 uvL = texCoord.xy / vec2(ZSLICEX , ZSLICEY);
@@ -194,9 +211,8 @@ const volumeShader = {
             float number = floor(texCoord.z * float(ZSLICEX * ZSLICEY));
             vec2 uuv;
             uuv = uvL + vec2( mod(number, float(ZSLICEX)) / float(ZSLICEX) , floor((float(ZSLICEX * ZSLICEY - 1) - number ) / float(ZSLICEY)) / float(ZSLICEY));
-            vec4 colorSlice1 = texture2D( volumeTexture, uuv );
-            colorSlice1.rgb = texture2D( colorRampTexture, vec2( colorSlice1.a, 0.5)).rgb;
-            return colorSlice1;
+
+			return getColor(texture2D(volumeTexture, uuv).a);
         }
     #endif
 
@@ -209,14 +225,12 @@ const volumeShader = {
         float frontDepth = texture2D(frontDepthTex, v_Uv).r;
         
         if(backDepth > 0.99999) {
-            gl_FragColor = vec4(diffuseColor.rgb, 1.0); 
+            gl_FragColor = diffuseColor; 
             return;
         }
         
-        if(int(id) == int(texId)) {
-            gl_FragColor = vec4(0.,0.,0. , 1.0);
-        } else {
-            gl_FragColor = vec4(diffuseColor.rgb , 1.0); 
+        if(int(id) != int(texId)) {
+            gl_FragColor = diffuseColor; 
             return;
         }
    
@@ -242,11 +256,13 @@ const volumeShader = {
 
         vec3 point = boxFrontPos.xyz / boxFrontPos.w;
 
-        if(backDepth < frontDepth ||  frontDepth > backDepth){
+        if(backDepth < frontDepth ||  frontDepth > backDepth) {
             point = cameraPos;
             dist = length(cameraPos.xyz - boxBackPos.xyz / boxBackPos.w);
             step = direction * dist / float(MAX_ITERATION);  
         }
+
+		float unitOpacity = unitDistanceOpacity * length(step);
 
         // ray marching
         for(int i = 0; i < MAX_ITERATION; i++) {
@@ -264,13 +280,19 @@ const volumeShader = {
 			vec3 rayPosObject = (boxMatrixInverse * vec4(point ,1.0)).xyz;
 
             colorSum = sampleAs3DTexture(rayPosObject); 
-            alphaSample = colorSum.a;
+
+			alphaSample = unitOpacity;
+			#ifdef VALUE_OPACITY
+				alphaSample *= colorSum.a;
+			#endif
+
+			// blend to accumulated color
             alphaSample *= (1.0 - accumulatedAlpha);
             accumulatedColor += colorSum * alphaSample;
             accumulatedAlpha += alphaSample;
         }
 
-        if(alphaCorrection > accumulatedAlpha){
+        if(alphaThreshold > accumulatedAlpha){
             gl_FragColor = diffuseColor;
             return;
         }

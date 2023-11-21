@@ -165,7 +165,7 @@
 			volumeMesh.geometry = shapes.get(params.shape);
 			volumeEffect.volumeTexture = textures.get(params.texture);
 		}
-
+		volumeEffect.unitAlphaCorrection = 2.0;
 		volumeEffect.enable = true;
 		refreshVolumeObject();
 
@@ -175,9 +175,12 @@
 		gui.add(params, 'texture', Array.from(textures.keys())).onChange(refreshVolumeObject);
 		gui.add(params, 'size', 0.1, 20, 0.01);
 		gui.add(params, 'offsetZ', -10, 10, 0.1);
-		gui.add(volumeEffect, 'alphaCorrection', 0, 1, 0.01);
+		gui.add(volumeEffect, 'alphaThreshold', 0, 1, 0.01);
+		gui.add(volumeEffect, 'unitDistanceOpacity', 0, 2, 0.01);
 		gui.add(volumeEffect, 'opacity', 0, 1, 0.01);
 		gui.add(volumeEffect, 'mixType', { normal: 0, additive: 1 });
+		gui.add(volumeEffect, 'valueAffectsOpacity');
+
 		gui.add(material, 'colorWrite').name('showShape');
 	});
 
