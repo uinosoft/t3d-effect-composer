@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>t3d-effect-composer</title>
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"/>
+	<link type="text/css" rel="stylesheet" href="main.css" />
+	<style>
+		.top-left-corner {
+			left: 15px;
+		}
+	</style>
+</head>
+
+<body>
+	<div id="container"></div>
+	<div id="info">Transition Effect</div>
+</body>
+
+<!-- Import maps polyfill -->
+<!-- Remove this when import maps will be widely supported -->
+<script async src="./libs/es-module-shims.js"></script>
+
+<script type="importmap">
+	{
+		"imports": {
+		"t3d": "./libs/t3d/build/t3d.module.js",
+		"t3d/addons/": "./libs/t3d/examples/jsm/",
+		"t3d-effect-composer": "../build/t3d.effectcomposer.module.js"
+		}
+	}
+</script>
+
+<script type="module">
+	import * as t3d from 't3d';
+	import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
+	import { GridHelper } from 't3d/addons/objects/GridHelper.js';
+	import { Clock } from 't3d/addons/Clock.js';
+
+	import { DefaultEffectComposer } from 't3d-effect-composer';
+	import { TransitionEffect } from './jsm/TransitionEffect.js';
+
+	import { GUI } from './libs/lil-gui.esm.min.js';
+	import Stats from './libs/stats.module.js';
+
+	let width = window.innerWidth || 2;
+	let height = window.innerHeight || 2;
+
+	const canvas = document.createElement('canvas');
+	canvas.width = width;
+	canvas.height = height;
+	document.body.appendChild(canvas);
+
+	const contextParams = { antialias: true, alpha: false, stencil: false };
+	const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
+	const renderer = new t3d.WebGLRenderer(gl);
+	const backRenderTarget = new t3d.RenderTargetBack(canvas);
+
+	const effectComposer = new DefaultEffectComposer(width, height, {
+		samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
+		webgl2: renderer.capabilities.version > 1,
+		floatColorBuffer: !!renderer.capabilities.getExtension('EXT_color_buffer_float')
+	});
+
+	effectComposer.getBuffer('SceneBuffer').setOutputEncoding(t3d.TEXEL_ENCODING_TYPE.SRGB);
+	effectComposer.sceneMSAA = true;
+
+	const scene = new t3d.Scene();
+
+	const camera = new t3d.Camera();
+	camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.SRGB;
+	camera.position.set(-100, 40, 100);
+	camera.lookAt(new t3d.Vector3(0, 0, 0), new t3d.Vector3(0, 1, 0));
+	camera.setPerspective((45 / 180) * Math.PI, width / height, 1, 5000);
+	scene.add(camera);
+	
+	const controller = new OrbitControls(camera, canvas);
+
+	const material = new t3d.BasicMaterial();
+	material.diffuse.setHSL(0.6, 1.0, 0.3);
+
+	const sphere_geometry = new t3d.SphereGeometry(15, 32, 16);
+	const sphere = new t3d.Mesh(sphere_geometry, material);
+	scene.add(sphere);
+
+	const box_geometry = new t3d.BoxGeometry(20, 20, 20);
+	const box = new t3d.Mesh(box_geometry, material);
+	box.visible = false;
+	scene.add(box);
+
+	const grid = new GridHelper(100, 10, 0x85a4d7, 0x222222);
+	grid.position.y = -15;
+	scene.add(grid);
+
+	const transitionEffect = new TransitionEffect(width, height);
+	transitionEffect.type = 1;
+	effectComposer.addEffect('transition', transitionEffect, 99);
+
+	let startSwitch = false;
+
+	const params = { speed: 1.0 };
+
+	const gui = new GUI();
+	gui.add(transitionEffect, 'type', { 'blend': 0, 'zoom': 1 });
+	gui.add(params, 'speed', 0, 2);
+	gui.add({
+		switch: () => {
+			transitionEffect.progress = 0;
+			startSwitch = true;
+		}
+	}, 'switch');
+
+	const stats = new Stats();
+	stats.dom.style.cssText = 'position:fixed;bottom:0;left:0;cursor:pointer;opacity:0.9;z-index:10000';
+	stats.showPanel(0);
+	document.body.appendChild(stats.dom);
+
+	const clock = new Clock();
+	function loop(count) {
+		requestAnimationFrame(loop);
+
+		stats.begin();
+		controller.update();
+
+		const deltaTime = clock.getDelta();
+
+		scene.updateMatrix();
+		scene.updateRenderStates(camera);
+		scene.updateRenderQueue(camera).getLayer(0);
+
+		renderer.setClearColor(0, 0, 0, 1);
+
+		effectComposer.render(renderer, scene, camera, backRenderTarget);
+
+		if (transitionEffect.progress < 1) {
+			transitionEffect.progress += deltaTime * params.speed;
+			transitionEffect.progress = Math.min(transitionEffect.progress, 1);
+		}
+
+		if (startSwitch) {
+			material.diffuse.setHSL(Math.random(), 1.0, 0.3);
+			sphere.visible = !sphere.visible;
+			box.visible = !box.visible;
+			startSwitch = false;
+		}
+
+		stats.end();
+	}
+	requestAnimationFrame(loop);
+
+	function onWindowResize() {
+		width = window.innerWidth || 2;
+		height = window.innerHeight || 2;
+
+		camera.setPerspective((45 / 180) * Math.PI, width / height, 1, 5000);
+
+		backRenderTarget.resize(width, height);
+		effectComposer.resize(width, height);
+	}
+	window.addEventListener('resize', onWindowResize, false);
+</script>
+</html>

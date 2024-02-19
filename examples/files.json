@@ -4,7 +4,8 @@
 		"effect_transparent",
 		"effect_taa",
 		"effect_tonemapping",
-		"effect_ssao"
+		"effect_ssao",
+		"effect_transition"
 	],
 	"layer": [
 		"layer_all",
