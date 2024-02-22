@@ -1,13 +1,17 @@
-import { Mesh, Geometry, BasicMaterial, DRAW_MODE, Attribute, Buffer } from 't3d';
+import { Mesh, Geometry, BasicMaterial, DRAW_MODE, BLEND_TYPE, Attribute, Buffer } from 't3d';
 
 class OctreeHelper extends Mesh {
 
-	constructor(color = 0xffff00) {
+	constructor(color = 0x000900) {
 		const geometry = new Geometry();
 
 		const material = new BasicMaterial();
 		material.drawMode = DRAW_MODE.LINES;
+		material.transparent = true;
+		material.blending = BLEND_TYPE.ADD;
 		material.diffuse.setHex(color);
+		material.envMap = undefined;
+		material.fog = false;
 
 		super(geometry, material);
 	}
@@ -17,6 +21,8 @@ class OctreeHelper extends Mesh {
 
 		const traverse = tree => {
 			for (let i = 0; i < tree.length; i++) {
+				if (tree[i].isEmpty()) continue;
+
 				const min = tree[i].box.min;
 				const max = tree[i].box.max;
 

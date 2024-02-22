@@ -4,179 +4,6 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 /**
- * Base class for property track.
- * @memberof t3d
- * @abstract
- */
-class KeyframeTrack {
-
-	/**
-	 * @param {t3d.Object3D} target
-	 * @param {String} propertyPath
-	 * @param {Array} times
-	 * @param {Array} values
-	 * @param {Boolean} [interpolant=true]
-	 */
-	constructor(target, propertyPath, times, values, interpolant = true) {
-		this.target = target;
-		this.propertyPath = propertyPath;
-
-		this.name = this.target.uuid + '.' + propertyPath;
-
-		this.times = times;
-		this.values = values;
-
-		this.valueSize = values.length / times.length;
-
-		this.interpolant = interpolant;
-	}
-
-	getValue(t, outBuffer) {
-		const times = this.times,
-			tl = times.length;
-
-		if (t <= times[0]) {
-			return this._copyValue(0, outBuffer);
-		} else if (t >= times[tl - 1]) {
-			return this._copyValue(tl - 1, outBuffer);
-		}
-
-		// TODO optimize
-		// https://github.com/mrdoob/three.js/blob/dev/src/math/Interpolant.js
-		let i0 = tl - 1;
-		while (t < times[i0] && i0 > 0) {
-			i0--;
-		}
-
-		const ratio = (t - times[i0]) / (times[i0 + 1] - times[i0]);
-		return this._interpolate(i0, ratio, outBuffer);
-	}
-
-	_interpolate(index0, ratio, outBuffer) {
-		const values = this.values,
-			valueSize = this.valueSize;
-
-		let value1, value2;
-
-		for (let i = 0; i < valueSize; i++) {
-			value1 = values[index0 * valueSize + i];
-			value2 = values[(index0 + 1) * valueSize + i];
-
-			if (this.interpolant) {
-				if (value1 !== undefined && value2 !== undefined) {
-					outBuffer[i] = value1 * (1 - ratio) + value2 * ratio;
-				} else {
-					outBuffer[i] = value1;
-				}
-			} else {
-				outBuffer[i] = value1;
-			}
-		}
-
-		return outBuffer;
-	}
-
-	_copyValue(index, outBuffer) {
-		const values = this.values,
-			valueSize = this.valueSize,
-			offset = valueSize * index;
-
-		for (let i = 0; i < valueSize; i++) {
-			outBuffer[i] = values[offset + i];
-		}
-
-		return outBuffer;
-	}
-
-}
-
-/**
- * Used for boolean property track.
- * @memberof t3d
- * @extends t3d.KeyframeTrack
- */
-class BooleanKeyframeTrack extends KeyframeTrack {
-
-	/**
-	 * @param {t3d.Object3D} target
-	 * @param {String} propertyPath
-	 * @param {Array} times
-	 * @param {Array} values
-	 * @param {Boolean} [interpolant=true]
-	 */
-	constructor(target, propertyPath, times, values, interpolant) {
-		super(target, propertyPath, times, values, interpolant);
-	}
-
-	_interpolate(index0, _ratio, outBuffer) {
-		outBuffer[0] = this.values[index0];
-		return outBuffer;
-	}
-
-}
-
-/**
- * @readonly
- * @type {String}
- * @default 'bool'
- */
-BooleanKeyframeTrack.prototype.valueTypeName = 'bool';
-
-/**
- * Used for color property track.
- * @memberof t3d
- * @extends t3d.KeyframeTrack
- */
-class ColorKeyframeTrack extends KeyframeTrack {
-
-	/**
-	 * @param {t3d.Object3D} target
-	 * @param {String} propertyPath
-	 * @param {Array} times
-	 * @param {Array} values
-	 * @param {Boolean} [interpolant=true]
-	 */
-	constructor(target, propertyPath, times, values, interpolant) {
-		super(target, propertyPath, times, values, interpolant);
-	}
-
-}
-
-/**
- * @readonly
- * @type {String}
- * @default 'color'
- */
-ColorKeyframeTrack.prototype.valueTypeName = 'color';
-
-/**
- * Used for number property track.
- * @memberof t3d
- * @extends t3d.KeyframeTrack
- */
-class NumberKeyframeTrack extends KeyframeTrack {
-
-	/**
-	 * @param {t3d.Object3D} target
-	 * @param {String} propertyPath
-	 * @param {Array} times
-	 * @param {Array} values
-	 * @param {Boolean} [interpolant=true]
-	 */
-	constructor(target, propertyPath, times, values, interpolant) {
-		super(target, propertyPath, times, values, interpolant);
-	}
-
-}
-
-/**
- * @readonly
- * @type {String}
- * @default 'number'
- */
-NumberKeyframeTrack.prototype.valueTypeName = 'number';
-
-/**
  * The vector 3 class.
  * @memberof t3d
  */
@@ -1966,6 +1793,366 @@ class Quaternion {
 }
 
 /**
+ * Interpolant serves as the base class for all interpolation algorithms.
+ * It defines a set of static methods that are intended to be invoked by a keyframe track for the purpose of interpolation.
+ * @memberof t3d
+ * @abstract
+ */
+class KeyframeInterpolant {
+
+	/**
+	 * Get the value size for keyframe values.
+	 * @return {Number} - the value size.
+	 */
+	static getValueSize() {
+		return this.values.length / this.times.length;
+	}
+
+	/**
+	 * Interpolate the value for the specified time.
+	 * @param {Number} index0 - the index of the first keyframe.
+	 * @param {Number} ratio - the ratio (0-1) of the time passed between the first keyframe and the next keyframe.
+	 * @param {Number} duration - the duration time between the first keyframe and the next keyframe.
+	 * @param {Array} outBuffer - the output buffer to store the interpolated value.
+	 * @return {Array} - the output buffer to store the interpolated value.
+	 */
+	static interpolate(index0, ratio, duration, outBuffer) {
+		throw new Error('Interpolant: call to abstract method');
+	}
+
+	/**
+	 * Copy the value for the specified index.
+	 * @param {Number} index - the index of the keyframe.
+	 * @param {Array} outBuffer - the output buffer to store the copied value.
+	 * @return {Array} - the output buffer to store the copied value.
+	 */
+	static copyValue(index, outBuffer) {
+		const values = this.values,
+			valueSize = this.valueSize,
+			offset = valueSize * index;
+
+		for (let i = 0; i < valueSize; i++) {
+			outBuffer[i] = values[offset + i];
+		}
+
+		return outBuffer;
+	}
+
+}
+
+/**
+ * Step (Discrete) interpolation of keyframe values.
+ * @memberof t3d
+ * @extends t3d.KeyframeInterpolant
+ */
+class StepInterpolant extends KeyframeInterpolant {
+
+	static interpolate(index0, ratio, duration, outBuffer) {
+		const values = this.values,
+			valueSize = this.valueSize,
+			offset = valueSize * index0;
+
+		for (let i = 0; i < valueSize; i++) {
+			outBuffer[i] = values[offset + i];
+		}
+
+		return outBuffer;
+	}
+
+}
+
+/**
+ * Linear interpolation of keyframe values.
+ * @memberof t3d
+ * @extends t3d.KeyframeInterpolant
+ */
+class LinearInterpolant extends KeyframeInterpolant {
+
+	static interpolate(index0, ratio, duration, outBuffer) {
+		const values = this.values,
+			valueSize = this.valueSize,
+
+			offset0 = index0 * valueSize,
+			offset1 = (index0 + 1) * valueSize;
+
+		let value1, value2;
+
+		for (let i = 0; i < valueSize; i++) {
+			value1 = values[offset0 + i];
+			value2 = values[offset1 + i];
+
+			if (value1 !== undefined && value2 !== undefined) {
+				outBuffer[i] = value1 * (1 - ratio) + value2 * ratio;
+			} else {
+				outBuffer[i] = value1;
+			}
+		}
+
+		return outBuffer;
+	}
+
+}
+
+/**
+ * Quaternion Linear interpolation of keyframe values.
+ * @memberof t3d
+ * @extends t3d.KeyframeInterpolant
+ */
+class QuaternionLinearInterpolant extends KeyframeInterpolant {
+
+	static interpolate(index0, ratio, duration, outBuffer) {
+		const values = this.values,
+			valueSize = this.valueSize;
+
+		Quaternion.slerpFlat(outBuffer, 0, values, index0 * valueSize, values, (index0 + 1) * valueSize, ratio);
+
+		return outBuffer;
+	}
+
+}
+
+/**
+ * Cubic spline interpolation of keyframe values.
+ * @memberof t3d
+ * @extends t3d.KeyframeInterpolant
+ */
+class CubicSplineInterpolant extends KeyframeInterpolant {
+
+	static getValueSize() {
+		return this.values.length / this.times.length / 3;
+	}
+
+	static interpolate(index0, ratio, duration, outBuffer) {
+		const values = this.values,
+			valueSize = this.valueSize,
+
+			valueSize2 = valueSize * 2,
+			valueSize3 = valueSize * 3,
+
+			rr = ratio * ratio,
+			rrr = rr * ratio,
+
+			offset0 = index0 * valueSize3,
+			offset1 = offset0 + valueSize3,
+
+			s2 = -2 * rrr + 3 * rr,
+			s3 = rrr - rr,
+			s0 = 1 - s2,
+			s1 = s3 - rr + ratio;
+
+		// Layout of keyframe output values for CUBICSPLINE animations:
+		//   [ inTangent_1, splineVertex_1, outTangent_1, inTangent_2, splineVertex_2, ... ]
+		for (let i = 0; i < valueSize; i++) {
+			const p0 = values[offset0 + i + valueSize], // splineVertex_k
+				m0 = values[offset0 + i + valueSize2] * duration, // outTangent_k * (t_k+1 - t_k)
+				p1 = values[offset1 + i + valueSize], // splineVertex_k+1
+				m1 = values[offset1 + i] * duration; // inTangent_k+1 * (t_k+1 - t_k)
+
+			outBuffer[i] = s0 * p0 + s1 * m0 + s2 * p1 + s3 * m1;
+		}
+
+		return outBuffer;
+	}
+
+	static copyValue(index, outBuffer) {
+		const values = this.values,
+			valueSize = this.valueSize,
+			offset = valueSize * index * 3 + valueSize;
+
+		for (let i = 0; i < valueSize; i++) {
+			outBuffer[i] = values[offset + i];
+		}
+
+		return outBuffer;
+	}
+
+}
+
+/**
+ * Quaternion Cubic spline interpolation of keyframe values.
+ * @memberof t3d
+ * @extends t3d.CubicSplineInterpolant
+ */
+class QuaternionCubicSplineInterpolant extends CubicSplineInterpolant {
+
+	static interpolate(index0, ratio, duration, outBuffer) {
+		const result = super.interpolate(index0, ratio, duration, outBuffer);
+
+		_q.fromArray(result).normalize().toArray(result);
+
+		return result;
+	}
+
+}
+
+const _q = new Quaternion();
+
+/**
+ * Base class for property track.
+ * @memberof t3d
+ * @abstract
+ */
+class KeyframeTrack {
+
+	/**
+	 * @param {t3d.Object3D} target
+	 * @param {String} propertyPath
+	 * @param {Array} times
+	 * @param {Array} values
+	 * @param {t3d.KeyframeInterpolant.constructor} [interpolant=t3d.LinearInterpolant]
+	 */
+	constructor(target, propertyPath, times, values, interpolant = LinearInterpolant) {
+		this.target = target;
+		this.propertyPath = propertyPath;
+
+		this.name = this.target.uuid + '.' + propertyPath;
+
+		this.times = times;
+		this.values = values;
+
+		this.valueSize = 0;
+		this.interpolant = null;
+
+		// since 0.2.2, remove this after few versions later
+		if (interpolant === true) {
+			interpolant = LinearInterpolant;
+		} else if (interpolant === false) {
+			interpolant = StepInterpolant;
+		}
+
+		this.setInterpolant(interpolant);
+	}
+
+	/**
+	 * Set interpolant for this keyframe track.
+	 * @param {t3d.KeyframeInterpolant.constructor} interpolant
+	 * @return {t3d.KeyframeTrack}
+	 */
+	setInterpolant(interpolant) {
+		this.valueSize = interpolant.getValueSize.call(this);
+		this.interpolant = interpolant;
+		return this;
+	}
+
+	/**
+	 * Get value at time.
+	 * The value will be interpolated by interpolant if time is between keyframes.
+	 * @param {Number} t - time
+	 * @param {Array} outBuffer - output buffer
+	 * @return {Array} output buffer
+	 */
+	getValue(t, outBuffer) {
+		const interpolant = this.interpolant,
+			times = this.times,
+			tl = times.length;
+
+		if (t <= times[0]) {
+			return interpolant.copyValue.call(this, 0, outBuffer);
+		} else if (t >= times[tl - 1]) {
+			return interpolant.copyValue.call(this, tl - 1, outBuffer);
+		}
+
+		// TODO use index cache for better performance
+		// https://github.com/mrdoob/three.js/blob/dev/src/math/Interpolant.js
+		let i0 = tl - 1;
+		while (t < times[i0] && i0 > 0) {
+			i0--;
+		}
+
+		const duration = times[i0 + 1] - times[i0];
+		const ratio = (t - times[i0]) / duration;
+		return interpolant.interpolate.call(this, i0, ratio, duration, outBuffer);
+	}
+
+}
+
+/**
+ * Used for boolean property track.
+ * @memberof t3d
+ * @extends t3d.KeyframeTrack
+ */
+class BooleanKeyframeTrack extends KeyframeTrack {
+
+	/**
+	 * @param {t3d.Object3D} target
+	 * @param {String} propertyPath
+	 * @param {Array} times
+	 * @param {Array} values
+	 * @param {t3d.KeyframeInterpolant.constructor} [interpolant=t3d.StepInterpolant]
+	 */
+	constructor(target, propertyPath, times, values, interpolant = StepInterpolant) {
+		// since 0.2.2, remove this after few versions later
+		if (interpolant === true) {
+			interpolant = StepInterpolant;
+		}
+
+		super(target, propertyPath, times, values, interpolant);
+	}
+
+}
+
+/**
+ * @readonly
+ * @type {String}
+ * @default 'bool'
+ */
+BooleanKeyframeTrack.prototype.valueTypeName = 'bool';
+
+/**
+ * Used for color property track.
+ * @memberof t3d
+ * @extends t3d.KeyframeTrack
+ */
+class ColorKeyframeTrack extends KeyframeTrack {
+
+	/**
+	 * @param {t3d.Object3D} target
+	 * @param {String} propertyPath
+	 * @param {Array} times
+	 * @param {Array} values
+	 * @param {t3d.KeyframeInterpolant.constructor} [interpolant=t3d.LinearInterpolant]
+	 */
+	constructor(target, propertyPath, times, values, interpolant) {
+		super(target, propertyPath, times, values, interpolant);
+	}
+
+}
+
+/**
+ * @readonly
+ * @type {String}
+ * @default 'color'
+ */
+ColorKeyframeTrack.prototype.valueTypeName = 'color';
+
+/**
+ * Used for number property track.
+ * @memberof t3d
+ * @extends t3d.KeyframeTrack
+ */
+class NumberKeyframeTrack extends KeyframeTrack {
+
+	/**
+	 * @param {t3d.Object3D} target
+	 * @param {String} propertyPath
+	 * @param {Array} times
+	 * @param {Array} values
+	 * @param {t3d.KeyframeInterpolant.constructor} [interpolant=t3d.LinearInterpolant]
+	 */
+	constructor(target, propertyPath, times, values, interpolant) {
+		super(target, propertyPath, times, values, interpolant);
+	}
+
+}
+
+/**
+ * @readonly
+ * @type {String}
+ * @default 'number'
+ */
+NumberKeyframeTrack.prototype.valueTypeName = 'number';
+
+/**
  * Used for quaternion property track.
  * @memberof t3d
  * @extends t3d.KeyframeTrack
@@ -1977,22 +2164,15 @@ class QuaternionKeyframeTrack extends KeyframeTrack {
 	 * @param {String} propertyPath
 	 * @param {Array} times
 	 * @param {Array} values
-	 * @param {Boolean} [interpolant=true]
+	 * @param {t3d.KeyframeInterpolant.constructor} [interpolant=t3d.QuaternionLinearInterpolant]
 	 */
-	constructor(target, propertyPath, times, values, interpolant) {
-		super(target, propertyPath, times, values, interpolant);
-	}
-
-	_interpolate(index0, ratio, outBuffer) {
-		const values = this.values;
-
-		if (this.interpolant) {
-			Quaternion.slerpFlat(outBuffer, 0, values, index0 * 4, values, (index0 + 1) * 4, ratio);
-		} else {
-			this._copyValue(index0, outBuffer);
+	constructor(target, propertyPath, times, values, interpolant = QuaternionLinearInterpolant) {
+		// since 0.2.2, remove this after few versions later
+		if (interpolant === true) {
+			interpolant = QuaternionLinearInterpolant;
 		}
 
-		return outBuffer;
+		super(target, propertyPath, times, values, interpolant);
 	}
 
 }
@@ -2016,15 +2196,15 @@ class StringKeyframeTrack extends KeyframeTrack {
 	 * @param {String} propertyPath
 	 * @param {Array} times
 	 * @param {Array} values
-	 * @param {Boolean} [interpolant=true]
+	 * @param {t3d.KeyframeInterpolant.constructor} [interpolant=t3d.StepInterpolant]
 	 */
-	constructor(target, propertyPath, times, values, interpolant) {
-		super(target, propertyPath, times, values, interpolant);
-	}
+	constructor(target, propertyPath, times, values, interpolant = StepInterpolant) {
+		// since 0.2.2, remove this after few versions later
+		if (interpolant === true) {
+			interpolant = StepInterpolant;
+		}
 
-	_interpolate(index0, _ratio, outBuffer) {
-		outBuffer[0] = this.values[index0];
-		return outBuffer;
+		super(target, propertyPath, times, values, interpolant);
 	}
 
 }
@@ -2048,7 +2228,7 @@ class VectorKeyframeTrack extends KeyframeTrack {
 	 * @param {String} propertyPath
 	 * @param {Array} times
 	 * @param {Array} values
-	 * @param {Boolean} [interpolant=true]
+	 * @param {t3d.KeyframeInterpolant.constructor} [interpolant=t3d.LinearInterpolant]
 	 */
 	constructor(target, propertyPath, times, values, interpolant) {
 		super(target, propertyPath, times, values, interpolant);
@@ -2075,7 +2255,6 @@ const MATERIAL_TYPE = {
 	PHONG: 'phong',
 	PBR: 'pbr',
 	PBR2: 'pbr2',
-	MATCAP: 'matcap',
 	POINT: 'point',
 	LINE: 'line',
 	SHADER: 'shader',
@@ -2107,7 +2286,10 @@ const BLEND_TYPE = {
 const BLEND_EQUATION = {
 	ADD: 100,
 	SUBTRACT: 101,
-	REVERSE_SUBTRACT: 102
+	REVERSE_SUBTRACT: 102,
+	/** Only webgl2 */
+	MIN: 103,
+	MAX: 104
 };
 
 /**
@@ -2317,9 +2499,7 @@ const SHADOW_TYPE = {
 	PCF5_SOFT: 'pcf5_soft',
 	/** Only webgl2 */
 	PCSS16_SOFT: 'pcss16_soft',
-	/** Only webgl2 */
 	PCSS32_SOFT: 'pcss32_soft',
-	/** Only webgl2 */
 	PCSS64_SOFT: 'pcss64_soft'
 };
 
@@ -2332,10 +2512,6 @@ const SHADOW_TYPE = {
 const TEXEL_ENCODING_TYPE = {
 	LINEAR: 'linear',
 	SRGB: 'sRGB',
-	RGBE: 'RGBE',
-	RGBM7: 'RGBM7',
-	RGBM16: 'RGBM16',
-	RGBD: 'RGBD',
 	GAMMA: 'Gamma'
 };
 
@@ -3992,12 +4168,32 @@ class Box3 {
 
 	/**
 	 * Returns the center point of the box as a Vector3.
-	 * @param {t3d.Vector3} optionalTarget - the result will be copied into this Vector3.
+	 * @param {t3d.Vector3} target - the result will be copied into this Vector3.
 	 * @return {t3d.Vector3}
 	 */
-	getCenter(optionalTarget) {
-		const result = optionalTarget || new Vector3();
-		return this.isEmpty() ? result.set(0, 0, 0) : result.addVectors(this.min, this.max).multiplyScalar(0.5);
+	getCenter(target = new Vector3()) {
+		return this.isEmpty() ? target.set(0, 0, 0) : target.addVectors(this.min, this.max).multiplyScalar(0.5);
+	}
+
+	/**
+	 * Returns the width, height and depth of this box.
+	 * @param {t3d.Vector3} target - the result will be copied into this Vector3.
+	 * @return {t3d.Vector3}
+	 */
+	getSize(target = new Vector3()) {
+		return this.isEmpty() ? target.set(0, 0, 0) : target.subVectors(this.max, this.min);
+	}
+
+	/**
+	 * Computes the union of this box and box,
+	 * setting the upper bound of this box to the greater of the two boxes' upper bounds and the lower bound of this box to the lesser of the two boxes' lower bounds.
+	 * @param {t3d.Box3} box - Box that will be unioned with this box.
+	 * @return {t3d.Box3}
+	 */
+	union(box) {
+		this.min.min(box.min);
+		this.max.max(box.max);
+		return this;
 	}
 
 	/**
@@ -4022,6 +4218,17 @@ class Box3 {
 		this.setFromPoints(_points);
 
 		return this;
+	}
+
+	/**
+	 * Returns true if the specified point lies within or on the boundaries of this box.
+	 * @param {t3d.Vector3} point - Vector3 to check for inclusion.
+	 * @return {Boolean}
+	 */
+	containsPoint(point) {
+		return point.x < this.min.x || point.x > this.max.x ||
+			point.y < this.min.y || point.y > this.max.y ||
+			point.z < this.min.z || point.z > this.max.z ? false : true;
 	}
 
 	/**
@@ -4911,6 +5118,7 @@ class Matrix3 {
 }
 
 const _vec3_1$3 = new Vector3();
+const _vec3_2 = new Vector3();
 const _mat4_1$3 = new Matrix3();
 
 /**
@@ -4965,6 +5173,21 @@ class Plane {
 		this.normal.copy(normal);
 		this.constant = -point.dot(this.normal);
 
+		return this;
+	}
+
+	/**
+	 * Defines the plane based on the 3 provided points.
+	 * The winding order is assumed to be counter-clockwise, and determines the direction of the normal.
+	 * @param {t3d.Vector3} a - first point on the plane.
+	 * @param {t3d.Vector3} b - second point on the plane.
+	 * @param {t3d.Vector3} c - third point on the plane.
+	 * @return {t3d.Plane}
+	 */
+	setFromCoplanarPoints(a, b, c) {
+		const normal = _vec3_1$3.subVectors(c, b).cross(_vec3_2.subVectors(a, b)).normalize();
+		// Q: should an error be thrown if normal is zero (e.g. degenerate plane)?
+		this.setFromNormalAndCoplanarPoint(normal, a);
 		return this;
 	}
 
@@ -5275,6 +5498,69 @@ class Ray {
 		_vec3_1$1.copy(this.direction).multiplyScalar(directionDistance).add(this.origin);
 
 		return _vec3_1$1.distanceToSquared(point);
+	}
+
+	/**
+	 * Get the distance of the closest approach between the Ray and the Plane.
+	 * @param {t3d.Plane} plane - the Plane to compute a distance to.
+	 * @return {Number}
+	 */
+	distanceToPlane(plane) {
+		const denominator = plane.normal.dot(this.direction);
+
+		if (denominator === 0) {
+			// line is coplanar, return origin
+			if (plane.distanceToPoint(this.origin) === 0) {
+				return 0;
+			}
+
+			// Null is preferable to undefined since undefined means.... it is undefined
+			return null;
+		}
+
+		const t = -(this.origin.dot(plane.normal) + plane.constant) / denominator;
+
+		// Return if the ray never intersects the plane
+		return t >= 0 ? t : null;
+	}
+
+	/**
+	 * Intersect this Ray with a Plane, returning the intersection point or null if there is no intersection.
+	 * @param {t3d.Plane} plane - the Plane to intersect with.
+	 * @param {t3d.Vector3} [optionalTarget=] - the result will be copied into this Vector3.
+	 * @return {t3d.Vector3}
+	 */
+	intersectPlane(plane, optionalTarget = new Vector3()) {
+		const t = this.distanceToPlane(plane);
+
+		if (t === null) {
+			return null;
+		}
+
+		return this.at(t, optionalTarget);
+	}
+
+	/**
+	 * Return true if this Ray intersects with the Plane.
+	 * @param {t3d.Plane} plane - the plane to intersect with.
+	 * @return {Boolean}
+	 */
+	intersectsPlane(plane) {
+		// check if the ray lies on the plane first
+		const distToPoint = plane.distanceToPoint(this.origin);
+
+		if (distToPoint === 0) {
+			return true;
+		}
+
+		const denominator = plane.normal.dot(this.direction);
+
+		if (denominator * distToPoint < 0) {
+			return true;
+		}
+
+		// ray origin is behind the plane (and is pointing behind it)
+		return false;
 	}
 
 	/**
@@ -7542,8 +7828,8 @@ function insertionSort(a, from, to, compareFunc) {
 }
 
 /**
- * RenderQueue is used to collect renderable objects from the scene.
- * And dispatch all renderable objects to the corresponding RenderQueueLayer according to object.renderLayer
+ * RenderQueue is used to collect all renderable items, lights and skeletons from the scene.
+ * Renderable items will be dispatched to the corresponding RenderQueueLayer according to the object's renderLayer property.
  * @memberof t3d
  */
 class RenderQueue {
@@ -7552,6 +7838,11 @@ class RenderQueue {
 		this.layerMap = new Map();
 		this.layerList = [];
 
+		this.lightsArray = [];
+
+		this.skeletons = new Set();
+
+		// to optimize the performance of the next push, cache the last layer used
 		this._lastLayer = this.createLayer(0);
 	}
 
@@ -7559,6 +7850,10 @@ class RenderQueue {
 		for (let i = 0, l = this.layerList.length; i < l; i++) {
 			this.layerList[i].begin();
 		}
+
+		this.lightsArray.length = 0;
+
+		this.skeletons.clear();
 	}
 
 	end() {
@@ -7569,17 +7864,15 @@ class RenderQueue {
 	}
 
 	push(object, camera) {
-		// frustum test, only test bounding sphere
-		if (object.frustumCulled && camera.frustumCulled) {
-			helpSphere.copy(object.geometry.boundingSphere).applyMatrix4(object.worldMatrix);
-			if (!camera.frustum.intersectsSphere(helpSphere)) {
-				return;
-			}
+		// collect skeleton if exists
+		if (object.skeleton) {
+			this.skeletons.add(object.skeleton);
 		}
 
-		// calculate z
+		// calculate depth for sorting
 		helpVector3.setFromMatrixPosition(object.worldMatrix);
-		helpVector3.applyMatrix4(camera.projectionViewMatrix); // helpVector3.project(camera);
+		helpVector3.applyMatrix4(camera.projectionViewMatrix);
+		const depth = helpVector3.z;
 
 		const layerId = object.renderLayer || 0;
 
@@ -7599,12 +7892,16 @@ class RenderQueue {
 				const group = groups[i];
 				const groupMaterial = object.material[group.materialIndex];
 				if (groupMaterial) {
-					layer.addRenderable(object, object.geometry, groupMaterial, helpVector3.z, group);
+					layer.addRenderable(object, object.geometry, groupMaterial, depth, group);
 				}
 			}
 		} else {
-			layer.addRenderable(object, object.geometry, object.material, helpVector3.z);
+			layer.addRenderable(object, object.geometry, object.material, depth);
 		}
+	}
+
+	pushLight(light) {
+		this.lightsArray.push(light);
 	}
 
 	/**
@@ -7662,7 +7959,6 @@ class RenderQueue {
 }
 
 const helpVector3 = new Vector3();
-const helpSphere = new Sphere();
 
 function sortLayer(a, b) {
 	return a.id - b.id;
@@ -7900,7 +8196,6 @@ class Scene extends Object3D {
 
 		this._sceneData = new SceneData();
 		this._lightData = new LightData();
-		this._skeletons = new Set();
 
 		this._renderQueueMap = new WeakMap();
 		this._renderStatesMap = new WeakMap();
@@ -7913,9 +8208,7 @@ class Scene extends Object3D {
 	 * @param {Boolean} [updateScene=true] - Whether to update scene data.
 	 * @return {t3d.RenderStates} - The result render states.
 	 */
-	updateRenderStates(camera, updateScene) {
-		updateScene = updateScene !== undefined ? updateScene : true;
-
+	updateRenderStates(camera, updateScene = true) {
 		if (!this._renderStatesMap.has(camera)) {
 			this._renderStatesMap.set(camera, new RenderStates(this._sceneData, this._lightData));
 		}
@@ -7951,36 +8244,29 @@ class Scene extends Object3D {
 	 * @param {Boolean} [updateSkeletons=true] - Whether to update skeletons.
 	 * @return {t3d.RenderQueue} - The result render queue.
 	 */
-	updateRenderQueue(camera, collectLights, updateSkeletons) {
-		collectLights = collectLights !== undefined ? collectLights : true;
-		updateSkeletons = updateSkeletons !== undefined ? updateSkeletons : true;
-
+	updateRenderQueue(camera, collectLights = true, updateSkeletons = true) {
 		if (!this._renderQueueMap.has(camera)) {
 			this._renderQueueMap.set(camera, new RenderQueue());
 		}
 
 		const renderQueue = this._renderQueueMap.get(camera);
 
-		if (updateSkeletons) {
-			this._skeletons.clear();
-		}
-
 		renderQueue.begin();
+		this._pushToRenderQueue(this, camera, renderQueue);
+		renderQueue.end();
 
 		if (collectLights) {
 			this._lightData.begin();
-			this._doPushObject(this, camera, renderQueue, updateSkeletons);
+			for (const light of renderQueue.lightsArray) {
+				this._lightData.push(light);
+			}
 			this._lightData.end(this._sceneData);
-		} else {
-			this._doPushMesh(this, camera, renderQueue, updateSkeletons);
 		}
-
-		renderQueue.end();
 
 		// Since skeletons may be referenced by different mesh, it is necessary to collect skeletons in the scene in order to avoid repeated updates.
 		// For IOS platform, we should try to avoid repeated texture updates within one frame, otherwise the performance will be seriously degraded.
 		if (updateSkeletons) {
-			for (const skeleton of this._skeletons) {
+			for (const skeleton of renderQueue.skeletons) {
 				skeleton.updateBones(this._sceneData);
 			}
 		}
@@ -7998,43 +8284,28 @@ class Scene extends Object3D {
 		return this._renderQueueMap.get(camera);
 	}
 
-	_doPushMesh(object, camera, renderQueue, updateSkeletons) {
+	_pushToRenderQueue(object, camera, renderQueue) {
 		if (!object.visible) {
 			return;
 		}
 
-		if (!!object.geometry && !!object.material && object.renderable) {
-			renderQueue.push(object, camera);
-
-			if (updateSkeletons && !!object.skeleton) {
-				this._skeletons.add(object.skeleton);
-			}
-		}
-
-		const children = object.children;
-		for (let i = 0, l = children.length; i < l; i++) {
-			this._doPushMesh(children[i], camera, renderQueue, updateSkeletons);
-		}
-	}
-
-	_doPushObject(object, camera, renderQueue, updateSkeletons) {
-		if (!object.visible) {
-			return;
-		}
-
-		if (!!object.geometry && !!object.material && object.renderable) {
-			renderQueue.push(object, camera);
-
-			if (updateSkeletons && !!object.skeleton) {
-				this._skeletons.add(object.skeleton);
+		if (object.geometry && object.material && object.renderable) {
+			if (object.frustumCulled && camera.frustumCulled) {
+				// frustum test, only test bounding sphere
+				_boundingSphere.copy(object.geometry.boundingSphere).applyMatrix4(object.worldMatrix);
+				if (camera.frustum.intersectsSphere(_boundingSphere)) {
+					renderQueue.push(object, camera);
+				}
+			} else {
+				renderQueue.push(object, camera);
 			}
 		} else if (object.isLight) {
-			this._lightData.push(object);
+			renderQueue.pushLight(object);
 		}
 
 		const children = object.children;
 		for (let i = 0, l = children.length; i < l; i++) {
-			this._doPushObject(children[i], camera, renderQueue, updateSkeletons);
+			this._pushToRenderQueue(children[i], camera, renderQueue);
 		}
 	}
 
@@ -8046,6 +8317,8 @@ class Scene extends Object3D {
  * @default true
  */
 Scene.prototype.isScene = true;
+
+const _boundingSphere = new Sphere();
 
 /**
  * The camera used for rendering a 3D scene.
@@ -8763,8 +9036,8 @@ class Geometry extends EventDispatcher {
 
 		/**
 		 * Split the geometry into groups, each of which will be rendered in a separate WebGL draw call. This allows an array of materials to be used with the geometry.
-		 * Each group is an object of the form:
-		 * { start: Integer, count: Integer, materialIndex: Integer }
+		 * Each group is an object of the form: { start: Integer, count: Integer, materialIndex: Integer },
+		 * or { multiDrawStarts: Integer[], multiDrawCounts: Integer[], multiDrawCount: Integer, materialIndex: Integer } if multiDraw is available.
 		 * @type {Array}
 		 * @default []
 		 */
@@ -10380,6 +10653,7 @@ class ThinRenderer {
 	 * @property {Function} afterRender - (Optional) After render each renderable item.
 	 * @property {Function} ifRender - (Optional) If render the renderable item.
 	 * @property {t3d.RenderInfo} renderInfo - (Optional) Render info for collect information.
+	 * @property {Boolean} onlyCompile - (Optional) Only compile shader, do not render.
 	 */
 
 	/**
@@ -10481,6 +10755,7 @@ class ThinRenderer {
 	 * @param {Number} width - The width of the rectangle to read from.
 	 * @param {Number} height - The height of the rectangle to read from.
 	 * @param {TypedArray} buffer Uint8Array is the only destination type supported in all cases, other types are renderTarget and platform dependent.
+	 * @return {Promise<TypedArray>} A promise that resolves with the passed in buffer after it has been filled with the pixel data.
 	 */
 	readRenderTargetPixels(x, y, width, height, buffer) {}
 
@@ -11391,41 +11666,6 @@ class LineMaterial extends Material {
 		super.copy(source);
 
 		this.lineWidth = source.lineWidth;
-
-		return this;
-	}
-
-}
-
-/**
- * MatcapMaterial is defined by a MatCap (or Lit Sphere) texture, which encodes the material color and shading.
- * MatcapMaterial does not respond to lights since the matcap image file encodes baked lighting.
- * It will cast a shadow onto an object that receives shadows (and shadow clipping works), but it will not self-shadow or receive shadows.
- * @extends t3d.Material
- * @memberof t3d
- */
-class MatcapMaterial extends Material {
-
-	/**
-	 * Create a MatcapMaterial.
-	 */
-	constructor() {
-		super();
-
-		this.type = MATERIAL_TYPE.MATCAP;
-
-		/**
-		 * The matcap map.
-		 * @type {t3d.Texture2D}
-		 * @default null
-		 */
-		this.matcap = null;
-	}
-
-	copy(source) {
-		super.copy(source);
-
-		this.matcap = source.matcap;
 
 		return this;
 	}
@@ -13603,7 +13843,7 @@ var begin_frag = "vec4 outColor = vec4(u_Color, u_Opacity);";
 
 var begin_vert = "vec3 transformed = vec3(a_Position);\nvec3 objectNormal = vec3(a_Normal);\n#ifdef USE_TANGENT\n    vec3 objectTangent = vec3(a_Tangent.xyz);\n#endif";
 
-var bsdfs = "vec2 integrateSpecularBRDF( const in float dotNV, const in float roughness ) {\n\tconst vec4 c0 = vec4( - 1, - 0.0275, - 0.572, 0.022 );\n\tconst vec4 c1 = vec4( 1, 0.0425, 1.04, - 0.04 );\n\tvec4 r = roughness * c0 + c1;\n\tfloat a004 = min( r.x * r.x, exp2( - 9.28 * dotNV ) ) * r.x + r.y;\n\treturn vec2( -1.04, 1.04 ) * a004 + r.zw;\n}\nvec3 BRDF_Diffuse_Lambert(vec3 diffuseColor) {\n    return RECIPROCAL_PI * diffuseColor;\n}\nvec3 F_Schlick( const in vec3 specularColor, const in float dotLH ) {\n\tfloat fresnel = exp2( ( -5.55473 * dotLH - 6.98316 ) * dotLH );\n\treturn ( 1.0 - specularColor ) * fresnel + specularColor;\n}\nvec3 F_Schlick_RoughnessDependent(const in vec3 F0, const in float dotNV, const in float roughness) {\n\tfloat fresnel = exp2( ( -5.55473 * dotNV - 6.98316 ) * dotNV );\n\tvec3 Fr = max( vec3( 1.0 - roughness ), F0 ) - F0;\n\treturn Fr * fresnel + F0;\n}\nfloat D_BlinnPhong( const in float shininess, const in float dotNH ) {\n\treturn RECIPROCAL_PI * ( shininess * 0.5 + 1.0 ) * pow( dotNH, shininess );\n}\nfloat G_BlinnPhong_Implicit( ) {\n\treturn 0.25;\n}\nvec3 BRDF_Specular_BlinnPhong(vec3 specularColor, vec3 N, vec3 L, vec3 V, float shininess) {\n    vec3 H = normalize(L + V);\n    float dotNH = saturate(dot(N, H));\n    float dotLH = saturate(dot(L, H));\n    vec3 F = F_Schlick(specularColor, dotLH);\n    float G = G_BlinnPhong_Implicit( );\n    float D = D_BlinnPhong(shininess, dotNH);\n    return F * G * D;\n}\nfloat D_GGX( const in float alpha, const in float dotNH ) {\n\tfloat a2 = pow2( alpha );\n\tfloat denom = pow2( dotNH ) * ( a2 - 1.0 ) + 1.0;\n\treturn RECIPROCAL_PI * a2 / pow2( denom );\n}\nfloat G_GGX_Smith( const in float alpha, const in float dotNL, const in float dotNV ) {\n\tfloat a2 = pow2( alpha );\n\tfloat gl = dotNL + sqrt( a2 + ( 1.0 - a2 ) * pow2( dotNL ) );\n\tfloat gv = dotNV + sqrt( a2 + ( 1.0 - a2 ) * pow2( dotNV ) );\n\treturn 1.0 / ( gl * gv );\n}\nfloat G_GGX_SmithCorrelated( const in float alpha, const in float dotNL, const in float dotNV ) {\n\tfloat a2 = pow2( alpha );\n\tfloat gv = dotNL * sqrt( a2 + ( 1.0 - a2 ) * pow2( dotNV ) );\n\tfloat gl = dotNV * sqrt( a2 + ( 1.0 - a2 ) * pow2( dotNL ) );\n\treturn 0.5 / max( gv + gl, EPSILON );\n}\nvec3 BRDF_Specular_GGX(vec3 specularColor, vec3 N, vec3 L, vec3 V, float roughness) {\n\tfloat alpha = pow2( roughness );\n\tvec3 H = normalize(L + V);\n\tfloat dotNL = saturate( dot(N, L) );\n\tfloat dotNV = saturate( dot(N, V) );\n\tfloat dotNH = saturate( dot(N, H) );\n\tfloat dotLH = saturate( dot(L, H) );\n\tvec3 F = F_Schlick( specularColor, dotLH );\n\tfloat G = G_GGX_SmithCorrelated( alpha, dotNL, dotNV );\n\tfloat D = D_GGX( alpha, dotNH );\n\treturn F * G * D;\n}\nvec3 BRDF_Specular_GGX_Environment(const in vec3 N, const in vec3 V, const in vec3 specularColor, const in float roughness) {\n\tfloat dotNV = saturate(dot(N, V));\n\tvec2 brdf = integrateSpecularBRDF(dotNV, roughness);\n\treturn specularColor * brdf.x + brdf.y;\n}\nvoid BRDF_Specular_Multiscattering_Environment(const in vec3 N, const in vec3 V, const in vec3 specularColor, const in float roughness, inout vec3 singleScatter, inout vec3 multiScatter) {\n\tfloat dotNV = saturate(dot(N, V));\n\tvec3 F = F_Schlick_RoughnessDependent(specularColor, dotNV, roughness);\n\tvec2 brdf = integrateSpecularBRDF(dotNV, roughness);\n\tvec3 FssEss = F * brdf.x + brdf.y;\n\tfloat Ess = brdf.x + brdf.y;\n\tfloat Ems = 1.0 - Ess;\n\tvec3 Favg = specularColor + (1.0 - specularColor) * 0.047619;\tvec3 Fms = FssEss * Favg / (1.0 - Ems * Favg);\n\tsingleScatter += FssEss;\n\tmultiScatter += Fms * Ems;\n}";
+var bsdfs = "\nvec3 BRDF_Diffuse_Lambert(vec3 diffuseColor) {\n    return RECIPROCAL_PI * diffuseColor;\n}\nvec3 F_Schlick(const in vec3 specularColor, const in float dotLH) {\n\tfloat fresnel = exp2((-5.55473 * dotLH - 6.98316) * dotLH);\n\treturn (1.0 - specularColor) * fresnel + specularColor;\n}\nfloat D_BlinnPhong(const in float shininess, const in float dotNH) {\n\treturn RECIPROCAL_PI * (shininess * 0.5 + 1.0) * pow(dotNH, shininess);\n}\nfloat G_BlinnPhong_Implicit() {\n\treturn 0.25;\n}\nvec3 BRDF_Specular_BlinnPhong(vec3 specularColor, vec3 N, vec3 L, vec3 V, float shininess) {\n    vec3 H = normalize(L + V);\n    float dotNH = saturate(dot(N, H));\n    float dotLH = saturate(dot(L, H));\n    vec3 F = F_Schlick(specularColor, dotLH);\n    float G = G_BlinnPhong_Implicit();\n    float D = D_BlinnPhong(shininess, dotNH);\n    return F * G * D;\n}\nfloat D_GGX(const in float alpha, const in float dotNH) {\n\tfloat a2 = pow2(alpha);\n\tfloat denom = pow2(dotNH) * (a2 - 1.0) + 1.0;\treturn RECIPROCAL_PI * a2 / pow2(denom);\n}\nfloat G_GGX_SmithCorrelated(const in float alpha, const in float dotNL, const in float dotNV) {\n\tfloat a2 = pow2(alpha);\n\tfloat gv = dotNL * sqrt(a2 + (1.0 - a2) * pow2(dotNV));\n\tfloat gl = dotNV * sqrt(a2 + (1.0 - a2) * pow2(dotNL));\n\treturn 0.5 / max(gv + gl, EPSILON);\n}\nvec3 BRDF_Specular_GGX(vec3 specularColor, vec3 N, vec3 L, vec3 V, float roughness) {\n\tfloat alpha = pow2(roughness);\n\tvec3 H = normalize(L + V);\n\tfloat dotNL = saturate(dot(N, L));\n\tfloat dotNV = saturate(dot(N, V));\n\tfloat dotNH = saturate(dot(N, H));\n\tfloat dotLH = saturate(dot(L, H));\n\tvec3 F = F_Schlick(specularColor, dotLH);\n\tfloat G = G_GGX_SmithCorrelated(alpha, dotNL, dotNV);\n\tfloat D = D_GGX(alpha, dotNH);\n\treturn F * G * D;\n}\nvec2 integrateSpecularBRDF(const in float dotNV, const in float roughness) {\n\tconst vec4 c0 = vec4(-1, -0.0275, -0.572, 0.022);\n\tconst vec4 c1 = vec4(1, 0.0425, 1.04, -0.04);\n\tvec4 r = roughness * c0 + c1;\n\tfloat a004 = min(r.x * r.x, exp2(-9.28 * dotNV)) * r.x + r.y;\n\treturn vec2(-1.04, 1.04) * a004 + r.zw;\n}\nvec3 F_Schlick_RoughnessDependent(const in vec3 F0, const in float dotNV, const in float roughness) {\n\tfloat fresnel = exp2((-5.55473 * dotNV - 6.98316) * dotNV);\n\tvec3 Fr = max(vec3(1.0 - roughness), F0) - F0;\n\treturn Fr * fresnel + F0;\n}\nvec3 BRDF_Specular_GGX_Environment(const in vec3 N, const in vec3 V, const in vec3 specularColor, const in float roughness) {\n\tfloat dotNV = saturate(dot(N, V));\n\tvec2 brdf = integrateSpecularBRDF(dotNV, roughness);\n\treturn specularColor * brdf.x + brdf.y;\n}\nvoid BRDF_Specular_Multiscattering_Environment(const in vec3 N, const in vec3 V, const in vec3 specularColor, const in float roughness, inout vec3 singleScatter, inout vec3 multiScatter) {\n\tfloat dotNV = saturate(dot(N, V));\n\tvec3 F = F_Schlick_RoughnessDependent(specularColor, dotNV, roughness);\n\tvec2 brdf = integrateSpecularBRDF(dotNV, roughness);\n\tvec3 FssEss = F * brdf.x + brdf.y;\n\tfloat Ess = brdf.x + brdf.y;\n\tfloat Ems = 1.0 - Ess;\n\tvec3 Favg = specularColor + (1.0 - specularColor) * 0.047619;\tvec3 Fms = FssEss * Favg / (1.0 - Ems * Favg);\n\tsingleScatter += FssEss;\n\tmultiScatter += Fms * Ems;\n}";
 
 var bumpMap_pars_frag = "#ifdef USE_BUMPMAP\n\tuniform sampler2D bumpMap;\n\tuniform float bumpScale;\n\tvec2 dHdxy_fwd(vec2 uv) {\n\t\tvec2 dSTdx = dFdx( uv );\n\t\tvec2 dSTdy = dFdy( uv );\n\t\tfloat Hll = bumpScale * texture2D( bumpMap, uv ).x;\n\t\tfloat dBx = bumpScale * texture2D( bumpMap, uv + dSTdx ).x - Hll;\n\t\tfloat dBy = bumpScale * texture2D( bumpMap, uv + dSTdy ).x - Hll;\n\t\treturn vec2( dBx, dBy );\n\t}\n\tvec3 perturbNormalArb( vec3 surf_pos, vec3 surf_norm, vec2 dHdxy) {\n\t\tvec3 vSigmaX = vec3( dFdx( surf_pos.x ), dFdx( surf_pos.y ), dFdx( surf_pos.z ) );\n\t\tvec3 vSigmaY = vec3( dFdy( surf_pos.x ), dFdy( surf_pos.y ), dFdy( surf_pos.z ) );\n\t\tvec3 vN = surf_norm;\n\t\tvec3 R1 = cross( vSigmaY, vN );\n\t\tvec3 R2 = cross( vN, vSigmaX );\n\t\tfloat fDet = dot( vSigmaX, R1 );\n\t\tfDet *= ( float( gl_FrontFacing ) * 2.0 - 1.0 );\n\t\tvec3 vGrad = sign( fDet ) * ( dHdxy.x * R1 + dHdxy.y * R2 );\n\t\treturn normalize( abs( fDet ) * surf_norm - vGrad );\n\t}\n#endif";
 
@@ -13627,7 +13867,7 @@ var diffuseMap_frag = "#ifdef USE_DIFFUSE_MAP\n    #if (USE_DIFFUSE_MAP == 2)\n 
 
 var diffuseMap_pars_frag = "#ifdef USE_DIFFUSE_MAP\n    uniform sampler2D diffuseMap;\n#endif";
 
-var emissiveMap_frag = "#ifdef USE_EMISSIVEMAP\n\tvec4 emissiveColor = texture2D(emissiveMap, vEmissiveMapUV);\n\temissiveColor.rgb = emissiveMapTexelToLinear( emissiveColor ).rgb;\n\ttotalEmissiveRadiance *= emissiveColor.rgb;\n#endif";
+var emissiveMap_frag = "#ifdef USE_EMISSIVEMAP\n\tvec4 emissiveColor = emissiveMapTexelToLinear(texture2D(emissiveMap, vEmissiveMapUV));\n\ttotalEmissiveRadiance *= emissiveColor.rgb;\n#endif";
 
 var emissiveMap_pars_frag = "#ifdef USE_EMISSIVEMAP\n\tuniform sampler2D emissiveMap;\n\tvarying vec2 vEmissiveMapUV;\n#endif";
 
@@ -13635,9 +13875,9 @@ var emissiveMap_vert = "#ifdef USE_EMISSIVEMAP\n\t#if (USE_EMISSIVEMAP == 2)\n  
 
 var emissiveMap_pars_vert = "#ifdef USE_EMISSIVEMAP\n\tuniform mat3 emissiveMapUVTransform;\n\tvarying vec2 vEmissiveMapUV;\n#endif";
 
-var encodings_frag = "gl_FragColor = linearToOutputTexel( gl_FragColor );";
+var encodings_frag = "gl_FragColor = linearToOutputTexel(gl_FragColor);";
 
-var encodings_pars_frag = "\nvec4 LinearToLinear( in vec4 value ) {\n\treturn value;\n}\nvec4 GammaToLinear( in vec4 value, in float gammaFactor ) {\n\treturn vec4( pow( value.xyz, vec3( gammaFactor ) ), value.w );\n}\nvec4 LinearToGamma( in vec4 value, in float gammaFactor ) {\n\treturn vec4( pow( value.xyz, vec3( 1.0 / gammaFactor ) ), value.w );\n}\nvec4 sRGBToLinear( in vec4 value ) {\n\treturn vec4( mix( pow( value.rgb * 0.9478672986 + vec3( 0.0521327014 ), vec3( 2.4 ) ), value.rgb * 0.0773993808, vec3( lessThanEqual( value.rgb, vec3( 0.04045 ) ) ) ), value.w );\n}\nvec4 LinearTosRGB( in vec4 value ) {\n\treturn vec4( mix( pow( value.rgb, vec3( 0.41666 ) ) * 1.055 - vec3( 0.055 ), value.rgb * 12.92, vec3( lessThanEqual( value.rgb, vec3( 0.0031308 ) ) ) ), value.w );\n}\nvec4 RGBEToLinear( in vec4 value ) {\n\treturn vec4( value.rgb * exp2( value.a * 255.0 - 128.0 ), 1.0 );\n}\nvec4 LinearToRGBE( in vec4 value ) {\n\tfloat maxComponent = max( max( value.r, value.g ), value.b );\n\tfloat fExp = clamp( ceil( log2( maxComponent ) ), -128.0, 127.0 );\n\treturn vec4( value.rgb / exp2( fExp ), ( fExp + 128.0 ) / 255.0 );\n}\nvec4 RGBMToLinear( in vec4 value, in float maxRange ) {\n\treturn vec4( value.xyz * value.w * maxRange, 1.0 );\n}\nvec4 LinearToRGBM( in vec4 value, in float maxRange ) {\n\tfloat maxRGB = max( value.x, max( value.g, value.b ) );\n\tfloat M      = clamp( maxRGB / maxRange, 0.0, 1.0 );\n\tM            = ceil( M * 255.0 ) / 255.0;\n\treturn vec4( value.rgb / ( M * maxRange ), M );\n}\nvec4 RGBDToLinear( in vec4 value, in float maxRange ) {\n\treturn vec4( value.rgb * ( ( maxRange / 255.0 ) / value.a ), 1.0 );\n}\nvec4 LinearToRGBD( in vec4 value, in float maxRange ) {\n\tfloat maxRGB = max( value.x, max( value.g, value.b ) );\n\tfloat D      = max( maxRange / maxRGB, 1.0 );\n\tD            = min( floor( D ) / 255.0, 1.0 );\n\treturn vec4( value.rgb * ( D * ( 255.0 / maxRange ) ), D );\n}\nconst mat3 cLogLuvM = mat3( 0.2209, 0.3390, 0.4184, 0.1138, 0.6780, 0.7319, 0.0102, 0.1130, 0.2969 );\nvec4 LinearToLogLuv( in vec4 value )  {\n\tvec3 Xp_Y_XYZp = value.rgb * cLogLuvM;\n\tXp_Y_XYZp = max(Xp_Y_XYZp, vec3(1e-6, 1e-6, 1e-6));\n\tvec4 vResult;\n\tvResult.xy = Xp_Y_XYZp.xy / Xp_Y_XYZp.z;\n\tfloat Le = 2.0 * log2(Xp_Y_XYZp.y) + 127.0;\n\tvResult.w = fract(Le);\n\tvResult.z = (Le - (floor(vResult.w*255.0))/255.0)/255.0;\n\treturn vResult;\n}\nconst mat3 cLogLuvInverseM = mat3( 6.0014, -2.7008, -1.7996, -1.3320, 3.1029, -5.7721, 0.3008, -1.0882, 5.6268 );\nvec4 LogLuvToLinear( in vec4 value ) {\n\tfloat Le = value.z * 255.0 + value.w;\n\tvec3 Xp_Y_XYZp;\n\tXp_Y_XYZp.y = exp2((Le - 127.0) / 2.0);\n\tXp_Y_XYZp.z = Xp_Y_XYZp.y / value.y;\n\tXp_Y_XYZp.x = value.x * Xp_Y_XYZp.z;\n\tvec3 vRGB = Xp_Y_XYZp.rgb * cLogLuvInverseM;\n\treturn vec4( max(vRGB, 0.0), 1.0 );\n}";
+var encodings_pars_frag = "vec4 LinearToLinear(in vec4 value) {\n\treturn value;\n}\nvec4 GammaToLinear(in vec4 value, in float gammaFactor) {\n\treturn vec4(pow(value.xyz, vec3(gammaFactor)), value.w);\n}\nvec4 LinearToGamma(in vec4 value, in float gammaFactor) {\n\treturn vec4(pow(value.xyz, vec3(1.0 / gammaFactor)), value.w);\n}\nvec4 sRGBToLinear(in vec4 value) {\n\treturn vec4(mix(pow(value.rgb * 0.9478672986 + vec3(0.0521327014), vec3(2.4)), value.rgb * 0.0773993808, vec3(lessThanEqual(value.rgb, vec3(0.04045)))), value.w);\n}\nvec4 LinearTosRGB(in vec4 value) {\n\treturn vec4(mix(pow(value.rgb, vec3(0.41666)) * 1.055 - vec3(0.055), value.rgb * 12.92, vec3(lessThanEqual(value.rgb, vec3(0.0031308)))), value.w);\n}";
 
 var end_frag = "gl_FragColor = outColor;";
 
@@ -13655,7 +13895,7 @@ var fog_pars_frag = "#ifdef USE_FOG\n    uniform vec3 u_FogColor;\n    #ifdef US
 
 var inverse = "mat4 inverseMat4(mat4 m) {\n    float\n    a00 = m[0][0], a01 = m[0][1], a02 = m[0][2], a03 = m[0][3],\n    a10 = m[1][0], a11 = m[1][1], a12 = m[1][2], a13 = m[1][3],\n    a20 = m[2][0], a21 = m[2][1], a22 = m[2][2], a23 = m[2][3],\n    a30 = m[3][0], a31 = m[3][1], a32 = m[3][2], a33 = m[3][3],\n    b00 = a00 * a11 - a01 * a10,\n    b01 = a00 * a12 - a02 * a10,\n    b02 = a00 * a13 - a03 * a10,\n    b03 = a01 * a12 - a02 * a11,\n    b04 = a01 * a13 - a03 * a11,\n    b05 = a02 * a13 - a03 * a12,\n    b06 = a20 * a31 - a21 * a30,\n    b07 = a20 * a32 - a22 * a30,\n    b08 = a20 * a33 - a23 * a30,\n    b09 = a21 * a32 - a22 * a31,\n    b10 = a21 * a33 - a23 * a31,\n    b11 = a22 * a33 - a23 * a32,\n    det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;\n    return mat4(\n        a11 * b11 - a12 * b10 + a13 * b09,\n        a02 * b10 - a01 * b11 - a03 * b09,\n        a31 * b05 - a32 * b04 + a33 * b03,\n        a22 * b04 - a21 * b05 - a23 * b03,\n        a12 * b08 - a10 * b11 - a13 * b07,\n        a00 * b11 - a02 * b08 + a03 * b07,\n        a32 * b02 - a30 * b05 - a33 * b01,\n        a20 * b05 - a22 * b02 + a23 * b01,\n        a10 * b10 - a11 * b08 + a13 * b06,\n        a01 * b08 - a00 * b10 - a03 * b06,\n        a30 * b04 - a31 * b02 + a33 * b00,\n        a21 * b02 - a20 * b04 - a23 * b00,\n        a11 * b07 - a10 * b09 - a12 * b06,\n        a00 * b09 - a01 * b07 + a02 * b06,\n        a31 * b01 - a30 * b03 - a32 * b00,\n        a20 * b03 - a21 * b01 + a22 * b00) / det;\n}";
 
-var light_frag = "\n#if (defined(USE_PHONG) || defined(USE_PBR))\n    vec3 V = normalize(u_CameraPosition - v_modelPos);\n#endif\n#ifdef USE_PBR\n    #ifdef USE_PBR2\n        vec3 diffuseColor = outColor.xyz;\n        vec3 specularColor = specularFactor.xyz;\n        float roughness = max(1.0 - glossinessFactor, 0.0525);\n    #else\n        vec3 diffuseColor = outColor.xyz * (1.0 - metalnessFactor);\n        vec3 specularColor = mix(vec3(0.04), outColor.xyz, metalnessFactor);\n        float roughness = max(roughnessFactor, 0.0525);\n    #endif\n    vec3 dxy = max(abs(dFdx(geometryNormal)), abs(dFdy(geometryNormal)));\n    float geometryRoughness = max(max(dxy.x, dxy.y), dxy.z);\n    roughness += geometryRoughness;\n    roughness = min(roughness, 1.0);\n    #ifdef USE_CLEARCOAT\n        float clearcoat = u_Clearcoat;\n        float clearcoatRoughness = u_ClearcoatRoughness;\n        #ifdef USE_CLEARCOATMAP\n\t\t    clearcoat *= texture2D(clearcoatMap, v_Uv).x;\n        #endif\n        #ifdef USE_CLEARCOAT_ROUGHNESSMAP\n\t\t    clearcoatRoughness *= texture2D(clearcoatRoughnessMap, v_Uv).y;\n\t    #endif\n        clearcoat = saturate(clearcoat);\n        clearcoatRoughness = max(clearcoatRoughness, 0.0525);\n\t    clearcoatRoughness += geometryRoughness;\n\t    clearcoatRoughness = min(clearcoatRoughness, 1.0);\n    #endif\n#else\n    vec3 diffuseColor = outColor.xyz;\n    #ifdef USE_PHONG\n        vec3 specularColor = u_SpecularColor.xyz;\n        float shininess = u_Specular;\n    #endif\n#endif\n#ifdef USE_LIGHT\n    vec3 L;\n    float falloff;\n    float dotNL;\n    vec3 irradiance;\n    float clearcoatDHR;\n    #ifdef USE_CLEARCOAT\n        float ccDotNL;\n        vec3 ccIrradiance;\n    #endif\n    #if NUM_DIR_LIGHTS > 0\n        #pragma unroll_loop_start\n        for (int i = 0; i < NUM_DIR_LIGHTS; i++) {\n            L = normalize(-u_Directional[i].direction);\n            falloff = 1.0;\n            #if defined(USE_SHADOW) && (UNROLLED_LOOP_INDEX < NUM_DIR_SHADOWS)\n                #ifdef USE_PCSS_SOFT_SHADOW\n                    falloff *= getShadowWithPCSS(directionalDepthMap[i], directionalShadowMap[i], vDirectionalShadowCoord[i], u_DirectionalShadow[i].shadowMapSize, u_DirectionalShadow[i].shadowBias, u_DirectionalShadow[i].shadowParams);\n                #else\n                    falloff *= getShadow(directionalShadowMap[i], vDirectionalShadowCoord[i], u_DirectionalShadow[i].shadowMapSize, u_DirectionalShadow[i].shadowBias, u_DirectionalShadow[i].shadowParams);\n                #endif\n            #endif\n            dotNL = saturate(dot(N, L));\n            irradiance = u_Directional[i].color * falloff * dotNL * PI;\n            #ifdef USE_CLEARCOAT        \n                ccDotNL = saturate(dot(clearcoatNormal, L));\n                ccIrradiance = ccDotNL * u_Directional[i].color * falloff  * PI;\n                clearcoatDHR = clearcoat * clearcoatDHRApprox(clearcoatRoughness, ccDotNL);\n                reflectedLight.directSpecular += ccIrradiance * clearcoat * BRDF_Specular_GGX(specularColor, clearcoatNormal, L, V, clearcoatRoughness);\n            #else\n\t\t        clearcoatDHR = 0.0;\n\t        #endif\n            reflectedLight.directDiffuse += (1.0 - clearcoatDHR) * irradiance * BRDF_Diffuse_Lambert(diffuseColor);\n            #ifdef USE_PHONG\n                reflectedLight.directSpecular += irradiance * BRDF_Specular_BlinnPhong(specularColor, N, L, V, shininess) * specularStrength;\n            #endif\n            #ifdef USE_PBR\n                reflectedLight.directSpecular += (1.0 - clearcoatDHR) * irradiance * BRDF_Specular_GGX(specularColor, N, L, V, roughness);\n            #endif\n        }\n        #pragma unroll_loop_end\n    #endif\n    #if NUM_POINT_LIGHTS > 0\n        vec3 worldV;\n        #pragma unroll_loop_start\n        for (int i = 0; i < NUM_POINT_LIGHTS; i++) {\n            worldV = v_modelPos - u_Point[i].position;\n            L = -worldV;\n            falloff = pow(clamp(1. - length(L) / u_Point[i].distance, 0.0, 1.0), u_Point[i].decay);\n            L = normalize(L);\n            #if defined(USE_SHADOW) && (UNROLLED_LOOP_INDEX < NUM_POINT_SHADOWS)\n                falloff *= getPointShadow(pointShadowMap[i], vPointShadowCoord[i], u_PointShadow[i].shadowMapSize, u_PointShadow[i].shadowBias, u_PointShadow[i].shadowParams, u_PointShadow[i].shadowCameraRange);\n            #endif\n            dotNL = saturate(dot(N, L));\n            irradiance = u_Point[i].color * falloff * dotNL * PI;\n            #ifdef USE_CLEARCOAT        \n                ccDotNL = saturate(dot(clearcoatNormal, L));\n                ccIrradiance = ccDotNL *  u_Point[i].color * falloff  * PI;\n                clearcoatDHR = clearcoat * clearcoatDHRApprox(clearcoatRoughness, ccDotNL);\n                reflectedLight.directSpecular += ccIrradiance * clearcoat * BRDF_Specular_GGX(specularColor, clearcoatNormal, L, V, clearcoatRoughness);\n            #else\n\t\t        clearcoatDHR = 0.0;\n\t        #endif\n            reflectedLight.directDiffuse += (1.0 - clearcoatDHR) * irradiance * BRDF_Diffuse_Lambert(diffuseColor);\n            #ifdef USE_PHONG\n                reflectedLight.directSpecular += irradiance * BRDF_Specular_BlinnPhong(specularColor, N, L, V, shininess) * specularStrength;\n            #endif\n            #ifdef USE_PBR\n                reflectedLight.directSpecular += (1.0 - clearcoatDHR) * irradiance * BRDF_Specular_GGX(specularColor, N, L, V, roughness);\n            #endif\n        }\n        #pragma unroll_loop_end\n    #endif\n    #if NUM_SPOT_LIGHTS > 0\n        float lightDistance;\n        float angleCos;\n        #pragma unroll_loop_start\n        for (int i = 0; i < NUM_SPOT_LIGHTS; i++) {\n            L = u_Spot[i].position - v_modelPos;\n            lightDistance = length(L);\n            L = normalize(L);\n            angleCos = dot(L, -normalize(u_Spot[i].direction));\n            falloff = smoothstep(u_Spot[i].coneCos, u_Spot[i].penumbraCos, angleCos);\n            falloff *= pow(clamp(1. - lightDistance / u_Spot[i].distance, 0.0, 1.0), u_Spot[i].decay);\n            #if defined(USE_SHADOW) && (UNROLLED_LOOP_INDEX < NUM_SPOT_SHADOWS)\n                #ifdef USE_PCSS_SOFT_SHADOW\n                    falloff *= getShadowWithPCSS(spotDepthMap[i], spotShadowMap[i], vSpotShadowCoord[i], u_SpotShadow[i].shadowMapSize, u_SpotShadow[i].shadowBias, u_SpotShadow[i].shadowParams);\n                #else\n                    falloff *= getShadow(spotShadowMap[i], vSpotShadowCoord[i], u_SpotShadow[i].shadowMapSize, u_SpotShadow[i].shadowBias, u_SpotShadow[i].shadowParams);\n                #endif\n            #endif\n            dotNL = saturate(dot(N, L));\n            irradiance = u_Spot[i].color * falloff * dotNL * PI;\n            #ifdef USE_CLEARCOAT        \n                ccDotNL = saturate(dot(clearcoatNormal, L));\n                ccIrradiance = ccDotNL *  u_Spot[i].color * falloff  * PI;\n                clearcoatDHR = clearcoat * clearcoatDHRApprox(clearcoatRoughness, ccDotNL);\n                reflectedLight.directSpecular += ccIrradiance * clearcoat * BRDF_Specular_GGX(specularColor, clearcoatNormal, L, V, clearcoatRoughness);\n            #else\n\t\t        clearcoatDHR = 0.0;\n\t        #endif\n            reflectedLight.directDiffuse += (1.0 - clearcoatDHR) * irradiance * BRDF_Diffuse_Lambert(diffuseColor);\n            #ifdef USE_PHONG\n                reflectedLight.directSpecular += irradiance * BRDF_Specular_BlinnPhong(specularColor, N, L, V, shininess) * specularStrength;\n            #endif\n            #ifdef USE_PBR\n                reflectedLight.directSpecular += (1.0 - clearcoatDHR) * irradiance * BRDF_Specular_GGX(specularColor, N, L, V, roughness);\n            #endif\n        }\n        #pragma unroll_loop_end\n    #endif\n    vec3 iblIrradiance = vec3(0., 0., 0.);\n    vec3 indirectIrradiance = vec3(0., 0., 0.);\n    vec3 indirectRadiance = vec3(0., 0., 0.);\n    vec3 clearcoatRadiance = vec3(0., 0., 0.);\n    #ifdef USE_AMBIENT_LIGHT\n        indirectIrradiance += u_AmbientLightColor * PI;\n    #endif\n    \n    #ifdef USE_SPHERICALHARMONICS_LIGHT\n        indirectIrradiance += getLightProbeIrradiance(u_SphericalHarmonicsLightData, N);\n    #endif\n    #if NUM_HEMI_LIGHTS > 0\n        float hemiDiffuseWeight;\n        #pragma unroll_loop_start\n        for (int i = 0; i < NUM_HEMI_LIGHTS; i++) {\n            L = normalize(u_Hemi[i].direction);\n            dotNL = dot(N, L);\n            hemiDiffuseWeight = 0.5 * dotNL + 0.5;\n            indirectIrradiance += mix(u_Hemi[i].groundColor, u_Hemi[i].skyColor, hemiDiffuseWeight) * PI;\n        }\n        #pragma unroll_loop_end\n    #endif\n    #if defined(USE_ENV_MAP) && defined(USE_PBR)\n        vec3 envDir;\n        #ifdef USE_VERTEX_ENVDIR\n            envDir = v_EnvDir;\n        #else\n            envDir = reflect(normalize(v_modelPos - u_CameraPosition), N);\n        #endif\n        iblIrradiance += getLightProbeIndirectIrradiance(maxMipLevel, N);\n        indirectRadiance += getLightProbeIndirectRadiance(roughness, maxMipLevel, N, envDir);\n        #ifdef USE_CLEARCOAT\n            vec3 clearcoatDir = reflect(normalize(v_modelPos - u_CameraPosition), clearcoatNormal);\n\t\t    clearcoatRadiance += getLightProbeIndirectRadiance(clearcoatRoughness, maxMipLevel, clearcoatNormal, clearcoatDir);\n\t    #endif\n    #endif\n    reflectedLight.indirectDiffuse += indirectIrradiance * BRDF_Diffuse_Lambert(diffuseColor);\n    #if defined(USE_ENV_MAP) && defined(USE_PBR)\n        #ifdef USE_CLEARCOAT\n            float ccDotNV = saturate(dot(clearcoatNormal, V));\n            reflectedLight.indirectSpecular += clearcoatRadiance * clearcoat * BRDF_Specular_GGX_Environment(clearcoatNormal, V, specularColor, clearcoatRoughness);\n            ccDotNL = ccDotNV;\n            clearcoatDHR = clearcoat * clearcoatDHRApprox(clearcoatRoughness, ccDotNL);\n        #else\n            clearcoatDHR = 0.0;\n        #endif\n        float clearcoatInv = 1.0 - clearcoatDHR;\n        vec3 singleScattering = vec3(0.0);\n\t    vec3 multiScattering = vec3(0.0);\n        vec3 cosineWeightedIrradiance = iblIrradiance * RECIPROCAL_PI;\n        BRDF_Specular_Multiscattering_Environment(N, V, specularColor, roughness, singleScattering, multiScattering);\n        vec3 diffuse = diffuseColor * (1.0 - (singleScattering + multiScattering));\n        reflectedLight.indirectSpecular += clearcoatInv * indirectRadiance * singleScattering;\n        reflectedLight.indirectSpecular += multiScattering * cosineWeightedIrradiance;\n        reflectedLight.indirectDiffuse += diffuse * cosineWeightedIrradiance;\n    #endif\n#endif";
+var light_frag = "\n#if (defined(USE_PHONG) || defined(USE_PBR))\n    vec3 V = normalize(u_CameraPosition - v_modelPos);\n#endif\n#ifdef USE_PBR\n    #ifdef USE_PBR2\n        vec3 diffuseColor = outColor.xyz;\n        vec3 specularColor = specularFactor.xyz;\n        float roughness = max(1.0 - glossinessFactor, 0.0525);\n    #else\n        vec3 diffuseColor = outColor.xyz * (1.0 - metalnessFactor);\n        vec3 specularColor = mix(vec3(0.04), outColor.xyz, metalnessFactor);\n        float roughness = max(roughnessFactor, 0.0525);\n    #endif\n    vec3 dxy = max(abs(dFdx(geometryNormal)), abs(dFdy(geometryNormal)));\n    float geometryRoughness = max(max(dxy.x, dxy.y), dxy.z);\n    roughness += geometryRoughness;\n    roughness = min(roughness, 1.0);\n    #ifdef USE_CLEARCOAT\n        float clearcoat = u_Clearcoat;\n        float clearcoatRoughness = u_ClearcoatRoughness;\n        #ifdef USE_CLEARCOATMAP\n\t\t    clearcoat *= texture2D(clearcoatMap, v_Uv).x;\n        #endif\n        #ifdef USE_CLEARCOAT_ROUGHNESSMAP\n\t\t    clearcoatRoughness *= texture2D(clearcoatRoughnessMap, v_Uv).y;\n\t    #endif\n        clearcoat = saturate(clearcoat);\n        clearcoatRoughness = max(clearcoatRoughness, 0.0525);\n\t    clearcoatRoughness += geometryRoughness;\n\t    clearcoatRoughness = min(clearcoatRoughness, 1.0);\n    #endif\n#else\n    vec3 diffuseColor = outColor.xyz;\n    #ifdef USE_PHONG\n        vec3 specularColor = u_SpecularColor.xyz;\n        float shininess = u_Specular;\n    #endif\n#endif\nvec3 L;\nfloat falloff;\nfloat dotNL;\nvec3 irradiance;\nfloat clearcoatDHR;\n#ifdef USE_CLEARCOAT\n    float ccDotNL;\n    vec3 ccIrradiance;\n#endif\n#if NUM_DIR_LIGHTS > 0\n    #pragma unroll_loop_start\n    for (int i = 0; i < NUM_DIR_LIGHTS; i++) {\n        L = normalize(-u_Directional[i].direction);\n        falloff = 1.0;\n        #if defined(USE_SHADOW) && (UNROLLED_LOOP_INDEX < NUM_DIR_SHADOWS)\n            #ifdef USE_PCSS_SOFT_SHADOW\n                falloff *= getShadowWithPCSS(directionalDepthMap[i], directionalShadowMap[i], vDirectionalShadowCoord[i], u_DirectionalShadow[i].shadowMapSize, u_DirectionalShadow[i].shadowBias, u_DirectionalShadow[i].shadowParams);\n            #else\n                falloff *= getShadow(directionalShadowMap[i], vDirectionalShadowCoord[i], u_DirectionalShadow[i].shadowMapSize, u_DirectionalShadow[i].shadowBias, u_DirectionalShadow[i].shadowParams);\n            #endif\n        #endif\n        dotNL = saturate(dot(N, L));\n        irradiance = u_Directional[i].color * falloff * dotNL * PI;\n        #ifdef USE_CLEARCOAT        \n            ccDotNL = saturate(dot(clearcoatNormal, L));\n            ccIrradiance = ccDotNL * u_Directional[i].color * falloff  * PI;\n            clearcoatDHR = clearcoat * clearcoatDHRApprox(clearcoatRoughness, ccDotNL);\n            reflectedLight.directSpecular += ccIrradiance * clearcoat * BRDF_Specular_GGX(specularColor, clearcoatNormal, L, V, clearcoatRoughness);\n        #else\n            clearcoatDHR = 0.0;\n        #endif\n        reflectedLight.directDiffuse += (1.0 - clearcoatDHR) * irradiance * BRDF_Diffuse_Lambert(diffuseColor);\n        #ifdef USE_PHONG\n            reflectedLight.directSpecular += irradiance * BRDF_Specular_BlinnPhong(specularColor, N, L, V, shininess) * specularStrength;\n        #endif\n        #ifdef USE_PBR\n            reflectedLight.directSpecular += (1.0 - clearcoatDHR) * irradiance * BRDF_Specular_GGX(specularColor, N, L, V, roughness);\n        #endif\n    }\n    #pragma unroll_loop_end\n#endif\n#if NUM_POINT_LIGHTS > 0\n    vec3 worldV;\n    #pragma unroll_loop_start\n    for (int i = 0; i < NUM_POINT_LIGHTS; i++) {\n        worldV = v_modelPos - u_Point[i].position;\n        L = -worldV;\n        falloff = pow(clamp(1. - length(L) / u_Point[i].distance, 0.0, 1.0), u_Point[i].decay);\n        L = normalize(L);\n        #if defined(USE_SHADOW) && (UNROLLED_LOOP_INDEX < NUM_POINT_SHADOWS)\n            falloff *= getPointShadow(pointShadowMap[i], vPointShadowCoord[i], u_PointShadow[i].shadowMapSize, u_PointShadow[i].shadowBias, u_PointShadow[i].shadowParams, u_PointShadow[i].shadowCameraRange);\n        #endif\n        dotNL = saturate(dot(N, L));\n        irradiance = u_Point[i].color * falloff * dotNL * PI;\n        #ifdef USE_CLEARCOAT        \n            ccDotNL = saturate(dot(clearcoatNormal, L));\n            ccIrradiance = ccDotNL *  u_Point[i].color * falloff  * PI;\n            clearcoatDHR = clearcoat * clearcoatDHRApprox(clearcoatRoughness, ccDotNL);\n            reflectedLight.directSpecular += ccIrradiance * clearcoat * BRDF_Specular_GGX(specularColor, clearcoatNormal, L, V, clearcoatRoughness);\n        #else\n            clearcoatDHR = 0.0;\n        #endif\n        reflectedLight.directDiffuse += (1.0 - clearcoatDHR) * irradiance * BRDF_Diffuse_Lambert(diffuseColor);\n        #ifdef USE_PHONG\n            reflectedLight.directSpecular += irradiance * BRDF_Specular_BlinnPhong(specularColor, N, L, V, shininess) * specularStrength;\n        #endif\n        #ifdef USE_PBR\n            reflectedLight.directSpecular += (1.0 - clearcoatDHR) * irradiance * BRDF_Specular_GGX(specularColor, N, L, V, roughness);\n        #endif\n    }\n    #pragma unroll_loop_end\n#endif\n#if NUM_SPOT_LIGHTS > 0\n    float lightDistance;\n    float angleCos;\n    #pragma unroll_loop_start\n    for (int i = 0; i < NUM_SPOT_LIGHTS; i++) {\n        L = u_Spot[i].position - v_modelPos;\n        lightDistance = length(L);\n        L = normalize(L);\n        angleCos = dot(L, -normalize(u_Spot[i].direction));\n        falloff = smoothstep(u_Spot[i].coneCos, u_Spot[i].penumbraCos, angleCos);\n        falloff *= pow(clamp(1. - lightDistance / u_Spot[i].distance, 0.0, 1.0), u_Spot[i].decay);\n        #if defined(USE_SHADOW) && (UNROLLED_LOOP_INDEX < NUM_SPOT_SHADOWS)\n            #ifdef USE_PCSS_SOFT_SHADOW\n                falloff *= getShadowWithPCSS(spotDepthMap[i], spotShadowMap[i], vSpotShadowCoord[i], u_SpotShadow[i].shadowMapSize, u_SpotShadow[i].shadowBias, u_SpotShadow[i].shadowParams);\n            #else\n                falloff *= getShadow(spotShadowMap[i], vSpotShadowCoord[i], u_SpotShadow[i].shadowMapSize, u_SpotShadow[i].shadowBias, u_SpotShadow[i].shadowParams);\n            #endif\n        #endif\n        dotNL = saturate(dot(N, L));\n        irradiance = u_Spot[i].color * falloff * dotNL * PI;\n        #ifdef USE_CLEARCOAT        \n            ccDotNL = saturate(dot(clearcoatNormal, L));\n            ccIrradiance = ccDotNL *  u_Spot[i].color * falloff  * PI;\n            clearcoatDHR = clearcoat * clearcoatDHRApprox(clearcoatRoughness, ccDotNL);\n            reflectedLight.directSpecular += ccIrradiance * clearcoat * BRDF_Specular_GGX(specularColor, clearcoatNormal, L, V, clearcoatRoughness);\n        #else\n            clearcoatDHR = 0.0;\n        #endif\n        reflectedLight.directDiffuse += (1.0 - clearcoatDHR) * irradiance * BRDF_Diffuse_Lambert(diffuseColor);\n        #ifdef USE_PHONG\n            reflectedLight.directSpecular += irradiance * BRDF_Specular_BlinnPhong(specularColor, N, L, V, shininess) * specularStrength;\n        #endif\n        #ifdef USE_PBR\n            reflectedLight.directSpecular += (1.0 - clearcoatDHR) * irradiance * BRDF_Specular_GGX(specularColor, N, L, V, roughness);\n        #endif\n    }\n    #pragma unroll_loop_end\n#endif\nvec3 indirectIrradiance = vec3(0., 0., 0.);   \n#ifdef USE_AMBIENT_LIGHT\n    indirectIrradiance += u_AmbientLightColor * PI;\n#endif\n#ifdef USE_SPHERICALHARMONICS_LIGHT\n    indirectIrradiance += getLightProbeIrradiance(u_SphericalHarmonicsLightData, N);\n#endif\n#if NUM_HEMI_LIGHTS > 0\n    float hemiDiffuseWeight;\n    #pragma unroll_loop_start\n    for (int i = 0; i < NUM_HEMI_LIGHTS; i++) {\n        L = normalize(u_Hemi[i].direction);\n        dotNL = dot(N, L);\n        hemiDiffuseWeight = 0.5 * dotNL + 0.5;\n        indirectIrradiance += mix(u_Hemi[i].groundColor, u_Hemi[i].skyColor, hemiDiffuseWeight) * PI;\n    }\n    #pragma unroll_loop_end\n#endif\nreflectedLight.indirectDiffuse += indirectIrradiance * BRDF_Diffuse_Lambert(diffuseColor);\n#if defined(USE_ENV_MAP) && defined(USE_PBR)\n    vec3 iblIrradiance = vec3(0., 0., 0.);\n    vec3 indirectRadiance = vec3(0., 0., 0.);\n    vec3 clearcoatRadiance = vec3(0., 0., 0.);\n    vec3 envDir;\n    #ifdef USE_VERTEX_ENVDIR\n        envDir = v_EnvDir;\n    #else\n        envDir = reflect(normalize(v_modelPos - u_CameraPosition), N);\n    #endif\n    iblIrradiance += getLightProbeIndirectIrradiance(maxMipLevel, N);\n    indirectRadiance += getLightProbeIndirectRadiance(roughness, maxMipLevel, N, envDir);\n    #ifdef USE_CLEARCOAT\n        vec3 clearcoatDir = reflect(normalize(v_modelPos - u_CameraPosition), clearcoatNormal);\n        clearcoatRadiance += getLightProbeIndirectRadiance(clearcoatRoughness, maxMipLevel, clearcoatNormal, clearcoatDir);\n    #endif\n    #ifdef USE_CLEARCOAT\n        float ccDotNV = saturate(dot(clearcoatNormal, V));\n        reflectedLight.indirectSpecular += clearcoatRadiance * clearcoat * BRDF_Specular_GGX_Environment(clearcoatNormal, V, specularColor, clearcoatRoughness);\n        ccDotNL = ccDotNV;\n        clearcoatDHR = clearcoat * clearcoatDHRApprox(clearcoatRoughness, ccDotNL);\n    #else\n        clearcoatDHR = 0.0;\n    #endif\n    float clearcoatInv = 1.0 - clearcoatDHR;\n    vec3 singleScattering = vec3(0.0);\n    vec3 multiScattering = vec3(0.0);\n    vec3 cosineWeightedIrradiance = iblIrradiance * RECIPROCAL_PI;\n    BRDF_Specular_Multiscattering_Environment(N, V, specularColor, roughness, singleScattering, multiScattering);\n    vec3 diffuse = diffuseColor * (1.0 - (singleScattering + multiScattering));\n    reflectedLight.indirectSpecular += clearcoatInv * indirectRadiance * singleScattering;\n    reflectedLight.indirectSpecular += multiScattering * cosineWeightedIrradiance;\n    reflectedLight.indirectDiffuse += diffuse * cosineWeightedIrradiance;\n#endif";
 
 var light_pars_frag = "#ifdef USE_AMBIENT_LIGHT\n    uniform vec3 u_AmbientLightColor;\n#endif\n#ifdef USE_SPHERICALHARMONICS_LIGHT\n    uniform vec3 u_SphericalHarmonicsLightData[9];\n#endif\n#ifdef USE_CLEARCOAT\n    float clearcoatDHRApprox(const in float roughness, const in float dotNL) {\n        return 0.04 + (1.0 - 0.16) * (pow(1.0 - dotNL, 5.0) * pow(1.0 - roughness, 2.0));\n    }\n#endif\n#if NUM_HEMI_LIGHTS > 0\n    struct HemisphereLight {\n        vec3 direction;\n        vec3 skyColor;\n\t\tvec3 groundColor;\n    };\n    uniform HemisphereLight u_Hemi[NUM_HEMI_LIGHTS];\n#endif\n#if NUM_DIR_LIGHTS > 0\n    struct DirectLight {\n        vec3 direction;\n        vec3 color;\n    };\n    uniform DirectLight u_Directional[NUM_DIR_LIGHTS];\n#endif\n#if NUM_POINT_LIGHTS > 0\n    struct PointLight {\n        vec3 position;\n        vec3 color;\n        float distance;\n        float decay;\n    };\n    uniform PointLight u_Point[NUM_POINT_LIGHTS];\n#endif\n#if NUM_SPOT_LIGHTS > 0\n    struct SpotLight {\n        vec3 position;\n        vec3 color;\n        float distance;\n        float decay;\n        float coneCos;\n        float penumbraCos;\n        vec3 direction;\n    };\n    uniform SpotLight u_Spot[NUM_SPOT_LIGHTS];\n#endif\n#if defined(USE_PBR) && defined(USE_ENV_MAP)\n    vec3 getLightProbeIndirectIrradiance(const in int maxMIPLevel, const in vec3 N) {\n        vec3 coordVec = vec3(u_EnvMap_Flip * N.x, N.yz);\n    \t#ifdef TEXTURE_LOD_EXT\n    \t\tvec4 envMapColor = textureCubeLodEXT(envMap, coordVec, float(maxMIPLevel));\n    \t#else\n    \t\tvec4 envMapColor = textureCube(envMap, coordVec, float(maxMIPLevel));\n    \t#endif\n        envMapColor = envMapTexelToLinear(envMapColor);\n        return PI * envMapColor.rgb * u_EnvMap_Intensity * u_EnvMapLight_Intensity;\n    }\n    float getSpecularMIPLevel(const in float roughness, const in int maxMIPLevel) {\n    \tfloat maxMIPLevelScalar = float(maxMIPLevel);\n        float sigma = PI * roughness * roughness / (1.0 + roughness);\n        float desiredMIPLevel = maxMIPLevelScalar + log2(sigma);\n    \treturn clamp(desiredMIPLevel, 0.0, maxMIPLevelScalar);\n    }\n    vec3 getLightProbeIndirectRadiance(const in float roughness, const in int maxMIPLevel, const in vec3 normal, const in vec3 envDir) {\n        float specularMIPLevel = getSpecularMIPLevel(roughness, maxMIPLevel);\n        vec3 coordVec = normalize(mix(envDir, normal, roughness * roughness));\n        coordVec.x *= u_EnvMap_Flip;\n        #ifdef TEXTURE_LOD_EXT\n    \t\tvec4 envMapColor = textureCubeLodEXT(envMap, coordVec, specularMIPLevel);\n    \t#else\n    \t\tvec4 envMapColor = textureCube(envMap, coordVec, specularMIPLevel);\n    \t#endif\n        envMapColor = envMapTexelToLinear(envMapColor);\n        return envMapColor.rgb * u_EnvMap_Intensity;\n    }\n    float computeSpecularOcclusion(const in float dotNV, const in float ambientOcclusion, const in float roughness) {\n    \treturn saturate(pow(dotNV + ambientOcclusion, exp2(-16.0 * roughness - 1.0)) - 1.0 + ambientOcclusion);\n    }\n#endif\n#ifdef USE_SPHERICALHARMONICS_LIGHT\n    vec3 shGetIrradianceAt(in vec3 normal, in vec3 shCoefficients[9]) {\n        float x = normal.x, y = normal.y, z = normal.z;\n        vec3 result = shCoefficients[0] * 0.886227;\n        result += shCoefficients[1] * 2.0 * 0.511664 * y;\n        result += shCoefficients[2] * 2.0 * 0.511664 * z;\n        result += shCoefficients[3] * 2.0 * 0.511664 * x;\n        result += shCoefficients[4] * 2.0 * 0.429043 * x * y;\n        result += shCoefficients[5] * 2.0 * 0.429043 * y * z;\n        result += shCoefficients[6] * (0.743125 * z * z - 0.247708);\n        result += shCoefficients[7] * 2.0 * 0.429043 * x * z;\n        result += shCoefficients[8] * 0.429043 * (x * x - y * y);\n        return result;\n    }\n    vec3 getLightProbeIrradiance(const in vec3 lightProbe[9], const in vec3 normal) {\n        vec3 irradiance = shGetIrradianceAt(normal, lightProbe);\n        return irradiance;\n    }\n#endif";
 
@@ -13715,7 +13955,7 @@ var specularMap_pars_frag = "#ifdef USE_SPECULARMAP\n\tuniform sampler2D specula
 
 var transpose = "mat4 transposeMat4(mat4 inMatrix) {\n    vec4 i0 = inMatrix[0];\n    vec4 i1 = inMatrix[1];\n    vec4 i2 = inMatrix[2];\n    vec4 i3 = inMatrix[3];\n    mat4 outMatrix = mat4(\n        vec4(i0.x, i1.x, i2.x, i3.x),\n        vec4(i0.y, i1.y, i2.y, i3.y),\n        vec4(i0.z, i1.z, i2.z, i3.z),\n        vec4(i0.w, i1.w, i2.w, i3.w)\n    );\n    return outMatrix;\n}";
 
-var tsn = "mat3 tsn(vec3 N, vec3 V, vec2 uv) {\n    vec3 q0 = vec3(dFdx(V.x), dFdx(V.y), dFdx(V.z));\n    vec3 q1 = vec3(dFdy(V.x), dFdy(V.y), dFdy(V.z));\n    vec2 st0 = dFdx( uv.st );\n    vec2 st1 = dFdy( uv.st );\n    float scale = sign( st1.t * st0.s - st0.t * st1.s );\n    vec3 S = normalize( ( q0 * st1.t - q1 * st0.t ) * scale );\n    vec3 T = normalize( ( -q0 * st1.s + q1 * st0.s ) * scale );\n    mat3 tsn = mat3( S, T, N );\n    return tsn;\n}";
+var tsn = "mat3 tsn(vec3 N, vec3 V, vec2 uv) {\n    vec3 q0 = dFdx(V.xyz);\n    vec3 q1 = dFdy(V.xyz);\n    vec2 st0 = dFdx(uv.xy);\n    vec2 st1 = dFdy(uv.xy);\n    float scale = sign(st1.y * st0.x - st0.y * st1.x);\n    vec3 S = normalize((q0 * st1.y - q1 * st0.y) * scale);\n    vec3 T = normalize((-q0 * st1.x + q1 * st0.x) * scale);\n    return mat3(S, T, N);\n}";
 
 var uv_pars_frag = "#ifdef USE_UV1\n    varying vec2 v_Uv;\n#endif\n#ifdef USE_UV2\n    varying vec2 v_Uv2;\n#endif";
 
@@ -13843,10 +14083,6 @@ var pbr2_frag = "#define USE_PBR\n#define USE_PBR2\n#include <common_frag>\n#inc
 
 var pbr_vert = "#define USE_PBR\n#include <common_vert>\n#include <normal_pars_vert>\n#include <uv_pars_vert>\n#include <color_pars_vert>\n#include <modelPos_pars_vert>\n#include <envMap_pars_vert>\n#include <aoMap_pars_vert>\n#include <alphamap_pars_vert>\n#include <emissiveMap_pars_vert>\n#include <shadowMap_pars_vert>\n#include <morphtarget_pars_vert>\n#include <skinning_pars_vert>\n#include <logdepthbuf_pars_vert>\nvoid main() {\n    #include <begin_vert>\n    #include <morphtarget_vert>\n    #include <morphnormal_vert>\n    #include <skinning_vert>\n    #include <skinnormal_vert>\n    #include <pvm_vert>\n    #include <normal_vert>\n    #include <logdepthbuf_vert>\n    #include <uv_vert>\n    #include <color_vert>\n    #include <modelPos_vert>\n    #include <envMap_vert>\n    #include <aoMap_vert>\n    #include <alphamap_vert>\n    #include <emissiveMap_vert>\n    #include <shadowMap_vert>\n}";
 
-var matcap_frag = "#define MATCAP\nuniform sampler2D matcap;\nvarying vec3 vViewPosition;\n#include <common_frag>\n#include <dithering_pars_frag>\n#include <uv_pars_frag>\n#include <color_pars_frag>\n#include <diffuseMap_pars_frag>\n#include <alphamap_pars_frag>\n#include <normalMap_pars_frag>\n#include <modelPos_pars_frag>\n#include <bumpMap_pars_frag>\n#include <normal_pars_frag>\n#include <fog_pars_frag>\n#include <logdepthbuf_pars_frag>\n#include <clippingPlanes_pars_frag>\nvoid main() {\n    #include <clippingPlanes_frag>\n    #include <logdepthbuf_frag>\n    #include <begin_frag>\n    #include <color_frag>\n    #include <diffuseMap_frag>\n    #include <alphamap_frag>\n    #include <alphaTest_frag>\n    #include <normal_frag>\n    vec3 viewDir = normalize(vViewPosition);\n\tvec3 x = normalize(vec3(viewDir.z, 0.0, -viewDir.x));\n\tvec3 y = cross(viewDir, x);\n    vec3 viewN = (u_View * vec4(N, 0.0)).xyz;\n\tvec2 uv = vec2(dot(x, viewN), dot(y, viewN)) * 0.495 + 0.5;\n    #ifdef USE_MATCAP\n\t\tvec4 matcapColor = texture2D(matcap, uv);\n\t\tmatcapColor = matcapTexelToLinear(matcapColor);\n\t#else\n\t\tvec4 matcapColor = vec4(1.0);\n\t#endif\n\toutColor.rgb *= matcapColor.rgb;\n    #include <end_frag>\n    #include <encodings_frag>\n    #include <premultipliedAlpha_frag>\n    #include <fog_frag>\n    #include <dithering_frag>\n}";
-
-var matcap_vert = "#define MATCAP\nvarying vec3 vViewPosition;\n#include <common_vert>\n#include <normal_pars_vert>\n#include <uv_pars_vert>\n#include <color_pars_vert>\n#include <alphamap_pars_vert>\n#include <modelPos_pars_vert>\n#include <morphtarget_pars_vert>\n#include <skinning_pars_vert>\n#include <logdepthbuf_pars_vert>\nvoid main() {\n    #include <begin_vert>\n    #include <morphtarget_vert>\n    #include <morphnormal_vert>\n    #include <skinning_vert>\n    #include <skinnormal_vert>\n    #include <pvm_vert>\n    #include <normal_vert>\n    #include <logdepthbuf_vert>\n    #include <uv_vert>\n    #include <color_vert>\n    #include <alphamap_vert>\n    #include <modelPos_vert>\n    vec4 mvPosition = u_View * worldPosition;\n    vViewPosition = - mvPosition.xyz;\n}";
-
 var phong_frag = "#define USE_PHONG\n#include <common_frag>\n#include <dithering_pars_frag>\nuniform float u_Specular;\nuniform vec3 u_SpecularColor;\n#include <specularMap_pars_frag>\nuniform vec3 emissive;\n#include <uv_pars_frag>\n#include <color_pars_frag>\n#include <diffuseMap_pars_frag>\n#include <alphamap_pars_frag>\n#include <normalMap_pars_frag>\n#include <bumpMap_pars_frag>\n#include <light_pars_frag>\n#include <normal_pars_frag>\n#include <modelPos_pars_frag>\n#include <bsdfs>\n#include <envMap_pars_frag>\n#include <aoMap_pars_frag>\n#include <shadowMap_pars_frag>\n#include <fog_pars_frag>\n#include <emissiveMap_pars_frag>\n#include <logdepthbuf_pars_frag>\n#include <clippingPlanes_pars_frag>\nvoid main() {\n    #include <clippingPlanes_frag>\n    #include <logdepthbuf_frag>\n    #include <begin_frag>\n    #include <color_frag>\n    #include <diffuseMap_frag>\n    #include <alphamap_frag>\n    #include <alphaTest_frag>\n    #include <normal_frag>\n    #include <specularMap_frag>\n    ReflectedLight reflectedLight = ReflectedLight(vec3(0.0), vec3(0.0), vec3(0.0), vec3(0.0));\n    #include <light_frag>\n    #include <aoMap_frag>\n    outColor.xyz = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular;\n    #include <envMap_frag>\n    #include <shadowMap_frag>\n    vec3 totalEmissiveRadiance = emissive;\n    #include <emissiveMap_frag>\n    outColor.xyz += totalEmissiveRadiance;\n    #include <end_frag>\n    #include <encodings_frag>\n    #include <premultipliedAlpha_frag>\n    #include <fog_frag>\n    #include <dithering_frag>\n}";
 
 var phong_vert = "#define USE_PHONG\n#include <common_vert>\n#include <normal_pars_vert>\n#include <uv_pars_vert>\n#include <color_pars_vert>\n#include <modelPos_pars_vert>\n#include <envMap_pars_vert>\n#include <aoMap_pars_vert>\n#include <alphamap_pars_vert>\n#include <emissiveMap_pars_vert>\n#include <shadowMap_pars_vert>\n#include <morphtarget_pars_vert>\n#include <skinning_pars_vert>\n#include <logdepthbuf_pars_vert>\nvoid main() {\n    #include <begin_vert>\n    #include <morphtarget_vert>\n    #include <morphnormal_vert>\n    #include <skinning_vert>\n    #include <skinnormal_vert>\n    #include <pvm_vert>\n    #include <normal_vert>\n    #include <logdepthbuf_vert>\n    #include <uv_vert>\n    #include <color_vert>\n    #include <modelPos_vert>\n    #include <envMap_vert>\n    #include <aoMap_vert>\n    #include <alphamap_vert>\n    #include <emissiveMap_vert>\n    #include <shadowMap_vert>\n}";
@@ -13870,8 +14106,6 @@ const ShaderLib = {
 	pbr_vert: pbr_vert,
 	pbr2_frag: pbr2_frag,
 	pbr2_vert: pbr_vert,
-	matcap_frag: matcap_frag,
-	matcap_vert: matcap_vert,
 	phong_frag: phong_frag,
 	phong_vert: phong_vert,
 	point_frag: point_frag,
@@ -13906,15 +14140,17 @@ class WebGLAttribute {
 function getAttributeCount(gl, type) {
 	switch (type) {
 		case gl.FLOAT:
-		case gl.BYTE:
-		case gl.UNSIGNED_BYTE:
-		case gl.UNSIGNED_SHORT:
+		case gl.INT:
+		case gl.UNSIGNED_INT:
 			return 1;
 		case gl.FLOAT_VEC2:
+		case gl.INT_VEC2:
 			return 2;
 		case gl.FLOAT_VEC3:
+		case gl.INT_VEC3:
 			return 3;
 		case gl.FLOAT_VEC4:
+		case gl.INT_VEC4:
 			return 4;
 		case gl.FLOAT_MAT2:
 			return 4;
@@ -13937,12 +14173,13 @@ function getAttributeFormat(gl, type) {
 		case gl.FLOAT_MAT3:
 		case gl.FLOAT_MAT4:
 			return gl.FLOAT;
-		case gl.UNSIGNED_BYTE:
-			return gl.UNSIGNED_BYTE;
-		case gl.UNSIGNED_SHORT:
-			return gl.UNSIGNED_SHORT;
-		case gl.BYTE:
-			return gl.BYTE;
+		case gl.INT:
+		case gl.INT_VEC2:
+		case gl.INT_VEC3:
+		case gl.INT_VEC4:
+			return gl.INT;
+		case gl.UNSIGNED_INT:
+			return gl.UNSIGNED_INT;
 		default:
 			return gl.FLOAT;
 	}
@@ -14094,12 +14331,10 @@ class WebGLGeometries extends PropertyMap {
 		const geometryProperties = this.get(geometry);
 
 		// If in pass rendering, skip the geometry if it has been set in this pass.
-		if (passInfo.enabled) {
-			if (geometryProperties.pass === passInfo.count) {
-				return;
-			}
-			geometryProperties.pass = passInfo.count;
+		if (geometryProperties.pass === passInfo.count) {
+			return;
 		}
+		geometryProperties.pass = passInfo.count;
 
 		if (!geometryProperties.created) {
 			geometry.addEventListener('dispose', this._onGeometryDispose);
@@ -14173,7 +14408,6 @@ const internalUniforms = {
 	'emissive': [4, function(material, textures) { const color = material.emissive; this.setValue(color.r, color.g, color.b); }],
 	'emissiveMap': [4, function(material, textures) { this.set(material.emissiveMap, textures); }],
 	'emissiveMapUVTransform': [4, function(material, textures) { this.set(material.emissiveMapTransform.elements); }],
-	'matcap': [4, function(material, textures) { this.set(material.matcap, textures); }],
 	'uvTransform': [4, function(material, textures) { this.set(material.diffuseMapTransform.elements); }],
 	'u_PointSize': [4, function(material, textures) { this.set(material.size); }],
 	'u_PointScale': [5, null],
@@ -14267,6 +14501,8 @@ function generateSetter(uniform, pureArray) {
 			break;
 		case gl.SAMPLER_2D:
 		case gl.SAMPLER_2D_SHADOW:
+		case gl.INT_SAMPLER_2D:
+		case gl.UNSIGNED_INT_SAMPLER_2D:
 			uniform.setValue = function(value, textures) {
 				const unit = textures.allocTexUnit();
 				textures.setTexture2D(value || (type === gl.SAMPLER_2D_SHADOW ? emptyShadowTexture : emptyTexture), unit);
@@ -15004,7 +15240,6 @@ function generateProps(state, capabilities, material, object, renderStates) {
 	props.useRoughnessMap = !!material.roughnessMap;
 	props.useMetalnessMap = !!material.metalnessMap;
 	props.useGlossinessMap = !!material.glossinessMap;
-	props.useMatcap = !!material.matcap;
 	props.useEnvMap = !!envMap;
 	props.envMapCombine = material.envMapCombine;
 
@@ -15041,7 +15276,6 @@ function generateProps(state, capabilities, material, object, renderStates) {
 	props.diffuseMapEncoding = getTextureEncodingFromMap(material.diffuseMap || material.cubeMap);
 	props.envMapEncoding = getTextureEncodingFromMap(envMap);
 	props.emissiveMapEncoding = getTextureEncodingFromMap(material.emissiveMap);
-	props.matcapEncoding = getTextureEncodingFromMap(material.matcap);
 	// other
 	props.alphaTest = material.alphaTest;
 	props.premultipliedAlpha = material.premultipliedAlpha;
@@ -15101,14 +15335,6 @@ function getEncodingComponents(encoding) {
 			return ['Linear', '(value)'];
 		case TEXEL_ENCODING_TYPE.SRGB:
 			return ['sRGB', '(value)'];
-		case TEXEL_ENCODING_TYPE.RGBE:
-			return ['RGBE', '(value)'];
-		case TEXEL_ENCODING_TYPE.RGBM7:
-			return ['RGBM', '(value, 7.0)'];
-		case TEXEL_ENCODING_TYPE.RGBM16:
-			return ['RGBM', '(value, 16.0)'];
-		case TEXEL_ENCODING_TYPE.RGBD:
-			return ['RGBD', '(value, 256.0)'];
 		case TEXEL_ENCODING_TYPE.GAMMA:
 			return ['Gamma', '(value, float(GAMMA_FACTOR))'];
 		default:
@@ -15132,6 +15358,8 @@ function createProgram(gl, defines, props, vertex, fragment) {
 		'precision ' + props.precision + ' int;',
 		// depth texture may have precision problem on iOS device.
 		'precision ' + props.precision + ' sampler2D;',
+		(props.version >= 2) ? 'precision ' + props.precision + ' isampler2D;' : '',
+		(props.version >= 2) ? 'precision ' + props.precision + ' usampler2D;' : '',
 
 		'#define SHADER_NAME ' + props.shaderName,
 
@@ -15145,7 +15373,6 @@ function createProgram(gl, defines, props, vertex, fragment) {
 
 		props.useAmbientLight ? '#define USE_AMBIENT_LIGHT' : '',
 		props.useSphericalHarmonicsLight ? '#define USE_SPHERICALHARMONICS_LIGHT' : '',
-		(props.pointLightNum > 0 || props.directLightNum > 0 || props.useAmbientLight || props.useSphericalHarmonicsLight || props.hemisphereLightNum > 0 || props.spotLightNum > 0) ? '#define USE_LIGHT' : '',
 		props.useNormalMap ? '#define USE_NORMAL_MAP' : '',
 		props.useBumpMap ? '#define USE_BUMPMAP' : '',
 		props.useSpecularMap ? '#define USE_SPECULARMAP' : '',
@@ -15191,6 +15418,8 @@ function createProgram(gl, defines, props, vertex, fragment) {
 		'precision ' + props.precision + ' int;',
 		// depth texture may have precision problem on iOS device.
 		'precision ' + props.precision + ' sampler2D;',
+		(props.version >= 2) ? 'precision ' + props.precision + ' isampler2D;' : '',
+		(props.version >= 2) ? 'precision ' + props.precision + ' usampler2D;' : '',
 		(props.version >= 2) ? 'precision ' + props.precision + ' sampler2DShadow;' : '',
 		(props.version >= 2) ? 'precision ' + props.precision + ' samplerCubeShadow;' : '',
 
@@ -15228,7 +15457,6 @@ function createProgram(gl, defines, props, vertex, fragment) {
 
 		props.useAmbientLight ? '#define USE_AMBIENT_LIGHT' : '',
 		props.useSphericalHarmonicsLight ? '#define USE_SPHERICALHARMONICS_LIGHT' : '',
-		(props.pointLightNum > 0 || props.directLightNum > 0 || props.useAmbientLight || props.useSphericalHarmonicsLight || props.hemisphereLightNum > 0 || props.spotLightNum > 0) ? '#define USE_LIGHT' : '',
 		props.useNormalMap ? '#define USE_NORMAL_MAP' : '',
 		props.useBumpMap ? '#define USE_BUMPMAP' : '',
 		props.useSpecularMap ? '#define USE_SPECULARMAP' : '',
@@ -15259,7 +15487,6 @@ function createProgram(gl, defines, props, vertex, fragment) {
 		props.alphaTest ? ('#define ALPHATEST ' + props.alphaTest) : '',
 		props.useEnvMap ? '#define ' + props.envMapCombine : '',
 		'#define GAMMA_FACTOR ' + props.gammaFactor,
-		props.useMatcap ? '#define USE_MATCAP' : '',
 
 		props.useUv1 ? '#define USE_UV1' : '',
 		props.useUv2 ? '#define USE_UV2' : '',
@@ -15272,7 +15499,6 @@ function createProgram(gl, defines, props, vertex, fragment) {
 		getTexelDecodingFunction('mapTexelToLinear', props.diffuseMapEncoding),
 		props.useEnvMap ? getTexelDecodingFunction('envMapTexelToLinear', props.envMapEncoding) : '',
 		props.useEmissiveMap ? getTexelDecodingFunction('emissiveMapTexelToLinear', props.emissiveMapEncoding) : '',
-		props.useMatcap ? getTexelDecodingFunction('matcapTexelToLinear', props.matcapEncoding) : '',
 		getTexelEncodingFunction('linearToOutputTexel', props.outputEncoding),
 
 		props.packDepthToRGBA ? '#define DEPTH_PACKING_RGBA' : '',
@@ -16039,7 +16265,9 @@ class WebGLState {
 		this.blendEquationToGL = {
 			[BLEND_EQUATION.ADD]: gl.FUNC_ADD,
 			[BLEND_EQUATION.SUBTRACT]: gl.FUNC_SUBTRACT,
-			[BLEND_EQUATION.REVERSE_SUBTRACT]: gl.FUNC_REVERSE_SUBTRACT
+			[BLEND_EQUATION.REVERSE_SUBTRACT]: gl.FUNC_REVERSE_SUBTRACT,
+			[BLEND_EQUATION.MIN]: gl.MIN,
+			[BLEND_EQUATION.MAX]: gl.MAX
 		};
 
 		this.blendFactorToGL = {
@@ -17592,7 +17820,8 @@ class WebGLVertexArrayBindings extends PropertyMap {
 				const bufferProperties = buffers.get(buffer);
 
 				const type = bufferProperties.type;
-				if (programAttribute.format !== type) ;
+
+				const integer = isWebGL2 && (programAttribute.format === gl.INT || programAttribute.format === gl.UNSIGNED_INT);
 
 				for (let i = 0, l = programAttribute.locationSize; i < l; i++) {
 					gl.enableVertexAttribArray(programAttribute.location + i);
@@ -17619,16 +17848,17 @@ class WebGLVertexArrayBindings extends PropertyMap {
 				gl.bindBuffer(gl.ARRAY_BUFFER, glBuffer);
 
 				if (programAttribute.count === stride && programAttribute.locationSize === 1) {
-					gl.vertexAttribPointer(programAttribute.location, programAttribute.count, type, normalized, 0, 0);
+					this._vertexAttribPointer(programAttribute.location, programAttribute.count, type, normalized, 0, 0, integer);
 				} else {
 					for (let i = 0; i < programAttribute.locationSize; i++) {
-						gl.vertexAttribPointer(
+						this._vertexAttribPointer(
 							programAttribute.location + i,
 							programAttribute.count / programAttribute.locationSize,
 							type,
 							normalized,
 							bytesPerElement * stride,
-							bytesPerElement * (offset + (programAttribute.count / programAttribute.locationSize) * i)
+							bytesPerElement * (offset + (programAttribute.count / programAttribute.locationSize) * i),
+							integer
 						);
 					}
 				}
@@ -17639,6 +17869,15 @@ class WebGLVertexArrayBindings extends PropertyMap {
 		if (geometry.index) {
 			const indexBufferProperties = buffers.get(geometry.index.buffer);
 			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBufferProperties.glBuffer);
+		}
+	}
+
+	_vertexAttribPointer(index, size, type, normalized, stride, offset, integer) {
+		const gl = this._gl;
+		if (integer) {
+			gl.vertexAttribIPointer(index, size, type, stride, offset);
+		} else {
+			gl.vertexAttribPointer(index, size, type, normalized, stride, offset);
 		}
 	}
 
@@ -17742,7 +17981,15 @@ class WebGLRenderer extends ThinRenderer {
 
 	endRender() {
 		super.endRender();
+
 		this._currentMaterial = null;
+
+		// Ensure depth buffer writing is enabled so it can be cleared on next render
+
+		const state = this._state;
+		state.depthBuffer.setTest(true);
+		state.depthBuffer.setMask(true);
+		state.colorBuffer.setMask(true);
 	}
 
 	clear(color, depth, stencil) {
@@ -17781,6 +18028,7 @@ class WebGLRenderer extends ThinRenderer {
 
 	readRenderTargetPixels(x, y, width, height, buffer) {
 		this._renderTargets.readRenderTargetPixels(x, y, width, height, buffer);
+		return Promise.resolve(buffer);
 	}
 
 	updateRenderTargetMipmap(renderTarget) {
@@ -17853,6 +18101,11 @@ class WebGLRenderer extends ThinRenderer {
 		const currentRenderTarget = state.currentRenderTarget;
 
 		if (!ifRender(renderable)) {
+			return;
+		}
+
+		if (!passInfo.enabled) {
+			console.warn('WebGLRenderer: beginRender must be called before renderRenderableItem.');
 			return;
 		}
 
@@ -17938,7 +18191,7 @@ class WebGLRenderer extends ThinRenderer {
 
 		const program = materialProperties.program;
 
-		if (!program.isReady(capabilities.parallelShaderCompileExt)) return;
+		if (options.onlyCompile || !program.isReady(capabilities.parallelShaderCompileExt)) return;
 
 		state.setProgram(program);
 
@@ -17973,16 +18226,14 @@ class WebGLRenderer extends ThinRenderer {
 		}
 
 		let refreshMaterial = true;
-		if (passInfo.enabled) {
-			if (!material.forceUpdateUniforms) {
-				if (materialProperties.pass !== passInfo.count) {
-					materialProperties.pass = passInfo.count;
-				} else {
-					refreshMaterial = this._currentMaterial !== material;
-				}
+		if (!material.forceUpdateUniforms) {
+			if (materialProperties.pass !== passInfo.count) {
+				materialProperties.pass = passInfo.count;
+			} else {
+				refreshMaterial = this._currentMaterial !== material;
 			}
-			this._currentMaterial = material;
 		}
+		this._currentMaterial = material;
 
 		const uniforms = program.getUniforms();
 
@@ -18075,12 +18326,6 @@ class WebGLRenderer extends ThinRenderer {
 		this._draw(geometry, material, group, renderInfo);
 
 		textures.resetTextureUnits();
-
-		// Ensure depth buffer writing is enabled so it can be cleared on next render
-
-		state.depthBuffer.setTest(true);
-		state.depthBuffer.setMask(true);
-		state.colorBuffer.setMask(true);
 
 		afterRender(renderable);
 		object.onAfterRender(renderable);
@@ -18241,25 +18486,31 @@ class WebGLRenderer extends ThinRenderer {
 		const capabilities = this.capabilities;
 		const buffers = this._buffers;
 
+		const instanceCount = geometry.instanceCount;
+		const useInstancing = instanceCount >= 0;
+		const useGroup = !!group;
+		const useMultiDraw = useGroup && group.multiDrawCount !== undefined;
 		const useIndexBuffer = geometry.index !== null;
-		const position = geometry.getAttribute('a_Position');
 
 		let drawStart = 0;
 		let drawCount = Infinity;
-		if (useIndexBuffer) {
-			drawCount = geometry.index.buffer.count;
-		} else if (position) {
-			drawCount = position.buffer.count;
+
+		if (!useMultiDraw) {
+			const position = geometry.getAttribute('a_Position');
+
+			if (useIndexBuffer) {
+				drawCount = geometry.index.buffer.count;
+			} else if (position) {
+				drawCount = position.buffer.count;
+			}
+
+			if (useGroup) {
+				drawStart = Math.max(drawStart, group.start);
+				drawCount = Math.min(drawCount, group.count);
+			}
+
+			if (drawCount < 0 || drawCount === Infinity) return;
 		}
-		const groupStart = group ? group.start : 0;
-		const groupCount = group ? group.count : Infinity;
-		drawStart = Math.max(drawStart, groupStart);
-		drawCount = Math.min(drawCount, groupCount);
-
-		if (drawCount < 0 || drawCount === Infinity) return;
-
-		const instanceCount = geometry.instanceCount;
-		const useInstancing = instanceCount >= 0;
 
 		if (useIndexBuffer) {
 			const indexBufferProperties = buffers.get(geometry.index.buffer);
@@ -18268,42 +18519,70 @@ class WebGLRenderer extends ThinRenderer {
 
 			if (type === gl.UNSIGNED_INT) {
 				if (capabilities.version < 2 && !capabilities.getExtension('OES_element_index_uint')) {
-					console.warn('draw elements type not support UNSIGNED_INT!');
+					console.warn('WebGLRenderer: draw elements type not support UNSIGNED_INT!');
 				}
 			}
 
 			if (useInstancing) {
-				if (instanceCount > 0) {
-					if (capabilities.version >= 2) {
-						gl.drawElementsInstanced(material.drawMode, drawCount, type, drawStart * bytesPerElement, instanceCount);
-					} else if (capabilities.getExtension('ANGLE_instanced_arrays')) {
-						capabilities.getExtension('ANGLE_instanced_arrays').drawElementsInstancedANGLE(material.drawMode, drawCount, type, drawStart * bytesPerElement, instanceCount);
-					} else {
-						console.warn('no support instanced draw.');
-						return;
-					}
+				if (instanceCount <= 0) return;
+
+				if (capabilities.version >= 2) {
+					gl.drawElementsInstanced(material.drawMode, drawCount, type, drawStart * bytesPerElement, instanceCount);
+				} else if (capabilities.getExtension('ANGLE_instanced_arrays')) {
+					capabilities.getExtension('ANGLE_instanced_arrays').drawElementsInstancedANGLE(material.drawMode, drawCount, type, drawStart * bytesPerElement, instanceCount);
+				} else {
+					console.warn('WebGLRenderer: using instanced draw but hardware does not support.');
+					return;
 				}
+			} else if (useMultiDraw) {
+				if (group.multiDrawCount <= 0) return;
+
+				const extension = capabilities.getExtension('WEBGL_multi_draw');
+
+				if (!extension) {
+					console.warn('WebGLRenderer: using multi draw but hardware does not support extension WEBGL_multi_draw.');
+					return;
+				}
+
+				extension.multiDrawElementsWEBGL(material.drawMode, group.multiDrawCounts, 0, type, group.multiDrawStarts, 0, group.multiDrawCount);
 			} else {
 				gl.drawElements(material.drawMode, drawCount, type, drawStart * bytesPerElement);
 			}
 		} else {
 			if (useInstancing) {
-				if (instanceCount > 0) {
-					if (capabilities.version >= 2) {
-						gl.drawArraysInstanced(material.drawMode, drawStart, drawCount, instanceCount);
-					} else if (capabilities.getExtension('ANGLE_instanced_arrays')) {
-						capabilities.getExtension('ANGLE_instanced_arrays').drawArraysInstancedANGLE(material.drawMode, drawStart, drawCount, instanceCount);
-					} else {
-						console.warn('no support instanced draw.');
-						return;
-					}
+				if (instanceCount <= 0) return;
+
+				if (capabilities.version >= 2) {
+					gl.drawArraysInstanced(material.drawMode, drawStart, drawCount, instanceCount);
+				} else if (capabilities.getExtension('ANGLE_instanced_arrays')) {
+					capabilities.getExtension('ANGLE_instanced_arrays').drawArraysInstancedANGLE(material.drawMode, drawStart, drawCount, instanceCount);
+				} else {
+					console.warn('WebGLRenderer: using instanced draw but hardware does not support.');
+					return;
 				}
+			} else if (useMultiDraw) {
+				if (group.multiDrawCount <= 0) return;
+
+				const extension = capabilities.getExtension('WEBGL_multi_draw');
+
+				if (!extension) {
+					console.warn('WebGLRenderer: using multi draw but hardware does not support extension WEBGL_multi_draw.');
+					return;
+				}
+
+				extension.multiDrawArraysWEBGL(material.drawMode, group.multiDrawStarts, 0, group.multiDrawCounts, 0, group.multiDrawCount);
 			} else {
 				gl.drawArrays(material.drawMode, drawStart, drawCount);
 			}
 		}
 
 		if (renderInfo) {
+			if (useMultiDraw) {
+				drawCount = 0;
+				for (let i = 0; i < group.multiDrawCount; i++) {
+					drawCount += group.multiDrawCounts[i];
+				}
+			}
 			renderInfo.update(drawCount, material.drawMode, instanceCount < 0 ? 1 : instanceCount);
 		}
 	}
@@ -18413,4 +18692,17 @@ class WebGLProperties {
 
 }
 
-export { ATTACHMENT, AmbientLight, AnimationAction, AnimationMixer, Attribute, BLEND_EQUATION, BLEND_FACTOR, BLEND_TYPE, BUFFER_USAGE, BasicMaterial, Bone, BooleanKeyframeTrack, Box2, Box3, BoxGeometry, Buffer, COMPARE_FUNC, CULL_FACE_TYPE, Camera, Color3, ColorKeyframeTrack, BoxGeometry as CubeGeometry, CylinderGeometry, DRAW_MODE, DRAW_SIDE, DefaultLoadingManager, DepthMaterial, DirectionalLight, DirectionalLightShadow, DistanceMaterial, ENVMAP_COMBINE_TYPE, Euler, EventDispatcher, FileLoader, Fog, FogExp2, Frustum, Geometry, Group, HemisphereLight, ImageLoader, KeyframeClip, KeyframeTrack, LambertMaterial, Light, LightData, LightShadow, LineMaterial, Loader, LoadingManager, MATERIAL_TYPE, MatcapMaterial, Material, Matrix3, Matrix4, Mesh, NumberKeyframeTrack, OPERATION, Object3D, PBR2Material, PBRMaterial, PIXEL_FORMAT, PIXEL_TYPE, PhongMaterial, Plane, PlaneGeometry, PointLight, PointLightShadow, PointsMaterial, PropertyBindingMixer, PropertyMap, QUERY_TYPE, Quaternion, QuaternionKeyframeTrack, Query, Ray, RenderBuffer, RenderInfo, RenderQueue, RenderQueueLayer, RenderStates, RenderTarget2D, RenderTargetBack, RenderTargetBase, RenderTargetCube, Renderer, SHADING_TYPE, SHADOW_TYPE, Scene, SceneData, ShaderChunk, ShaderLib, ShaderMaterial, ShaderPostPass, ShadowMapPass, Skeleton, SkinnedMesh, Sphere, SphereGeometry, Spherical, SphericalHarmonics3, SphericalHarmonicsLight, SpotLight, SpotLightShadow, StringKeyframeTrack, TEXEL_ENCODING_TYPE, TEXTURE_FILTER, TEXTURE_WRAP, Texture2D, Texture3D, TextureBase, TextureCube, ThinRenderer, TorusKnotGeometry, Triangle, VERTEX_COLOR, Vector2, Vector3, Vector4, VectorKeyframeTrack, COMPARE_FUNC as WEBGL_COMPARE_FUNC, OPERATION as WEBGL_OP, PIXEL_FORMAT as WEBGL_PIXEL_FORMAT, PIXEL_TYPE as WEBGL_PIXEL_TYPE, TEXTURE_FILTER as WEBGL_TEXTURE_FILTER, TEXTURE_WRAP as WEBGL_TEXTURE_WRAP, WebGLAttribute, WebGLCapabilities, WebGLGeometries, WebGLProgram, WebGLPrograms, WebGLProperties, WebGLQueries, WebGLRenderBuffers, WebGLRenderPass, WebGLRenderer, WebGLState, WebGLTextures, WebGLUniforms, cloneJson, cloneUniforms, generateUUID, isPowerOfTwo, nearestPowerOfTwo, nextPowerOfTwo };
+// since 0.2.1, moved matcap shader to addons.
+
+MATERIAL_TYPE.MATCAP = 'matcap';
+
+class MatcapMaterial extends BasicMaterial {
+
+	constructor() {
+		super();
+		console.warn('MatcapMaterial has been removed and fallback to BasicMaterial, use addons/shaders/MatcapShader instead.');
+	}
+
+}
+
+export { ATTACHMENT, AmbientLight, AnimationAction, AnimationMixer, Attribute, BLEND_EQUATION, BLEND_FACTOR, BLEND_TYPE, BUFFER_USAGE, BasicMaterial, Bone, BooleanKeyframeTrack, Box2, Box3, BoxGeometry, Buffer, COMPARE_FUNC, CULL_FACE_TYPE, Camera, Color3, ColorKeyframeTrack, BoxGeometry as CubeGeometry, CubicSplineInterpolant, CylinderGeometry, DRAW_MODE, DRAW_SIDE, DefaultLoadingManager, DepthMaterial, DirectionalLight, DirectionalLightShadow, DistanceMaterial, ENVMAP_COMBINE_TYPE, Euler, EventDispatcher, FileLoader, Fog, FogExp2, Frustum, Geometry, Group, HemisphereLight, ImageLoader, KeyframeClip, KeyframeInterpolant, KeyframeTrack, LambertMaterial, Light, LightData, LightShadow, LineMaterial, LinearInterpolant, Loader, LoadingManager, MATERIAL_TYPE, MatcapMaterial, Material, Matrix3, Matrix4, Mesh, NumberKeyframeTrack, OPERATION, Object3D, PBR2Material, PBRMaterial, PIXEL_FORMAT, PIXEL_TYPE, PhongMaterial, Plane, PlaneGeometry, PointLight, PointLightShadow, PointsMaterial, PropertyBindingMixer, PropertyMap, QUERY_TYPE, Quaternion, QuaternionCubicSplineInterpolant, QuaternionKeyframeTrack, QuaternionLinearInterpolant, Query, Ray, RenderBuffer, RenderInfo, RenderQueue, RenderQueueLayer, RenderStates, RenderTarget2D, RenderTargetBack, RenderTargetBase, RenderTargetCube, Renderer, SHADING_TYPE, SHADOW_TYPE, Scene, SceneData, ShaderChunk, ShaderLib, ShaderMaterial, ShaderPostPass, ShadowMapPass, Skeleton, SkinnedMesh, Sphere, SphereGeometry, Spherical, SphericalHarmonics3, SphericalHarmonicsLight, SpotLight, SpotLightShadow, StepInterpolant, StringKeyframeTrack, TEXEL_ENCODING_TYPE, TEXTURE_FILTER, TEXTURE_WRAP, Texture2D, Texture3D, TextureBase, TextureCube, ThinRenderer, TorusKnotGeometry, Triangle, VERTEX_COLOR, Vector2, Vector3, Vector4, VectorKeyframeTrack, COMPARE_FUNC as WEBGL_COMPARE_FUNC, OPERATION as WEBGL_OP, PIXEL_FORMAT as WEBGL_PIXEL_FORMAT, PIXEL_TYPE as WEBGL_PIXEL_TYPE, TEXTURE_FILTER as WEBGL_TEXTURE_FILTER, TEXTURE_WRAP as WEBGL_TEXTURE_WRAP, WebGLAttribute, WebGLCapabilities, WebGLGeometries, WebGLProgram, WebGLPrograms, WebGLProperties, WebGLQueries, WebGLRenderBuffers, WebGLRenderPass, WebGLRenderer, WebGLState, WebGLTextures, WebGLUniforms, cloneJson, cloneUniforms, generateUUID, isPowerOfTwo, nearestPowerOfTwo, nextPowerOfTwo };
