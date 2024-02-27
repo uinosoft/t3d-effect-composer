@@ -60,6 +60,7 @@ export class TransitionEffect extends Effect {
 		} else {
 			if (this._frameShotRenderTarget) {
 				composer._renderTargetCache.release(this._frameShotRenderTarget, 0);
+				this._frameShotRenderTarget = null;
 			}
 		}
 
