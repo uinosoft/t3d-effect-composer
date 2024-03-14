@@ -97,7 +97,6 @@
 	const platte = new Texture2DLoader().load('./resources/platte.png');
 
 	const volumeEffect = new VolumeEffect();
-	volumeEffect.enable = false;
 	volumeEffect.id = 1;
 	volumeEffect.colorRampTexture = platte;
 	effectComposer.addEffect('volumeEffect', volumeEffect, 99);
@@ -166,7 +165,6 @@
 			volumeEffect.volumeTexture = textures.get(params.texture);
 		}
 		volumeEffect.unitAlphaCorrection = 2.0;
-		volumeEffect.enable = true;
 		refreshVolumeObject();
 
 		const gui = new GUI();
