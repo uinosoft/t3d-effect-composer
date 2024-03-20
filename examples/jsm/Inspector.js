@@ -42,7 +42,7 @@ class Inspector {
 			ssrFolder.add(ssrEffect, 'eyeFadeEnd', 0, 1, 0.01);
 			ssrFolder.add(ssrEffect, 'minGlossiness', 0, 1, 0.01);
 			ssrFolder.add(ssrEffect, 'strength', 0, 1, 0.01);
-			ssrFolder.add(ssrEffect, 'mixType', [0, 1]);
+			ssrFolder.add(ssrEffect, 'falloff', 0, 1, 0.01);
 
 			const colorCorrectionEffect = effectComposer.getEffect('ColorCorrection');
 			const colorCorrectionFolder = postEffectFolder.addFolder('ColorCorrection');

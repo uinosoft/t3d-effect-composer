@@ -2495,12 +2495,16 @@
 
 			// Object larger than minGlossiness will have ssr effect
 			this.minGlossiness = 0.2;
-			this.strength = 0.2;
-			this.mixType = 0; // 0: Add, 1: Mix
 
+			// the strength of ssr effect
+			this.strength = 0.2;
+
+			// the falloff of base color when mix with ssr color
+			this.falloff = 0;
 			this.blurSize = 2;
 			this.depthRange = 1;
 			this.jitter = true;
+			this._copyRGBPass = new t3d.ShaderPostPass(copyRGBShader);
 			this._ssrPass = new t3d.ShaderPostPass(ssrShader);
 			this._blurPass = new t3d.ShaderPostPass(blurShader);
 			this._blurPass.material.defines.NORMALTEX_ENABLED = 1;
@@ -2521,8 +2525,13 @@
 			// Step 1: ssr pass
 
 			renderer.setRenderTarget(tempRT1);
-			renderer.setClearColor(0, 0, 0, 1);
-			renderer.clear(true, true, false);
+			if (inputRenderTarget) {
+				this._copyRGBPass.uniforms.tDiffuse = sceneBuffer.output()._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
+				this._copyRGBPass.render(renderer); // clear rgb channel to scene color and alpha channel to 0
+			} else {
+				renderer.setClearColor(0, 0, 0, 0);
+				renderer.clear(true, true, false);
+			}
 			this._ssrPass.uniforms.colorTex = sceneBuffer.output()._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 			this._ssrPass.uniforms.gBufferTexture1 = gBuffer.output()._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 			this._ssrPass.uniforms.gBufferTexture2 = gBuffer.output()._attachments[t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
@@ -2586,13 +2595,8 @@
 				}
 				this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 				this._blendPass.uniforms.texture2 = tempRT1.texture;
-				this._blendPass.uniforms.reflectivitySampler = gBuffer.output()._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
-				this._blendPass.uniforms.reflectivityThreshold = this.minGlossiness;
 				this._blendPass.uniforms.strength = this.strength;
-				if (this._blendPass.material.defines.MIX_TYPE !== this.mixType) {
-					this._blendPass.material.needsUpdate = true;
-					this._blendPass.material.defines.MIX_TYPE = this.mixType;
-				}
+				this._blendPass.uniforms.falloff = this.falloff;
 				if (finish) {
 					this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
 					this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
@@ -2904,50 +2908,52 @@
 			}
 
 			vec4 color = texture2D(colorTex, hitPixel);
-			gl_FragColor = vec4(color.rgb * alpha, color.a);
+			gl_FragColor = vec4(color.rgb, color.a * alpha);
 		}
+		`
+	};
+	const copyRGBShader = {
+		name: 'ec_copy_rgb',
+		defines: {},
+		uniforms: {
+			tDiffuse: null
+		},
+		vertexShader: defaultVertexShader,
+		fragmentShader: `
+				uniform sampler2D tDiffuse;
+
+				varying vec2 v_Uv;
+
+				void main() {
+			vec3 color = texture2D(tDiffuse, v_Uv).rgb;
+						gl_FragColor = vec4(color, 0.0);
+				}
 		`
 	};
 	const mixSSRShader = {
 		name: 'ec_ssr_mix',
-		defines: {
-			MIX_TYPE: 0
-		},
+		defines: {},
 		uniforms: {
 			texture1: null,
 			texture2: null,
-			reflectivitySampler: null,
 			strength: 0.15,
-			reflectivityThreshold: 0.6,
-			type: 1.0
+			falloff: 1
 		},
 		vertexShader: defaultVertexShader,
 		fragmentShader: `
 				uniform sampler2D texture1;
 				uniform sampler2D texture2;
-		uniform sampler2D reflectivitySampler;
-		uniform float reflectivityThreshold;
 		uniform float strength;
+		uniform float falloff;
 				varying vec2 v_Uv;
 				void main() {
-			#if MIX_TYPE == 0
-				vec4 texel1 = texture2D(texture1, v_Uv);
-				vec4 texel2 = texture2D(texture2, v_Uv);
-				vec3 color = texel1.rgb * 1.0 + texel2.rgb * 1.0 * strength;
-				gl_FragColor = vec4(color, texel1.a);
-			#else
-				vec4 color = texture2D(texture1, v_Uv);
-				vec4 SSR = texture2D(texture2, v_Uv);
-				float reflectivity = texture(reflectivitySampler, v_Uv).a;
-				if (reflectivity <= reflectivityThreshold) {
-					gl_FragColor = color;
-					return;
-				}
-				vec3 reflectionMultiplier = vec3(reflectivity * strength);
-				vec3 colorMultiplier = 1.0-reflectionMultiplier;
-				vec3 finalColor = (color.rgb*colorMultiplier)+(SSR.rgb*reflectionMultiplier);
-				gl_FragColor =vec4(finalColor,color.a);
-			#endif
+			vec4 baseColor = texture2D(texture1, v_Uv);
+			vec4 ssrColor = texture2D(texture2, v_Uv);
+
+			float reflectivity = ssrColor.a * strength;
+			vec3 finalColor = baseColor.rgb * (1.0 - reflectivity * falloff) + ssrColor.rgb * reflectivity;
+
+			gl_FragColor = vec4(finalColor, baseColor.a);
 				}
 		`
 	};
@@ -6300,6 +6306,21 @@
 			}
 		};
 	}
+
+	// since v0.1.3
+	// SSREffect mixType property compatibility, to be removed in the future
+	Object.defineProperties(SSREffect.prototype, {
+		mixType: {
+			set: function (value) {
+				// console.warn('SSREffect: mixType has been deprecated, use falloff instead.');
+				this.falloff = value;
+			},
+			get: function () {
+				// console.warn('SSREffect: mixType has been deprecated, use falloff instead.');
+				return this.falloff;
+			}
+		}
+	});
 
 	exports.AccumulationBuffer = AccumulationBuffer;
 	exports.BloomEffect = BloomEffect;

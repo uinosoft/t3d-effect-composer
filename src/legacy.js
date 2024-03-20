@@ -1,5 +1,6 @@
 import { ShaderPostPass } from 't3d';
 import EffectComposer from './EffectComposer.js';
+import SSREffect from './effects/SSREffect.js';
 
 export const RenderLayer = {
 	Background: 2,
@@ -35,3 +36,18 @@ if (!ShaderPostPass.prototype.dispose) {
 		}
 	};
 }
+
+// since v0.1.3
+// SSREffect mixType property compatibility, to be removed in the future
+Object.defineProperties(SSREffect.prototype, {
+	mixType: {
+		set: function(value) {
+			// console.warn('SSREffect: mixType has been deprecated, use falloff instead.');
+			this.falloff = value;
+		},
+		get: function() {
+			// console.warn('SSREffect: mixType has been deprecated, use falloff instead.');
+			return this.falloff;
+		}
+	}
+});
