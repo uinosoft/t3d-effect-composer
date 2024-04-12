@@ -1466,7 +1466,9 @@ export const ToneMappingType = {
 	Linear: 1,
 	Reinhard: 2,
 	Cineon: 3,
-	ACESFilmic: 4
+	ACESFilmic: 4,
+	Neutral: 5,
+	AgX: 6
 };
 
 export function isDepthStencilAttachment(attachment) {
