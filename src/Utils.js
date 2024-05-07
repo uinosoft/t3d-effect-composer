@@ -15,6 +15,20 @@ export const defaultVertexShader = `
     }
 `;
 
+export const unitVectorToOctahedronGLSL = `
+vec2 unitVectorToOctahedron(vec3 v) {
+    vec2 up = v.xz / dot(vec3(1.0), abs(v));
+    vec2 down = (1.0 - abs(up.yx)) * sign(up.xy);
+    return mix(up, down, step(0.0, -v.y));
+}`;
+
+export const octahedronToUnitVectorGLSL = `
+vec3 octahedronToUnitVector(vec2 p) {
+    vec3 v = vec3(p.x, 1.0 - dot(abs(p), vec2(1.0)), p.y);
+    v.xz = mix(v.xz, (1.0 - abs(v.zx)) * sign(v.xz), step(0.0, -v.y));
+    return normalize(v);
+}`;
+
 export const blurShader = {
 	name: 'ec_blur',
 	defines: {
@@ -46,8 +60,11 @@ export const blurShader = {
         #if NORMALTEX_ENABLED == 1
             uniform sampler2D normalTex;
             uniform mat4 viewInverseTranspose;
+
+            ${octahedronToUnitVectorGLSL}
+
             vec3 getViewNormal(const in vec2 screenPosition) {
-                vec3 normal = texture2D(normalTex, screenPosition).xyz * 2.0 - 1.0;
+                vec3 normal = octahedronToUnitVector(texture2D(normalTex, screenPosition).rg);
                 // Convert to view space
                 return (viewInverseTranspose * vec4(normal, 0.0)).xyz;
             }

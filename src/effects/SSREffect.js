@@ -1,6 +1,6 @@
 import { ShaderPostPass, ATTACHMENT, Matrix4 } from 't3d';
 import Effect from './Effect.js';
-import { defaultVertexShader, blurShader } from '../Utils.js';
+import { defaultVertexShader, octahedronToUnitVectorGLSL, blurShader } from '../Utils.js';
 
 export default class SSREffect extends Effect {
 
@@ -257,6 +257,8 @@ const ssrShader = {
 		uniform float nearZ;
 		uniform vec2 viewportSize;
 
+		${octahedronToUnitVectorGLSL}
+
 		float fetchDepth(sampler2D depthTexture, vec2 uv) {
 			vec4 depthTexel = texture2D(depthTexture, uv);
 			return depthTexel.r * 2.0 - 1.0;
@@ -439,20 +441,20 @@ const ssrShader = {
 			return alpha;
 		}
 		void main() {
-			vec4 normalAndGloss = texture2D(gBufferTexture1, v_Uv);
+			vec4 gBufferTexel = texture2D(gBufferTexture1, v_Uv);
 
-			if (dot(normalAndGloss.rgb, vec3(1.0)) == 0.0) {
+			if (gBufferTexel.r < -2.0) {
 				discard;
 			}
 
-			float g = normalAndGloss.a;
+			float g = 1. - gBufferTexel.a;
 			if (g <= minGlossiness) {
 				discard;
 			}
 
 			float reflectivity = g;
 
-			vec3 N = normalAndGloss.rgb * 2.0 - 1.0;
+			vec3 N = octahedronToUnitVector(gBufferTexel.rg);
 			N = normalize((viewInverseTranspose * vec4(N, 0.0)).xyz);
 
 			// Position in view
@@ -478,7 +480,7 @@ const ssrShader = {
 
 			float alpha = calculateAlpha(iterationCount, reflectivity, hitPixel, hitPoint, dist, rayDir) * float(intersect);
 
-			vec3 hitNormal = texture2D(gBufferTexture1, hitPixel).rgb * 2.0 - 1.0;
+			vec3 hitNormal = octahedronToUnitVector(texture2D(gBufferTexture1, hitPixel).rg);
 			hitNormal = normalize((viewInverseTranspose * vec4(hitNormal, 0.0)).xyz);
 
 			// Ignore the pixel not face the ray

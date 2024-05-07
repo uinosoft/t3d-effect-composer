@@ -103,6 +103,18 @@
 				gl_Position = u_ProjectionView * u_Model * vec4(a_Position, 1.0);
 		}
 `;
+	const unitVectorToOctahedronGLSL = `
+vec2 unitVectorToOctahedron(vec3 v) {
+		vec2 up = v.xz / dot(vec3(1.0), abs(v));
+		vec2 down = (1.0 - abs(up.yx)) * sign(up.xy);
+		return mix(up, down, step(0.0, -v.y));
+}`;
+	const octahedronToUnitVectorGLSL = `
+vec3 octahedronToUnitVector(vec2 p) {
+		vec3 v = vec3(p.x, 1.0 - dot(abs(p), vec2(1.0)), p.y);
+		v.xz = mix(v.xz, (1.0 - abs(v.zx)) * sign(v.xz), step(0.0, -v.y));
+		return normalize(v);
+}`;
 	const blurShader = {
 		name: 'ec_blur',
 		defines: {
@@ -135,8 +147,11 @@
 				#if NORMALTEX_ENABLED == 1
 						uniform sampler2D normalTex;
 						uniform mat4 viewInverseTranspose;
+
+						${octahedronToUnitVectorGLSL}
+
 						vec3 getViewNormal(const in vec2 screenPosition) {
-								vec3 normal = texture2D(normalTex, screenPosition).xyz * 2.0 - 1.0;
+								vec3 normal = octahedronToUnitVector(texture2D(normalTex, screenPosition).rg);
 								// Convert to view space
 								return (viewInverseTranspose * vec4(normal, 0.0)).xyz;
 						}
@@ -2362,6 +2377,8 @@
 				uniform float bias;
 				uniform float intensity;
 
+		${octahedronToUnitVectorGLSL}
+
 				float getDepth(const in vec2 screenPosition) {
 						#if DEPTH_PACKING == 1
 								return unpackRGBAToDepth(texture2D(depthTex, screenPosition));
@@ -2371,7 +2388,7 @@
 				}
 
 				vec3 getViewNormal(const in vec2 screenPosition) {
-						vec3 normal = texture2D(normalTex, screenPosition).xyz * 2.0 - 1.0;
+						vec3 normal = octahedronToUnitVector(texture2D(normalTex, screenPosition).rg);
 						// Convert to view space
 						return (viewInverseTranspose * vec4(normal, 0.0)).xyz;
 				}
@@ -2678,6 +2695,8 @@
 		uniform float nearZ;
 		uniform vec2 viewportSize;
 
+		${octahedronToUnitVectorGLSL}
+
 		float fetchDepth(sampler2D depthTexture, vec2 uv) {
 			vec4 depthTexel = texture2D(depthTexture, uv);
 			return depthTexel.r * 2.0 - 1.0;
@@ -2860,20 +2879,20 @@
 			return alpha;
 		}
 		void main() {
-			vec4 normalAndGloss = texture2D(gBufferTexture1, v_Uv);
+			vec4 gBufferTexel = texture2D(gBufferTexture1, v_Uv);
 
-			if (dot(normalAndGloss.rgb, vec3(1.0)) == 0.0) {
+			if (gBufferTexel.r < -2.0) {
 				discard;
 			}
 
-			float g = normalAndGloss.a;
+			float g = 1. - gBufferTexel.a;
 			if (g <= minGlossiness) {
 				discard;
 			}
 
 			float reflectivity = g;
 
-			vec3 N = normalAndGloss.rgb * 2.0 - 1.0;
+			vec3 N = octahedronToUnitVector(gBufferTexel.rg);
 			N = normalize((viewInverseTranspose * vec4(N, 0.0)).xyz);
 
 			// Position in view
@@ -2899,7 +2918,7 @@
 
 			float alpha = calculateAlpha(iterationCount, reflectivity, hitPixel, hitPoint, dist, rayDir) * float(intersect);
 
-			vec3 hitNormal = texture2D(gBufferTexture1, hitPixel).rgb * 2.0 - 1.0;
+			vec3 hitNormal = octahedronToUnitVector(texture2D(gBufferTexture1, hitPixel).rg);
 			hitNormal = normalize((viewInverseTranspose * vec4(hitNormal, 0.0)).xyz);
 
 			// Ignore the pixel not face the ray
@@ -4706,7 +4725,7 @@
 			const cameraJitter = composer.$cameraJitter;
 			const enableCameraJitter = this.enableCameraJitter && cameraJitter.accumulating();
 			renderer.setRenderTarget(this._rt);
-			renderer.setClearColor(0, 0, 0, 0);
+			renderer.setClearColor(-2.1, -2.1, 0.5, 0.5);
 			renderer.clear(true, true, false);
 			const renderOptions = this._renderOptions;
 			const renderStates = scene.getRenderStates(camera);
@@ -4776,7 +4795,9 @@
 		return function (renderable) {
 			const material = func(renderable);
 			material.diffuseMap = renderable.material.diffuseMap;
+			material.uniforms['metalness'] = renderable.material.metalness !== undefined ? renderable.material.metalness : 0.5;
 			material.uniforms['roughness'] = renderable.material.roughness !== undefined ? renderable.material.roughness : 0.5;
+			material.metalnessMap = renderable.material.metalnessMap;
 			material.roughnessMap = renderable.material.roughnessMap;
 			material.side = renderable.material.side;
 			return material;
@@ -4789,6 +4810,7 @@
 		if (!materialRef) {
 			const useFlatShading = !renderable.geometry.attributes['a_Normal'] || renderable.material.shading === t3d.SHADING_TYPE.FLAT_SHADING;
 			const useDiffuseMap = !!renderable.material.diffuseMap;
+			const useMetalnessMap = !!renderable.material.metalnessMap;
 			const useRoughnessMap = !!renderable.material.roughnessMap;
 			const useSkinning = renderable.object.isSkinnedMesh && renderable.object.skeleton;
 			const morphTargets = !!renderable.object.morphTargetInfluences;
@@ -4802,10 +4824,10 @@
 					maxBones = renderable.object.skeleton.bones.length;
 				}
 			}
-			const code = useFlatShading + '_' + useDiffuseMap + '_' + useRoughnessMap + '_' + useSkinning + '_' + maxBones + '_' + morphTargets + '_' + morphNormals + '_' + side;
+			const code = useFlatShading + '_' + useDiffuseMap + '_' + useMetalnessMap + '_' + useRoughnessMap + '_' + useSkinning + '_' + maxBones + '_' + morphTargets + '_' + morphNormals + '_' + side;
 			materialRef = materialMap$2.get(code);
 			if (!materialRef) {
-				const material = new t3d.ShaderMaterial(normalGlossinessShader);
+				const material = new t3d.ShaderMaterial(gBufferShader);
 				material.shading = useFlatShading ? t3d.SHADING_TYPE.FLAT_SHADING : t3d.SHADING_TYPE.SMOOTH_SHADING;
 				material.alphaTest = useDiffuseMap ? 0.999 : 0; // ignore if alpha < 0.99
 				material.side = side;
@@ -4829,14 +4851,12 @@
 		}
 		return materialRef.material;
 	}
-	const normalGlossinessShader = {
-		name: 'ec_gbuffer_ng',
-		defines: {
-			G_USE_ROUGHNESSMAP: false
-		},
+	const gBufferShader = {
+		name: 'ec_gbuffer',
+		defines: {},
 		uniforms: {
-			roughness: 0.5,
-			roughnessMap: null
+			metalness: 0.5,
+			roughness: 0.5
 		},
 		vertexShader: `
 				#include <common_vert>
@@ -4866,7 +4886,15 @@
 				#include <packing>
 				#include <normal_pars_frag>
 
-				uniform float roughness;
+		${unitVectorToOctahedronGLSL}
+
+				uniform float metalness;
+		
+		#ifdef USE_METALNESSMAP
+						uniform sampler2D metalnessMap;
+				#endif
+
+		uniform float roughness;
 
 				#ifdef USE_ROUGHNESSMAP
 						uniform sampler2D roughnessMap;
@@ -4892,16 +4920,22 @@
 				#endif 
 			#endif
 
+			float metalnessFactor = metalness;
+						#ifdef USE_METALNESSMAP
+				metalnessFactor *= texture2D(metalnessMap, v_Uv).b;
+						#endif
+
 						float roughnessFactor = roughness;
 						#ifdef USE_ROUGHNESSMAP
 								roughnessFactor *= texture2D(roughnessMap, v_Uv).g;
 						#endif
 
-						vec4 packedNormalGlossiness;
-						packedNormalGlossiness.xyz = normal * 0.5 + 0.5;
-						packedNormalGlossiness.w = clamp(1. - roughnessFactor, 0., 1.);
+						vec4 outputColor;
+						outputColor.xy = unitVectorToOctahedron(normal);
+			outputColor.z = saturate(metalnessFactor);
+						outputColor.w = saturate(roughnessFactor);
 						
-						gl_FragColor = packedNormalGlossiness;
+						gl_FragColor = outputColor;
 				}
 		`
 	};
@@ -6224,7 +6258,7 @@
 			renderer.clear(true, true, false);
 			const gBuffer = composer.getBuffer('GBuffer');
 			const gBufferRenderStates = gBuffer.getCurrentRenderStates();
-			this._mainPass.uniforms['normalGlossinessTexture'] = gBuffer.output()._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
+			this._mainPass.uniforms['colorTexture0'] = gBuffer.output()._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 			this._mainPass.uniforms['depthTexture'] = gBuffer.output()._attachments[t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
 			this._mainPass.uniforms['debug'] = this.debugType || 0;
 			gBufferRenderStates.camera.projectionViewMatrix.toArray(this._mainPass.uniforms['projectionView']);
@@ -6235,26 +6269,23 @@
 		Normal: 0,
 		Depth: 1,
 		Position: 2,
-		Glossiness: 3
+		Metalness: 3,
+		Roughness: 4,
+		Glossiness: 4 // Deprecated since v0.2.0, fallback to Roughness
 	};
 	GBufferDebugger.DebugTypes = DebugTypes;
 	const shader = {
 		name: 'ec_debug_gbuffer',
 		defines: {},
 		uniforms: {
-			normalGlossinessTexture: null,
+			colorTexture0: null,
 			depthTexture: null,
 			projectionView: new Float32Array(16),
-			// DEBUG
-			// - 0: normal
-			// - 1: depth
-			// - 2: position
-			// - 3: glossiness
 			debug: 0
 		},
 		vertexShader: defaultVertexShader,
 		fragmentShader: `
-		uniform sampler2D normalGlossinessTexture;
+		uniform sampler2D colorTexture0;
 		uniform sampler2D depthTexture;
 		uniform int debug;
 
@@ -6262,14 +6293,17 @@
 
 		varying vec2 v_Uv;
 
+		${octahedronToUnitVectorGLSL}
+
 		void main() {
 			vec2 texCoord = v_Uv;
-			vec4 texel = texture2D(normalGlossinessTexture, texCoord);
+			vec4 texel = texture2D(colorTexture0, texCoord);
 
-			if (dot(texel.rgb, vec3(1.0)) == 0.0) {
+			if (texel.r < -2.0) {
 				discard;
 			}
 
+			vec3 normal = octahedronToUnitVector(texel.rg);
 			float depth = texture2D(depthTexture, texCoord).r;
 
 			vec2 xy = texCoord * 2.0 - 1.0;
@@ -6281,11 +6315,13 @@
 			vec3 position = p4.xyz / p4.w;
 
 			if (debug == 0) {
-				gl_FragColor = vec4(texel.rgb, 1.0);
+				gl_FragColor = vec4(normal * 0.5 + 0.5, 1.0);
 			} else if (debug == 1) {
 				gl_FragColor = vec4(vec3(depth), 1.0);
 			} else if (debug == 2) {
 				gl_FragColor = vec4(position, 1.0);
+			} else if (debug == 3) {
+				gl_FragColor = vec4(vec3(texel.b), 1.0);
 			} else {
 				gl_FragColor = vec4(vec3(texel.a), 1.0);
 			}
@@ -6468,7 +6504,9 @@
 	exports.isDepthStencilAttachment = isDepthStencilAttachment;
 	exports.maskShader = maskShader;
 	exports.multiplyShader = multiplyShader;
+	exports.octahedronToUnitVectorGLSL = octahedronToUnitVectorGLSL;
 	exports.seperableBlurShader = seperableBlurShader;
+	exports.unitVectorToOctahedronGLSL = unitVectorToOctahedronGLSL;
 	exports.verticalBlurShader = verticalBlurShader;
 
 }));

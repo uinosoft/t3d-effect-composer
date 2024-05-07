@@ -120,7 +120,7 @@ class Inspector {
 		const debuggerFolder = gui.addFolder('Debugger');
 		debuggerFolder.close();
 
-		const gBufferTypes = ['Normal', 'Depth', 'Position', 'Glossiness'], debugTypes = ['Null', 'GBuffer', 'SSAO', 'SSR'];
+		const gBufferTypes = ['Normal', 'Depth', 'Position', 'Metalness', 'Roughness'], debugTypes = ['Null', 'GBuffer', 'SSAO', 'SSR'];
 		let debugDetailControl = null;
 		let debugMaskControl = null;
 		let nonDepthMarkBufferDebugger = null, markBufferDebugger = null, colorMarkBufferDebugger = null;

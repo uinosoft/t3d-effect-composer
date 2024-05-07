@@ -1,3 +1,5 @@
+import { defaultVertexShader, octahedronToUnitVectorGLSL } from 't3d-effect-composer';
+
 /**
  * Sketch Shader
  */
@@ -12,20 +14,7 @@ export const SketchShader = {
 		uContrast: 0.5,
 		matProjViewInverse: new Array(16)
 	},
-	vertexShader: `
-		attribute vec3 a_Position;
-		attribute vec2 a_Uv;
-
-		uniform mat4 u_ProjectionView;
-		uniform mat4 u_Model;
-
-		varying vec2 v_Uv;
-
-		void main() {
-			v_Uv = a_Uv;
-			gl_Position = u_ProjectionView * u_Model * vec4( a_Position, 1.0 );
-		}
-	`,
+	vertexShader: defaultVertexShader,
 	fragmentShader: `
 		varying vec2 v_Uv;
 
@@ -36,8 +25,11 @@ export const SketchShader = {
 		uniform float uContrast;
 		uniform mat4 matProjViewInverse;
 
+		${octahedronToUnitVectorGLSL}
+
 		void getNormalPosition(in vec2 coord, out vec3 position, out vec3 normal) {
-			normal.xyz = texture2D(normalTexture, coord).xyz * 2.0 - 1.0;
+			vec2 normal2 = texture2D(normalTexture, coord).rg;
+			normal.xyz = mix(vec3(-1.0), octahedronToUnitVector(normal2), step(-2.0, normal2.x));
 		 	float z = texture2D(depthTexture, coord).r * 2.0 - 1.0;
 		 	vec2 xy = coord * 2.0 - 1.0;
 		 	vec4 p4 = vec4(xy, z, 1.0);

@@ -1,5 +1,5 @@
 import { ShaderPostPass, ATTACHMENT, Matrix4 } from 't3d';
-import { Effect, defaultVertexShader } from 't3d-effect-composer';
+import { Effect, defaultVertexShader, octahedronToUnitVectorGLSL } from 't3d-effect-composer';
 
 export default class RainEffect extends Effect {
 
@@ -234,12 +234,16 @@ const mixShader = {
 		uniform sampler2D texture4;
 		uniform float coverStrength;
 		varying vec2 v_Uv;
+
+		${octahedronToUnitVectorGLSL}
+
 		void main() {
 			vec4 texel1 = texture2D(texture1, v_Uv);
 			vec4 texel2 = texture2D(texture2, v_Uv);
 			vec4 texel3 = texture2D(texture3, v_Uv);
 			vec4 texel4 = texture2D(texture4, v_Uv);
-			float coverDensity = step(0.9, texel4.y * 2.0 - 1.0);
+			vec3 normal = octahedronToUnitVector(texel4.rg);
+			float coverDensity = step(0.9, normal.y);
 			gl_FragColor = vec4(vec3(texel1.rgb + texel2.rgb + texel3.rgb * coverStrength * coverDensity), texel1.a);
 		}
 	`

@@ -1,6 +1,6 @@
 import { ShaderPostPass, ATTACHMENT, Matrix4, Texture2D, Vector3, PIXEL_TYPE, TEXTURE_FILTER, TEXTURE_WRAP } from 't3d';
 import Effect from './Effect.js';
-import { defaultVertexShader, blurShader, multiplyShader } from '../Utils.js';
+import { defaultVertexShader, octahedronToUnitVectorGLSL, blurShader, multiplyShader } from '../Utils.js';
 
 export default class SSAOEffect extends Effect {
 
@@ -330,6 +330,8 @@ const ssaoShader = {
         uniform float bias;
         uniform float intensity;
 
+		${octahedronToUnitVectorGLSL}
+
         float getDepth(const in vec2 screenPosition) {
             #if DEPTH_PACKING == 1
                 return unpackRGBAToDepth(texture2D(depthTex, screenPosition));
@@ -339,7 +341,7 @@ const ssaoShader = {
         }
 
         vec3 getViewNormal(const in vec2 screenPosition) {
-            vec3 normal = texture2D(normalTex, screenPosition).xyz * 2.0 - 1.0;
+            vec3 normal = octahedronToUnitVector(texture2D(normalTex, screenPosition).rg);
             // Convert to view space
             return (viewInverseTranspose * vec4(normal, 0.0)).xyz;
         }

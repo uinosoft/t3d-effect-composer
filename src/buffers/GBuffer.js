@@ -1,4 +1,5 @@
 import { RenderTarget2D, Texture2D, ATTACHMENT, PIXEL_FORMAT, PIXEL_TYPE, TEXTURE_FILTER, SHADING_TYPE, ShaderMaterial, Vector3, Matrix4, Vector4 } from 't3d';
+import { unitVectorToOctahedronGLSL } from '../Utils.js';
 import Buffer from './Buffer.js';
 
 export default class GBuffer extends Buffer {
@@ -94,7 +95,7 @@ export default class GBuffer extends Buffer {
 		const enableCameraJitter = this.enableCameraJitter && cameraJitter.accumulating();
 
 		renderer.setRenderTarget(this._rt);
-		renderer.setClearColor(0, 0, 0, 0);
+		renderer.setClearColor(-2.1, -2.1, 0.5, 0.5);
 		renderer.clear(true, true, false);
 
 		const renderOptions = this._renderOptions;
@@ -185,7 +186,9 @@ function createGetMaterialFunction(func = defaultMaterialReplaceFunction) {
 	return function(renderable) {
 		const material = func(renderable);
 		material.diffuseMap = renderable.material.diffuseMap;
+		material.uniforms['metalness'] = renderable.material.metalness !== undefined ? renderable.material.metalness : 0.5;
 		material.uniforms['roughness'] = renderable.material.roughness !== undefined ? renderable.material.roughness : 0.5;
+		material.metalnessMap = renderable.material.metalnessMap;
 		material.roughnessMap = renderable.material.roughnessMap;
 		material.side = renderable.material.side;
 
@@ -202,6 +205,7 @@ function defaultMaterialReplaceFunction(renderable) {
 	if (!materialRef) {
 		const useFlatShading = !renderable.geometry.attributes['a_Normal'] || (renderable.material.shading === SHADING_TYPE.FLAT_SHADING);
 		const useDiffuseMap = !!renderable.material.diffuseMap;
+		const useMetalnessMap = !!renderable.material.metalnessMap;
 		const useRoughnessMap = !!renderable.material.roughnessMap;
 		const useSkinning = renderable.object.isSkinnedMesh && renderable.object.skeleton;
 		const morphTargets = !!renderable.object.morphTargetInfluences;
@@ -219,6 +223,7 @@ function defaultMaterialReplaceFunction(renderable) {
 
 		const code = useFlatShading +
 			'_' + useDiffuseMap +
+			'_' + useMetalnessMap +
 			'_' + useRoughnessMap +
 			'_' + useSkinning +
 			'_' + maxBones +
@@ -228,7 +233,7 @@ function defaultMaterialReplaceFunction(renderable) {
 
 		materialRef = materialMap.get(code);
 		if (!materialRef) {
-			const material = new ShaderMaterial(normalGlossinessShader);
+			const material = new ShaderMaterial(gBufferShader);
 			material.shading = useFlatShading ? SHADING_TYPE.FLAT_SHADING : SHADING_TYPE.SMOOTH_SHADING;
 			material.alphaTest = useDiffuseMap ? 0.999 : 0; // ignore if alpha < 0.99
 			material.side = side;
@@ -256,14 +261,12 @@ function defaultMaterialReplaceFunction(renderable) {
 	return materialRef.material;
 }
 
-const normalGlossinessShader = {
-	name: 'ec_gbuffer_ng',
-	defines: {
-		G_USE_ROUGHNESSMAP: false
-	},
+const gBufferShader = {
+	name: 'ec_gbuffer',
+	defines: {},
 	uniforms: {
-		roughness: 0.5,
-		roughnessMap: null
+		metalness: 0.5,
+		roughness: 0.5
 	},
 	vertexShader: `
         #include <common_vert>
@@ -293,7 +296,15 @@ const normalGlossinessShader = {
         #include <packing>
         #include <normal_pars_frag>
 
-        uniform float roughness;
+		${unitVectorToOctahedronGLSL}
+
+        uniform float metalness;
+		
+		#ifdef USE_METALNESSMAP
+            uniform sampler2D metalnessMap;
+        #endif
+
+		uniform float roughness;
 
         #ifdef USE_ROUGHNESSMAP
             uniform sampler2D roughnessMap;
@@ -319,16 +330,22 @@ const normalGlossinessShader = {
 				#endif 
 			#endif
 
+			float metalnessFactor = metalness;
+            #ifdef USE_METALNESSMAP
+				metalnessFactor *= texture2D(metalnessMap, v_Uv).b;
+            #endif
+
             float roughnessFactor = roughness;
             #ifdef USE_ROUGHNESSMAP
                 roughnessFactor *= texture2D(roughnessMap, v_Uv).g;
             #endif
 
-            vec4 packedNormalGlossiness;
-            packedNormalGlossiness.xyz = normal * 0.5 + 0.5;
-            packedNormalGlossiness.w = clamp(1. - roughnessFactor, 0., 1.);
+            vec4 outputColor;
+            outputColor.xy = unitVectorToOctahedron(normal);
+			outputColor.z = saturate(metalnessFactor);
+            outputColor.w = saturate(roughnessFactor);
             
-            gl_FragColor = packedNormalGlossiness;
+            gl_FragColor = outputColor;
         }
     `
 };

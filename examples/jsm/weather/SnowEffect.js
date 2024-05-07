@@ -1,5 +1,5 @@
 import { ShaderPostPass, ATTACHMENT, Color3 } from 't3d';
-import { Effect, defaultVertexShader, fxaaShader } from 't3d-effect-composer';
+import { Effect, defaultVertexShader, octahedronToUnitVectorGLSL, fxaaShader } from 't3d-effect-composer';
 
 export default class SnowEffect extends Effect {
 
@@ -188,9 +188,12 @@ const snowCoverShader = {
 		uniform sampler2D normalTexture;
 		uniform float cover;
 		varying vec2 v_Uv;
+
+		${octahedronToUnitVectorGLSL}
+
 		void main() {
-			vec4 texel = texture2D(normalTexture, v_Uv);
-			float coverDensity = step(0.1, texel.y * 2.0 - 1.0) * (texel.y * 2.0 - 1.0);
+			vec3 normal = octahedronToUnitVector(texture2D(normalTexture, v_Uv).rg);
+			float coverDensity = step(0.1, normal.y) * normal.y;
 			gl_FragColor = vec4(vec3(coverDensity * cover), 1.0);
 		}
 	`

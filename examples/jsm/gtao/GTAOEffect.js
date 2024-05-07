@@ -1,5 +1,5 @@
 import { ShaderPostPass, ATTACHMENT, Matrix4 } from 't3d';
-import { Effect, defaultVertexShader, multiplyShader } from 't3d-effect-composer';
+import { Effect, defaultVertexShader, octahedronToUnitVectorGLSL, multiplyShader } from 't3d-effect-composer';
 
 /**
  * Ground Truth Ambient Occlusion Effect.
@@ -175,6 +175,8 @@ const GTAOShader = {
 
 		varying vec2 v_Uv;
 
+		${octahedronToUnitVectorGLSL}
+
 		vec3 MultiBounce(float AO, vec3 Albedo) {
 			vec3 A = 2.0 * Albedo - vec3(0.33);
 			vec3 B = -4.8 * Albedo + vec3(0.64);
@@ -200,8 +202,7 @@ const GTAOShader = {
 		}
 		
 		float rayMarch(float maxPixelScaled) {
-			vec4 normalAndGloss = texture2D(normalTex, v_Uv);
-			vec3 originNormal = normalAndGloss.rgb * 2.0 - 1.0;
+			vec3 originNormal = octahedronToUnitVector(texture2D(normalTex, v_Uv).rg);
 			float stepPixel = maxPixelScaled / rayMarchSegment;
 			float totalWeight = 0.1;
 			float darkWeight = 0.0;
@@ -235,7 +236,7 @@ const GTAOShader = {
 			if(depth >= (1.0 - EPSILON)) {
 				discard;
 			}
-			vec4 wNormal = texture2D(normalTex, v_Uv);
+			
 			float ndcZ = depth * 2.0 - 1.0;
 			float maxPixelScaled = calcPixelByNDC(ndcZ);
 			float newFactor = rayMarch(maxPixelScaled);

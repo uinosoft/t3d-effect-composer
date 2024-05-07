@@ -9,9 +9,9 @@ const babelrc = {
 				modules: false,
 				targets: '>0.3%, not dead',
 				loose: true,
-				bugfixes: true,
-			},
-		],
+				bugfixes: true
+			}
+		]
 	]
 };
 
@@ -80,7 +80,7 @@ export default [
 				name: 't3d',
 				extend: true,
 				file: 'build/t3d.effectcomposer.min.js',
-				globals: { 't3d': 't3d' },
+				globals: { 't3d': 't3d' }
 			}
 		]
 	},
