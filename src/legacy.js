@@ -1,12 +1,7 @@
 import { ShaderPostPass } from 't3d';
 import EffectComposer from './EffectComposer.js';
 import SSREffect from './effects/SSREffect.js';
-
-export const RenderLayer = {
-	Background: 2,
-	Main: 0,
-	Overlay: 1
-};
+import GBufferDebugger from './debuggers/GBufferDebugger.js';
 
 EffectComposer.prototype.setGeometryReplaceFunction = function(func) {
 	console.warn('EffectComposer.setGeometryReplaceFunction has been removed, use SceneBuffer.setGeometryReplaceFunction instead.');
@@ -51,3 +46,6 @@ Object.defineProperties(SSREffect.prototype, {
 		}
 	}
 });
+
+// Deprecated since v0.2.0, fallback to Roughness
+GBufferDebugger.DebugTypes.Glossiness = GBufferDebugger.DebugTypes.Roughness;

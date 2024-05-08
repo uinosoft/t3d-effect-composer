@@ -35,8 +35,7 @@ const DebugTypes = {
 	Depth: 1,
 	Position: 2,
 	Metalness: 3,
-	Roughness: 4,
-	Glossiness: 4 // Deprecated since v0.2.0, fallback to Roughness
+	Roughness: 4
 };
 
 GBufferDebugger.DebugTypes = DebugTypes;

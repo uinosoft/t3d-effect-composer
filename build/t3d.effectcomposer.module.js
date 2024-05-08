@@ -6962,8 +6962,7 @@ const DebugTypes = {
 	Depth: 1,
 	Position: 2,
 	Metalness: 3,
-	Roughness: 4,
-	Glossiness: 4 // Deprecated since v0.2.0, fallback to Roughness
+	Roughness: 4
 };
 
 GBufferDebugger.DebugTypes = DebugTypes;
@@ -7133,12 +7132,6 @@ class SSRDebugger extends Debugger {
 
 }
 
-const RenderLayer = {
-	Background: 2,
-	Main: 0,
-	Overlay: 1
-};
-
 EffectComposer.prototype.setGeometryReplaceFunction = function(func) {
 	console.warn('EffectComposer.setGeometryReplaceFunction has been removed, use SceneBuffer.setGeometryReplaceFunction instead.');
 	const sceneBuffer = this._bufferMap.get('SceneBuffer');
@@ -7183,4 +7176,7 @@ Object.defineProperties(SSREffect.prototype, {
 	}
 });
 
-export { AccumulationBuffer, BloomEffect, BlurEdgeEffect, Buffer, ChromaticAberrationEffect, ColorCorrectionEffect, ColorMarkBufferDebugger, DOFEffect, Debugger, DefaultEffectComposer, Effect, EffectComposer, FXAAEffect, FilmEffect, GBufferDebugger, GhostingEffect, GlowEffect, InnerGlowEffect, MarkBufferDebugger, NonDepthMarkBufferDebugger, OutlineEffect, RadialTailingEffect, RenderLayer, RenderListMask, SSAODebugger, SSAOEffect, SSRDebugger, SSREffect, SoftGlowEffect, TAAEffect, TailingEffect, ToneMappingEffect, ToneMappingType, VignettingEffect, additiveShader, blurShader, channelShader, copyShader, defaultVertexShader, fxaaShader, highlightShader, horizontalBlurShader, isDepthStencilAttachment, maskShader, multiplyShader, octahedronToUnitVectorGLSL, seperableBlurShader, unitVectorToOctahedronGLSL, verticalBlurShader };
+// Deprecated since v0.2.0, fallback to Roughness
+GBufferDebugger.DebugTypes.Glossiness = GBufferDebugger.DebugTypes.Roughness;
+
+export { AccumulationBuffer, BloomEffect, BlurEdgeEffect, Buffer, ChromaticAberrationEffect, ColorCorrectionEffect, ColorMarkBufferDebugger, DOFEffect, Debugger, DefaultEffectComposer, Effect, EffectComposer, FXAAEffect, FilmEffect, GBufferDebugger, GhostingEffect, GlowEffect, InnerGlowEffect, MarkBufferDebugger, NonDepthMarkBufferDebugger, OutlineEffect, RadialTailingEffect, RenderListMask, SSAODebugger, SSAOEffect, SSRDebugger, SSREffect, SoftGlowEffect, TAAEffect, TailingEffect, ToneMappingEffect, ToneMappingType, VignettingEffect, additiveShader, blurShader, channelShader, copyShader, defaultVertexShader, fxaaShader, highlightShader, horizontalBlurShader, isDepthStencilAttachment, maskShader, multiplyShader, octahedronToUnitVectorGLSL, seperableBlurShader, unitVectorToOctahedronGLSL, verticalBlurShader };

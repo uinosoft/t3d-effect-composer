@@ -6270,8 +6270,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 		Depth: 1,
 		Position: 2,
 		Metalness: 3,
-		Roughness: 4,
-		Glossiness: 4 // Deprecated since v0.2.0, fallback to Roughness
+		Roughness: 4
 	};
 	GBufferDebugger.DebugTypes = DebugTypes;
 	const shader = {
@@ -6411,11 +6410,6 @@ vec3 octahedronToUnitVector(vec2 p) {
 		}
 	}
 
-	const RenderLayer = {
-		Background: 2,
-		Main: 0,
-		Overlay: 1
-	};
 	EffectComposer.prototype.setGeometryReplaceFunction = function (func) {
 		console.warn('EffectComposer.setGeometryReplaceFunction has been removed, use SceneBuffer.setGeometryReplaceFunction instead.');
 		const sceneBuffer = this._bufferMap.get('SceneBuffer');
@@ -6459,6 +6453,9 @@ vec3 octahedronToUnitVector(vec2 p) {
 		}
 	});
 
+	// Deprecated since v0.2.0, fallback to Roughness
+	GBufferDebugger.DebugTypes.Glossiness = GBufferDebugger.DebugTypes.Roughness;
+
 	exports.AccumulationBuffer = AccumulationBuffer;
 	exports.BloomEffect = BloomEffect;
 	exports.BlurEdgeEffect = BlurEdgeEffect;
@@ -6481,7 +6478,6 @@ vec3 octahedronToUnitVector(vec2 p) {
 	exports.NonDepthMarkBufferDebugger = NonDepthMarkBufferDebugger;
 	exports.OutlineEffect = OutlineEffect;
 	exports.RadialTailingEffect = RadialTailingEffect;
-	exports.RenderLayer = RenderLayer;
 	exports.RenderListMask = RenderListMask;
 	exports.SSAODebugger = SSAODebugger;
 	exports.SSAOEffect = SSAOEffect;
