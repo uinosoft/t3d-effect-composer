@@ -5006,6 +5006,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 			for (let i = 0; i < options.maxMarkAttachment; i++) {
 				const rt = new t3d.RenderTarget2D(width, height);
 				rt.detach(t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+				rt.texture.type = options.highDynamicRange ? t3d.PIXEL_TYPE.HALF_FLOAT : t3d.PIXEL_TYPE.UNSIGNED_BYTE;
 				if (!bufferMipmaps) {
 					rt.texture.generateMipmaps = false;
 					rt.texture.minFilter = t3d.TEXTURE_FILTER.LINEAR;
@@ -5015,7 +5016,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 			this._mrts = [];
 			for (let i = 0; i < options.maxMarkAttachment; i++) {
 				const mrt = new t3d.RenderTarget2D(width, height);
-				mrt.attach(new t3d.RenderBuffer(width, height, t3d.PIXEL_FORMAT.RGBA8, options.samplerNumber), t3d.ATTACHMENT.COLOR_ATTACHMENT0);
+				mrt.attach(new t3d.RenderBuffer(width, height, options.highDynamicRange ? t3d.PIXEL_FORMAT.RGBA16F : t3d.PIXEL_FORMAT.RGBA8, options.samplerNumber), t3d.ATTACHMENT.COLOR_ATTACHMENT0);
 				mrt.detach(t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 				this._mrts.push(mrt);
 			}
