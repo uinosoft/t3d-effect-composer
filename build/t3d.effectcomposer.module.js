@@ -5425,7 +5425,7 @@ class NonDepthMarkBuffer extends Buffer {
 		for (let i = 0; i < options.maxMarkAttachment; i++) {
 			const rt = new RenderTarget2D(width, height);
 			rt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
-			rt.texture.type = options.highDynamicRange ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
+			rt.texture.type = options.halfFloatMarkBuffer ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
 			if (!bufferMipmaps) {
 				rt.texture.generateMipmaps = false;
 				rt.texture.minFilter = TEXTURE_FILTER.LINEAR;
@@ -5437,7 +5437,7 @@ class NonDepthMarkBuffer extends Buffer {
 		for (let i = 0; i < options.maxMarkAttachment; i++) {
 			const mrt = new RenderTarget2D(width, height);
 			mrt.attach(
-				new RenderBuffer(width, height, options.highDynamicRange ? PIXEL_FORMAT.RGBA16F : PIXEL_FORMAT.RGBA8, options.samplerNumber),
+				new RenderBuffer(width, height, options.halfFloatMarkBuffer ? PIXEL_FORMAT.RGBA16F : PIXEL_FORMAT.RGBA8, options.samplerNumber),
 				ATTACHMENT.COLOR_ATTACHMENT0
 			);
 			mrt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
@@ -5740,7 +5740,7 @@ class ColorMarkBuffer extends Buffer {
 		for (let i = 0; i < options.maxColorAttachment; i++) {
 			const rt = new RenderTarget2D(width, height);
 			rt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
-			rt.texture.type = options.highDynamicRange ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
+			rt.texture.type = options.halfFloatMarkBuffer ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
 			if (!bufferMipmaps) {
 				rt.texture.generateMipmaps = false;
 				rt.texture.minFilter = TEXTURE_FILTER.LINEAR;
@@ -5752,7 +5752,7 @@ class ColorMarkBuffer extends Buffer {
 		for (let i = 0; i < options.maxColorAttachment; i++) {
 			const mrt = new RenderTarget2D(width, height);
 			mrt.attach(
-				new RenderBuffer(width, height, options.highDynamicRange ? PIXEL_FORMAT.RGBA16F : PIXEL_FORMAT.RGBA8, options.samplerNumber),
+				new RenderBuffer(width, height, options.halfFloatMarkBuffer ? PIXEL_FORMAT.RGBA16F : PIXEL_FORMAT.RGBA8, options.samplerNumber),
 				ATTACHMENT.COLOR_ATTACHMENT0
 			);
 			mrt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
@@ -6414,6 +6414,7 @@ class EffectComposer {
 	 * @param {Number} [options.samplerNumber=8] - MSAA sampling multiple.
 	 * @param {Number} [options.maxMarkAttachment=5] - Maximum number of mark attachments. Means that it supports up to N*4 effects that need to be marked.
 	 * @param {Number} [options.maxColorAttachment=5] - Maximum number of color buffer attachments.
+	 * @param {Boolean} [options.halfFloatMarkBuffer=false] - Determines whether to use half float for the mark buffer. This is forced to be true if `highDynamicRange` is enabled. Enable this to allow the strength of the mesh effect to exceed 1.
 	 */
 	constructor(width, height, options = {}) {
 		this._size = new Vector2(width, height);
@@ -6425,6 +6426,7 @@ class EffectComposer {
 		options.samplerNumber = options.samplerNumber || 8;
 		options.maxMarkAttachment = options.maxMarkAttachment || 5;
 		options.maxColorAttachment = options.maxColorAttachment || 5;
+		options.halfFloatMarkBuffer = options.halfFloatMarkBuffer || options.highDynamicRange;
 
 		// Create buffers
 

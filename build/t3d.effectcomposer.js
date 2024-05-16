@@ -5006,7 +5006,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 			for (let i = 0; i < options.maxMarkAttachment; i++) {
 				const rt = new t3d.RenderTarget2D(width, height);
 				rt.detach(t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
-				rt.texture.type = options.highDynamicRange ? t3d.PIXEL_TYPE.HALF_FLOAT : t3d.PIXEL_TYPE.UNSIGNED_BYTE;
+				rt.texture.type = options.halfFloatMarkBuffer ? t3d.PIXEL_TYPE.HALF_FLOAT : t3d.PIXEL_TYPE.UNSIGNED_BYTE;
 				if (!bufferMipmaps) {
 					rt.texture.generateMipmaps = false;
 					rt.texture.minFilter = t3d.TEXTURE_FILTER.LINEAR;
@@ -5016,7 +5016,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 			this._mrts = [];
 			for (let i = 0; i < options.maxMarkAttachment; i++) {
 				const mrt = new t3d.RenderTarget2D(width, height);
-				mrt.attach(new t3d.RenderBuffer(width, height, options.highDynamicRange ? t3d.PIXEL_FORMAT.RGBA16F : t3d.PIXEL_FORMAT.RGBA8, options.samplerNumber), t3d.ATTACHMENT.COLOR_ATTACHMENT0);
+				mrt.attach(new t3d.RenderBuffer(width, height, options.halfFloatMarkBuffer ? t3d.PIXEL_FORMAT.RGBA16F : t3d.PIXEL_FORMAT.RGBA8, options.samplerNumber), t3d.ATTACHMENT.COLOR_ATTACHMENT0);
 				mrt.detach(t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 				this._mrts.push(mrt);
 			}
@@ -5275,7 +5275,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 			for (let i = 0; i < options.maxColorAttachment; i++) {
 				const rt = new t3d.RenderTarget2D(width, height);
 				rt.detach(t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
-				rt.texture.type = options.highDynamicRange ? t3d.PIXEL_TYPE.HALF_FLOAT : t3d.PIXEL_TYPE.UNSIGNED_BYTE;
+				rt.texture.type = options.halfFloatMarkBuffer ? t3d.PIXEL_TYPE.HALF_FLOAT : t3d.PIXEL_TYPE.UNSIGNED_BYTE;
 				if (!bufferMipmaps) {
 					rt.texture.generateMipmaps = false;
 					rt.texture.minFilter = t3d.TEXTURE_FILTER.LINEAR;
@@ -5285,7 +5285,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 			this._mrts = [];
 			for (let i = 0; i < options.maxColorAttachment; i++) {
 				const mrt = new t3d.RenderTarget2D(width, height);
-				mrt.attach(new t3d.RenderBuffer(width, height, options.highDynamicRange ? t3d.PIXEL_FORMAT.RGBA16F : t3d.PIXEL_FORMAT.RGBA8, options.samplerNumber), t3d.ATTACHMENT.COLOR_ATTACHMENT0);
+				mrt.attach(new t3d.RenderBuffer(width, height, options.halfFloatMarkBuffer ? t3d.PIXEL_FORMAT.RGBA16F : t3d.PIXEL_FORMAT.RGBA8, options.samplerNumber), t3d.ATTACHMENT.COLOR_ATTACHMENT0);
 				mrt.detach(t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 				this._mrts.push(mrt);
 			}
@@ -5827,6 +5827,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 		 * @param {Number} [options.samplerNumber=8] - MSAA sampling multiple.
 		 * @param {Number} [options.maxMarkAttachment=5] - Maximum number of mark attachments. Means that it supports up to N*4 effects that need to be marked.
 		 * @param {Number} [options.maxColorAttachment=5] - Maximum number of color buffer attachments.
+		 * @param {Boolean} [options.halfFloatMarkBuffer=false] - Determines whether to use half float for the mark buffer. This is forced to be true if `highDynamicRange` is enabled. Enable this to allow the strength of the mesh effect to exceed 1.
 		 */
 		constructor(width, height, options = {}) {
 			this._size = new t3d.Vector2(width, height);
@@ -5837,6 +5838,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 			options.samplerNumber = options.samplerNumber || 8;
 			options.maxMarkAttachment = options.maxMarkAttachment || 5;
 			options.maxColorAttachment = options.maxColorAttachment || 5;
+			options.halfFloatMarkBuffer = options.halfFloatMarkBuffer || options.highDynamicRange;
 
 			// Create buffers
 

@@ -21,6 +21,7 @@ export default class EffectComposer {
 	 * @param {Number} [options.samplerNumber=8] - MSAA sampling multiple.
 	 * @param {Number} [options.maxMarkAttachment=5] - Maximum number of mark attachments. Means that it supports up to N*4 effects that need to be marked.
 	 * @param {Number} [options.maxColorAttachment=5] - Maximum number of color buffer attachments.
+	 * @param {Boolean} [options.halfFloatMarkBuffer=false] - Determines whether to use half float for the mark buffer. This is forced to be true if `highDynamicRange` is enabled. Enable this to allow the strength of the mesh effect to exceed 1.
 	 */
 	constructor(width, height, options = {}) {
 		this._size = new Vector2(width, height);
@@ -32,6 +33,7 @@ export default class EffectComposer {
 		options.samplerNumber = options.samplerNumber || 8;
 		options.maxMarkAttachment = options.maxMarkAttachment || 5;
 		options.maxColorAttachment = options.maxColorAttachment || 5;
+		options.halfFloatMarkBuffer = options.halfFloatMarkBuffer || options.highDynamicRange;
 
 		// Create buffers
 

@@ -57,7 +57,7 @@
     const effectComposer = new DefaultEffectComposer(width, height, {
     	samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
     	webgl2: renderer.capabilities.version > 1,
-    	floatColorBuffer: !!renderer.capabilities.getExtension('EXT_color_buffer_float')
+    	halfFloatMarkBuffer: true
     });
     effectComposer.sceneMSAA = true;
 
@@ -241,7 +241,7 @@
     const controlFolder = gui.addFolder('Detail Controls');
     controlFolder.close();
     for (let i = 0; i < num; i++) {
-    	controlFolder.add(cubes[0][i].effects, 'Glow', 0, 2, 0.01).name('glow' + i).onChange(value => {
+    	controlFolder.add(cubes[0][i].effects, 'Glow', 0, 5, 0.01).name('glow' + i).onChange(value => {
     		cubes[1][i].effects.Glow = value;
     		cubes[2][i].effects.SoftGlow = value;
     		cubes[3][i].effects.SoftGlow = value;

@@ -48,6 +48,7 @@
     "t3d": "^0.2.0"
   },
   "scripts": {
+    "dev": "rollup -c -w",
     "build": "rollup -c",
     "lint": "eslint src",
     "lint-fix": "eslint src --fix",
