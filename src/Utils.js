@@ -235,25 +235,27 @@ export const maskShader = {
 	uniforms: {
 		colorTexture: null,
 		maskTexture: null,
+		channel: [1, 0, 0, 0],
 		additiveTexture: null,
-		channel: [1, 0, 0, 0]
+		additiveStrength: 1
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
         uniform sampler2D colorTexture;
+
 		uniform sampler2D maskTexture;
+        uniform vec4 channel;
 
 		uniform sampler2D additiveTexture;
-
-		uniform vec4 channel;
-
+        uniform float additiveStrength;
+		
         varying vec2 v_Uv;
 
         void main() {
 			vec4 colorTex = texture2D(colorTexture, v_Uv);
 			vec4 maskTex = texture2D(maskTexture, v_Uv);
 			vec4 addTex = texture2D(additiveTexture, v_Uv);
-            gl_FragColor = colorTex * dot(maskTex, channel) + addTex;
+            gl_FragColor = colorTex * dot(maskTex, channel) + addTex * additiveStrength;
         }
     `
 };
@@ -263,6 +265,7 @@ export const highlightShader = {
 	defines: {},
 	uniforms: {
 		tDiffuse: null,
+		diffuseStrength: 1.0,
 		threshold: 1.0,
 		smoothWidth: 0.01
 	},
@@ -272,10 +275,12 @@ export const highlightShader = {
 		uniform float smoothWidth;
 
         uniform sampler2D tDiffuse;
+        uniform float diffuseStrength;
+
         varying vec2 v_Uv;
 
         void main() {
-            vec4 texel = texture2D(tDiffuse, v_Uv);
+            vec4 texel = texture2D(tDiffuse, v_Uv) * diffuseStrength;
             vec3 luma = vec3(0.299, 0.587, 0.114);
             float v = dot(texel.xyz, luma);
             gl_FragColor = smoothstep(threshold, threshold + smoothWidth, v) * texel;

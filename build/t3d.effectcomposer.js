@@ -317,25 +317,27 @@ vec3 octahedronToUnitVector(vec2 p) {
 		uniforms: {
 			colorTexture: null,
 			maskTexture: null,
+			channel: [1, 0, 0, 0],
 			additiveTexture: null,
-			channel: [1, 0, 0, 0]
+			additiveStrength: 1
 		},
 		vertexShader: defaultVertexShader,
 		fragmentShader: `
 				uniform sampler2D colorTexture;
+
 		uniform sampler2D maskTexture;
+				uniform vec4 channel;
 
 		uniform sampler2D additiveTexture;
-
-		uniform vec4 channel;
-
+				uniform float additiveStrength;
+		
 				varying vec2 v_Uv;
 
 				void main() {
 			vec4 colorTex = texture2D(colorTexture, v_Uv);
 			vec4 maskTex = texture2D(maskTexture, v_Uv);
 			vec4 addTex = texture2D(additiveTexture, v_Uv);
-						gl_FragColor = colorTex * dot(maskTex, channel) + addTex;
+						gl_FragColor = colorTex * dot(maskTex, channel) + addTex * additiveStrength;
 				}
 		`
 	};
@@ -344,6 +346,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 		defines: {},
 		uniforms: {
 			tDiffuse: null,
+			diffuseStrength: 1.0,
 			threshold: 1.0,
 			smoothWidth: 0.01
 		},
@@ -353,10 +356,12 @@ vec3 octahedronToUnitVector(vec2 p) {
 		uniform float smoothWidth;
 
 				uniform sampler2D tDiffuse;
+				uniform float diffuseStrength;
+
 				varying vec2 v_Uv;
 
 				void main() {
-						vec4 texel = texture2D(tDiffuse, v_Uv);
+						vec4 texel = texture2D(tDiffuse, v_Uv) * diffuseStrength;
 						vec3 luma = vec3(0.299, 0.587, 0.114);
 						float v = dot(texel.xyz, luma);
 						gl_FragColor = smoothstep(threshold, threshold + smoothWidth, v) * texel;
@@ -3901,6 +3906,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 			this.radius = 0.4;
 			this.threshold = 0.01;
 			this.smoothWidth = 0.1;
+			this.maskStrength = 1;
 			this._maskPass = new t3d.ShaderPostPass(maskShader);
 			this._highlightPass = new t3d.ShaderPostPass(highlightShader);
 			this._blurPass = new t3d.ShaderPostPass(seperableBlurShader);
@@ -3929,8 +3935,9 @@ vec3 octahedronToUnitVector(vec2 p) {
 				this._maskPass.uniforms.colorTexture = sceneBuffer.output()._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 				this._maskPass.uniforms.maskTexture = markBuffer.output(attachIndex)._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 				this._maskPass.uniforms.additiveTexture = colorBufferTexture;
+				this._maskPass.uniforms.additiveStrength = this.maskStrength;
 				for (let i = 0; i < 4; i++) {
-					this._maskPass.uniforms.channel[i] = i === channelIndex ? 1 : 0;
+					this._maskPass.uniforms.channel[i] = i === channelIndex ? this.maskStrength : 0;
 				}
 				this._maskPass.render(renderer);
 			}
@@ -3938,6 +3945,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 			renderer.setClearColor(0, 0, 0, 0);
 			renderer.clear(true, true, false);
 			this._highlightPass.uniforms.tDiffuse = usedMarkBuffer ? tempRT2.texture : colorBufferTexture;
+			this._highlightPass.uniforms.diffuseStrength = usedMarkBuffer ? 1 : this.maskStrength;
 			this._highlightPass.uniforms.threshold = this.threshold;
 			this._highlightPass.uniforms.smoothWidth = this.smoothWidth;
 			this._highlightPass.render(renderer);
@@ -4080,6 +4088,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 			this.strength = 0.5;
 			this.blendRate = 0.4;
 			this.blurSize = 1;
+			this.maskStrength = 1;
 			this._maskPass = new t3d.ShaderPostPass(maskShader);
 			this._downSamplerPass = new t3d.ShaderPostPass(downSampleShader);
 			this._hBlurPass = new t3d.ShaderPostPass(horizontalBlurShader);
@@ -4109,8 +4118,9 @@ vec3 octahedronToUnitVector(vec2 p) {
 				this._maskPass.uniforms.colorTexture = sceneBuffer.output()._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 				this._maskPass.uniforms.maskTexture = markBuffer.output(attachIndex)._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
 				this._maskPass.uniforms.additiveTexture = colorBufferTexture;
+				this._maskPass.uniforms.additiveStrength = this.maskStrength;
 				for (let i = 0; i < 4; i++) {
-					this._maskPass.uniforms.channel[i] = i === channelIndex ? 1 : 0;
+					this._maskPass.uniforms.channel[i] = i === channelIndex ? this.maskStrength : 0;
 				}
 				this._maskPass.render(renderer);
 			}
@@ -4118,9 +4128,9 @@ vec3 octahedronToUnitVector(vec2 p) {
 			renderer.setClearColor(0, 0, 0, 0);
 			renderer.clear(true, true, false);
 			this._downSamplerPass.uniforms.tDiffuse = usedMarkBuffer ? this._tempRTList[0].texture : colorBufferTexture;
+			this._downSamplerPass.uniforms.bright = (usedMarkBuffer ? 1 : this.maskStrength) * 4; // make this brighter
 			this._downSamplerPass.uniforms.texSize[0] = this._tempRTList[0].width;
 			this._downSamplerPass.uniforms.texSize[1] = this._tempRTList[0].height;
-			this._downSamplerPass.uniforms.bright = 4; // make this brighter
 			this._downSamplerPass.render(renderer);
 
 			// down sampler

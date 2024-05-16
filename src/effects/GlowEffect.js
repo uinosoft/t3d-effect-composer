@@ -22,6 +22,7 @@ export default class GlowEffect extends Effect {
 		this.radius = 0.4;
 		this.threshold = 0.01;
 		this.smoothWidth = 0.1;
+		this.maskStrength = 1;
 
 		this._maskPass = new ShaderPostPass(maskShader);
 		this._highlightPass = new ShaderPostPass(highlightShader);
@@ -58,8 +59,9 @@ export default class GlowEffect extends Effect {
 			this._maskPass.uniforms.colorTexture = sceneBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			this._maskPass.uniforms.maskTexture = markBuffer.output(attachIndex)._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			this._maskPass.uniforms.additiveTexture = colorBufferTexture;
+			this._maskPass.uniforms.additiveStrength = this.maskStrength;
 			for (let i = 0; i < 4; i++) {
-				this._maskPass.uniforms.channel[i] = (i === channelIndex) ? 1 : 0;
+				this._maskPass.uniforms.channel[i] = (i === channelIndex) ? this.maskStrength : 0;
 			}
 			this._maskPass.render(renderer);
 		}
@@ -68,6 +70,7 @@ export default class GlowEffect extends Effect {
 		renderer.setClearColor(0, 0, 0, 0);
 		renderer.clear(true, true, false);
 		this._highlightPass.uniforms.tDiffuse = usedMarkBuffer ? tempRT2.texture : colorBufferTexture;
+		this._highlightPass.uniforms.diffuseStrength = usedMarkBuffer ? 1 : this.maskStrength;
 		this._highlightPass.uniforms.threshold = this.threshold;
 		this._highlightPass.uniforms.smoothWidth = this.smoothWidth;
 		this._highlightPass.render(renderer);

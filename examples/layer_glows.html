@@ -202,6 +202,7 @@
     glowFolder.close();
     glowFolder.add(glowEffect, 'active');
     glowFolder.add(glowEffect, 'strength', 0, 2, 0.01);
+    glowFolder.add(glowEffect, 'maskStrength', 0, 2, 0.01);
     glowFolder.add(glowEffect, 'threshold', 0, 1, 0.01);
     glowFolder.add(glowEffect, 'radius', 0, 1, 0.01);
     glowFolder.add(glowEffect, 'smoothWidth', 0, 1, 0.01);
@@ -211,6 +212,7 @@
     softGlowFolder.add(softGlowEffect, 'active');
     softGlowFolder.add(softGlowEffect, 'blendRate', 0, 1, 0.01);
     softGlowFolder.add(softGlowEffect, 'strength', 0, 2, 0.01);
+    softGlowFolder.add(softGlowEffect, 'maskStrength', 0, 2, 0.01);
     softGlowFolder.add(softGlowEffect, 'blurSize', 0, 1, 0.01);
 
     const statsFolder = gui.addFolder('Stats');
