@@ -1056,6 +1056,25 @@
 		}
 
 		/**
+		 * Linearly interpolates between two matrix4.
+		 * @param {t3d.Matrix4} m1
+		 * @param {t3d.Matrix4} m2
+		 * @param {Number} ratio
+		 * @return {t3d.Matrix4}
+		 */
+		lerpMatrices(m1, m2, ratio) {
+			if (ratio === 0) return this.copy(m1);
+			if (ratio === 1) return this.copy(m2);
+			const te = this.elements,
+				te1 = m1.elements,
+				te2 = m2.elements;
+			for (let i = 0; i < 16; i++) {
+				te[i] = te1[i] * (1 - ratio) + te2[i] * ratio;
+			}
+			return this;
+		}
+
+		/**
 		 * Return true if this matrix and m are equal.
 		 * @param {t3d.Matrix4} m
 		 * @return {Boolean}
@@ -3009,11 +3028,11 @@
 	 */
 	class KeyframeClip {
 		/**
-		 * @param {String} name - A name for this clip.
-		 * @param {t3d.KeyframeTrack[]} tracks - An array of KeyframeTracks.
+		 * @param {String} [name=''] - A name for this clip.
+		 * @param {t3d.KeyframeTrack[]} [tracks=[]] - An array of KeyframeTracks.
 		 * @param {Number} [duration] - The duration of this clip (in seconds). If not passed, the duration will be calculated from the passed tracks array.
 		 */
-		constructor(name, tracks, duration = -1) {
+		constructor(name = '', tracks = [], duration = -1) {
 			/**
 			 * A name for this clip.
 			 * @type {String}
@@ -7233,7 +7252,7 @@
 
 	class LightHash {
 		constructor() {
-			this._factor = new Uint16Array(9);
+			this._factor = new Uint16Array(10);
 		}
 		update(lights) {
 			this._factor[0] = lights.useAmbient ? 1 : 0;
@@ -8779,77 +8798,6 @@
 		return max;
 	}
 
-	/**
-	 * A class for generating plane geometries.
-	 * @memberof t3d
-	 * @extends t3d.Geometry
-	 */
-	class PlaneGeometry extends Geometry {
-		/**
-		 * @param {Number} [width=1] — Width along the X axis.
-		 * @param {Number} [height=1] — Height along the Y axis.
-		 * @param {Number} [widthSegments=1]
-		 * @param {Number} [heightSegments=1]
-		 */
-		constructor(width = 1, height = 1, widthSegments = 1, heightSegments = 1) {
-			super();
-			const width_half = width / 2;
-			const height_half = height / 2;
-			const gridX = Math.floor(widthSegments);
-			const gridY = Math.floor(heightSegments);
-			const gridX1 = gridX + 1;
-			const gridY1 = gridY + 1;
-			const segment_width = width / gridX;
-			const segment_height = height / gridY;
-			let ix, iy;
-
-			// buffers
-
-			const indices = [];
-			const vertices = [];
-			const normals = [];
-			const uvs = [];
-
-			// generate vertices, normals and uvs
-
-			for (iy = 0; iy < gridY1; iy++) {
-				const y = iy * segment_height - height_half;
-				for (ix = 0; ix < gridX1; ix++) {
-					const x = ix * segment_width - width_half;
-					vertices.push(x, 0, y);
-					normals.push(0, 1, 0);
-					uvs.push(ix / gridX);
-					uvs.push(1 - iy / gridY);
-				}
-			}
-
-			// indices
-
-			for (iy = 0; iy < gridY; iy++) {
-				for (ix = 0; ix < gridX; ix++) {
-					const a = ix + gridX1 * iy;
-					const b = ix + gridX1 * (iy + 1);
-					const c = ix + 1 + gridX1 * (iy + 1);
-					const d = ix + 1 + gridX1 * iy;
-
-					// faces
-
-					indices.push(a, b, d);
-					indices.push(b, c, d);
-				}
-			}
-
-			// build geometry
-
-			this.setIndex(new Attribute(new Buffer(vertices.length / 3 > 65536 ? new Uint32Array(indices) : new Uint16Array(indices), 1)));
-			this.addAttribute('a_Position', new Attribute(new Buffer(new Float32Array(vertices), 3)));
-			this.addAttribute('a_Normal', new Attribute(new Buffer(new Float32Array(normals), 3)));
-			this.addAttribute('a_Uv', new Attribute(new Buffer(new Float32Array(uvs), 2)));
-			this.computeBoundingBox();
-			this.computeBoundingSphere();
-		}
-	}
-
 	let _materialId = 0;
 
 	/**
@@ -9586,11 +9534,13 @@
 			const scene = new Scene();
 			const camera = this.camera = new Camera();
 			camera.frustumCulled = false;
-			camera.position.set(0, 1, 0);
-			camera.lookAt(new Vector3(0, 0, 0), new Vector3(0, 0, -1));
+			camera.position.set(0, 0, 1);
+			camera.lookAt(new Vector3(0, 0, 0), new Vector3(0, 1, 0));
 			camera.setOrtho(-1, 1, -1, 1, 0.1, 2);
 			scene.add(camera);
-			const geometry = this.geometry = new PlaneGeometry(2, 2, 1, 1);
+			const geometry = this.geometry = new Geometry(); // fullscreen triangle
+			geometry.addAttribute('a_Position', new Attribute(new Buffer(new Float32Array([-1, 3, 0, -1, -1, 0, 3, -1, 0]), 3)));
+			geometry.addAttribute('a_Uv', new Attribute(new Buffer(new Float32Array([0, 2, 0, 0, 2, 0]), 2)));
 			const material = this.material = new ShaderMaterial(shader);
 			this.uniforms = material.uniforms;
 			const plane = new Mesh(geometry, material);
@@ -10664,6 +10614,77 @@
 
 				groupStart += groupCount;
 			}
+			this.computeBoundingBox();
+			this.computeBoundingSphere();
+		}
+	}
+
+	/**
+	 * A class for generating plane geometries.
+	 * @memberof t3d
+	 * @extends t3d.Geometry
+	 */
+	class PlaneGeometry extends Geometry {
+		/**
+		 * @param {Number} [width=1] — Width along the X axis.
+		 * @param {Number} [height=1] — Height along the Y axis.
+		 * @param {Number} [widthSegments=1]
+		 * @param {Number} [heightSegments=1]
+		 */
+		constructor(width = 1, height = 1, widthSegments = 1, heightSegments = 1) {
+			super();
+			const width_half = width / 2;
+			const height_half = height / 2;
+			const gridX = Math.floor(widthSegments);
+			const gridY = Math.floor(heightSegments);
+			const gridX1 = gridX + 1;
+			const gridY1 = gridY + 1;
+			const segment_width = width / gridX;
+			const segment_height = height / gridY;
+			let ix, iy;
+
+			// buffers
+
+			const indices = [];
+			const vertices = [];
+			const normals = [];
+			const uvs = [];
+
+			// generate vertices, normals and uvs
+
+			for (iy = 0; iy < gridY1; iy++) {
+				const y = iy * segment_height - height_half;
+				for (ix = 0; ix < gridX1; ix++) {
+					const x = ix * segment_width - width_half;
+					vertices.push(x, 0, y);
+					normals.push(0, 1, 0);
+					uvs.push(ix / gridX);
+					uvs.push(1 - iy / gridY);
+				}
+			}
+
+			// indices
+
+			for (iy = 0; iy < gridY; iy++) {
+				for (ix = 0; ix < gridX; ix++) {
+					const a = ix + gridX1 * iy;
+					const b = ix + gridX1 * (iy + 1);
+					const c = ix + 1 + gridX1 * (iy + 1);
+					const d = ix + 1 + gridX1 * iy;
+
+					// faces
+
+					indices.push(a, b, d);
+					indices.push(b, c, d);
+				}
+			}
+
+			// build geometry
+
+			this.setIndex(new Attribute(new Buffer(vertices.length / 3 > 65536 ? new Uint32Array(indices) : new Uint16Array(indices), 1)));
+			this.addAttribute('a_Position', new Attribute(new Buffer(new Float32Array(vertices), 3)));
+			this.addAttribute('a_Normal', new Attribute(new Buffer(new Float32Array(normals), 3)));
+			this.addAttribute('a_Uv', new Attribute(new Buffer(new Float32Array(uvs), 2)));
 			this.computeBoundingBox();
 			this.computeBoundingSphere();
 		}
@@ -11752,6 +11773,235 @@
 	});
 
 	/**
+	 * Creates a 3D texture. (WebGL 2.0)
+	 * @memberof t3d
+	 * @extends t3d.TextureBase
+	 */
+	class Texture3D extends TextureBase {
+		constructor() {
+			super();
+
+			/**
+						 * Image data for this texture.
+						 * @type {Object}
+						 */
+			this.image = {
+				data: new Uint8Array([255, 255, 255, 255, 255, 255, 255, 255]),
+				width: 2,
+				height: 2,
+				depth: 2
+			};
+
+			/**
+			 * This defines how the texture is wrapped in the depth direction.
+			 * @type {t3d.TEXTURE_WRAP}
+			 * @default t3d.TEXTURE_WRAP.CLAMP_TO_EDGE
+			 */
+			this.wrapR = TEXTURE_WRAP.CLAMP_TO_EDGE;
+
+			/**
+			 * @default t3d.PIXEL_FORMAT.RED
+			 */
+			this.format = PIXEL_FORMAT.RED;
+
+			/**
+			 * @default t3d.PIXEL_TYPE.UNSIGNED_BYTE
+			 */
+			this.type = PIXEL_TYPE.UNSIGNED_BYTE;
+
+			/**
+			 * @default t3d.TEXTURE_FILTER.NEAREST
+			 */
+			this.magFilter = TEXTURE_FILTER.NEAREST;
+
+			/**
+			 * @default t3d.TEXTURE_FILTER.NEAREST
+			 */
+			this.minFilter = TEXTURE_FILTER.NEAREST;
+
+			/**
+			 * @default false
+			 */
+			this.generateMipmaps = false;
+
+			/**
+			 * @default false
+			 */
+			this.flipY = false;
+
+			/**
+			 * @default 1
+			 */
+			this.unpackAlignment = 1;
+		}
+
+		/**
+		 * Copy the given 3d texture into this texture.
+		 * @param {t3d.Texture3D} source - The 3d texture to be copied.
+		 * @return {t3d.Texture3D}
+		 */
+		copy(source) {
+			super.copy(source);
+			this.image = source.image;
+			return this;
+		}
+	}
+
+	/**
+	 * @readonly
+	 * @type {Boolean}
+	 * @default true
+	 */
+	Texture3D.prototype.isTexture3D = true;
+
+	/**
+	 * Render Target that render to 3d texture.
+	 * @memberof t3d
+	 * @extends t3d.RenderTargetBase
+	 */
+	class RenderTarget3D extends RenderTargetBase {
+		/**
+		 * @param {Number} width - The width of the render target.
+		 * @param {Number} height - The height of the render target.
+		 * @param {Number} depth - The depth of the render target.
+		 */
+		constructor(width, height, depth) {
+			super(width, height);
+			this.depth = depth;
+			this._attachments = {};
+			this.attach(new Texture3D(), ATTACHMENT.COLOR_ATTACHMENT0);
+
+			/**
+			 * Specifies the layer.
+			 * This is only available in WebGL2.
+			 * @type {Number}
+			 * @default 0
+			 */
+			this.activeLayer = 0;
+
+			/**
+			 * Specifies the active mipmap level.
+			 * This is only available in WebGL2.
+			 * @type {Number}
+			 * @default 0
+			 */
+			this.activeMipmapLevel = 0;
+		}
+
+		/**
+		 * Attach a texture(RTT) or renderbuffer to the framebuffer.
+		 * Notice: For now, dynamic Attachment during rendering is not supported.
+		 * @param	{t3d.Texture3D|t3d.RenderBuffer} target
+		 * @param	{t3d.ATTACHMENT} [attachment=t3d.ATTACHMENT.COLOR_ATTACHMENT0]
+		 */
+		attach(target, attachment = ATTACHMENT.COLOR_ATTACHMENT0) {
+			if (target.isTexture) {
+				if (target.image && target.image.rtt) {
+					if (target.image.width !== this.width || target.image.height !== this.height || target.image.depth !== this.depth) {
+						target.version++;
+						target.image.width = this.width;
+						target.image.height = this.height;
+						target.image.depth = this.depth;
+					}
+				} else {
+					target.version++;
+					target.image = {
+						rtt: true,
+						data: null,
+						width: this.width,
+						height: this.height,
+						depth: this.depth
+					};
+				}
+			} else {
+				target.resize(this.width, this.height);
+			}
+			this._attachments[attachment] = target;
+		}
+
+		/**
+		 * Detach a texture(RTT) or renderbuffer.
+		 * @param	{t3d.ATTACHMENT} [attachment=t3d.ATTACHMENT.COLOR_ATTACHMENT0]
+		 */
+		detach(attachment = ATTACHMENT.COLOR_ATTACHMENT0) {
+			delete this._attachments[attachment];
+		}
+
+		/**
+		 * Resize the render target.
+		 * @param {Number} width - The width of the render target.
+		 * @param {Number} height - The height of the render target.
+		 * @param {Number} depth - The depth of the render target.
+		 * @return {Boolean} - If size changed.
+		 */
+		resize(width, height, depth) {
+			let changed = false;
+			if (this.width !== width || this.height !== height || this.depth !== depth) {
+				this.width = width;
+				this.height = height;
+				this.depth = depth;
+				changed = true;
+			}
+			if (changed) {
+				this.dispose(false);
+				for (const attachment in this._attachments) {
+					const target = this._attachments[attachment];
+					if (target.isTexture) {
+						target.image = {
+							rtt: true,
+							data: null,
+							width: this.width,
+							height: this.height,
+							depth: this.depth
+						};
+						target.version++;
+					} else {
+						target.resize(width, height);
+					}
+				}
+			}
+			return changed;
+		}
+
+		/**
+		 * Dispose the render target.
+		 * @param {Boolean} [disposeAttachments=true] whether to dispose textures and render buffers attached on this render target.
+		 */
+		dispose(disposeAttachments = true) {
+			super.dispose();
+			if (disposeAttachments) {
+				for (const attachment in this._attachments) {
+					this._attachments[attachment].dispose();
+				}
+			}
+		}
+	}
+
+	/**
+	 * @readonly
+	 * @type {Boolean}
+	 * @default true
+	 */
+	RenderTarget3D.prototype.isRenderTarget3D = true;
+	Object.defineProperties(RenderTarget3D.prototype, {
+		texture: {
+			set: function (texture) {
+				if (texture) {
+					if (texture.isTexture) {
+						this.attach(texture, ATTACHMENT.COLOR_ATTACHMENT0);
+					}
+				} else {
+					this.detach(ATTACHMENT.COLOR_ATTACHMENT0);
+				}
+			},
+			get: function () {
+				const target = this._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
+				return target.isTexture ? target : null;
+			}
+		}
+	});
+
+	/**
 	 * Render Target that render to canvas element.
 	 * @memberof t3d
 	 * @extends t3d.RenderTargetBase
@@ -11966,88 +12216,6 @@
 			}
 		}
 	});
-
-	/**
-	 * Creates a 3D texture. (WebGL 2.0)
-	 * @memberof t3d
-	 * @extends t3d.TextureBase
-	 */
-	class Texture3D extends TextureBase {
-		constructor() {
-			super();
-
-			/**
-						 * Image data for this texture.
-						 * @type {Object}
-						 */
-			this.image = {
-				data: new Uint8Array([255, 255, 255, 255, 255, 255, 255, 255]),
-				width: 2,
-				height: 2,
-				depth: 2
-			};
-
-			/**
-			 * This defines how the texture is wrapped in the depth direction.
-			 * @type {t3d.TEXTURE_WRAP}
-			 * @default t3d.TEXTURE_WRAP.CLAMP_TO_EDGE
-			 */
-			this.wrapR = TEXTURE_WRAP.CLAMP_TO_EDGE;
-
-			/**
-			 * @default t3d.PIXEL_FORMAT.RED
-			 */
-			this.format = PIXEL_FORMAT.RED;
-
-			/**
-			 * @default t3d.PIXEL_TYPE.UNSIGNED_BYTE
-			 */
-			this.type = PIXEL_TYPE.UNSIGNED_BYTE;
-
-			/**
-			 * @default t3d.TEXTURE_FILTER.NEAREST
-			 */
-			this.magFilter = TEXTURE_FILTER.NEAREST;
-
-			/**
-			 * @default t3d.TEXTURE_FILTER.NEAREST
-			 */
-			this.minFilter = TEXTURE_FILTER.NEAREST;
-
-			/**
-			 * @default false
-			 */
-			this.generateMipmaps = false;
-
-			/**
-			 * @default false
-			 */
-			this.flipY = false;
-
-			/**
-			 * @default 1
-			 */
-			this.unpackAlignment = 1;
-		}
-
-		/**
-		 * Copy the given 3d texture into this texture.
-		 * @param {t3d.Texture3D} source - The 3d texture to be copied.
-		 * @return {t3d.Texture3D}
-		 */
-		copy(source) {
-			super.copy(source);
-			this.image = source.image;
-			return this;
-		}
-	}
-
-	/**
-	 * @readonly
-	 * @type {Boolean}
-	 * @default true
-	 */
-	Texture3D.prototype.isTexture3D = true;
 
 	let _queryId = 0;
 
@@ -14386,9 +14554,15 @@
 		vshader = unrollLoops(vshader);
 		fshader = unrollLoops(fshader);
 
-		// support glsl version 300 es for webgl ^2.0
+		// enable glsl version 300 es for webgl ^2.0
 		if (props.version > 1) {
-			prefixVertex = ['#version 300 es\n', '#define attribute in', '#define varying out', '#define texture2D texture'].join('\n') + '\n' + prefixVertex;
+			// extract vertex extensions and insert after version strings later
+			// because it must be at the top of the shader
+			const vertexExtensions = vshader.match(extensionPattern);
+			if (vertexExtensions) {
+				vshader = vshader.replace(extensionPattern, '');
+			}
+			prefixVertex = ['#version 300 es', vertexExtensions ? vertexExtensions.join('\n') : '', '#define attribute in', '#define varying out', '#define texture2D texture'].join('\n') + '\n' + prefixVertex;
 			fshader = fshader.replace('#extension GL_EXT_draw_buffers : require', '');
 
 			// replace gl_FragData by layout
@@ -14399,7 +14573,7 @@
 				layout.push('layout(location = ' + i + ') out highp vec4 pc_fragData' + i + ';');
 				i++;
 			}
-			prefixFragment = ['#version 300 es\n', '#define varying in', fshader.indexOf('layout') > -1 || layout.length > 0 ? '' : 'out highp vec4 pc_fragColor;', '#define gl_FragColor pc_fragColor', '#define gl_FragDepthEXT gl_FragDepth', '#define texture2D texture', '#define textureCube texture', '#define texture2DProj textureProj', '#define texture2DLodEXT textureLod', '#define texture2DProjLodEXT textureProjLod', '#define textureCubeLodEXT textureLod', '#define texture2DGradEXT textureGrad', '#define texture2DProjGradEXT textureProjGrad', '#define textureCubeGradEXT textureGrad', layout.join('\n')].join('\n') + '\n' + prefixFragment;
+			prefixFragment = ['#version 300 es', '#define varying in', fshader.indexOf('layout') > -1 || layout.length > 0 ? '' : 'out highp vec4 pc_fragColor;', '#define gl_FragColor pc_fragColor', '#define gl_FragDepthEXT gl_FragDepth', '#define texture2D texture', '#define textureCube texture', '#define texture2DProj textureProj', '#define texture2DLodEXT textureLod', '#define texture2DProjLodEXT textureProjLod', '#define textureCubeLodEXT textureLod', '#define texture2DGradEXT textureGrad', '#define texture2DProjGradEXT textureProjGrad', '#define textureCubeGradEXT textureGrad', layout.join('\n')].join('\n') + '\n' + prefixFragment;
 		}
 		vshader = prefixVertex + vshader;
 		fshader = prefixFragment + fshader;
@@ -14436,6 +14610,7 @@
 	function unrollLoops(string) {
 		return string.replace(unrollLoopPattern, loopReplacer);
 	}
+	const extensionPattern = /#extension .*/g;
 
 	class WebGLQueries extends PropertyMap {
 		constructor(prefix, gl, capabilities) {
@@ -15745,6 +15920,10 @@
 				renderTargetProperties.__currentActiveCubeFace = renderTarget.activeCubeFace;
 				renderTargetProperties.__currentActiveMipmapLevel = renderTarget.activeMipmapLevel;
 			}
+			if (renderTarget.isRenderTarget3D) {
+				renderTargetProperties.__currentActiveLayer = renderTarget.activeLayer;
+				renderTargetProperties.__currentActiveMipmapLevel = renderTarget.activeMipmapLevel;
+			}
 			gl.bindFramebuffer(gl.FRAMEBUFFER, glFrameBuffer);
 			for (const attachTarget in renderTarget._attachments) {
 				const glAttachTarget = attachTargetToGL[attachTarget];
@@ -15764,6 +15943,10 @@
 					const textureProperties = textures.setTextureCube(attachment);
 					gl.framebufferTexture2D(gl.FRAMEBUFFER, glAttachTarget, gl.TEXTURE_CUBE_MAP_POSITIVE_X + renderTarget.activeCubeFace, textureProperties.__webglTexture, renderTarget.activeMipmapLevel);
 					state.bindTexture(gl.TEXTURE_CUBE_MAP, null);
+				} else if (attachment.isTexture3D) {
+					const textureProperties = textures.setTexture3D(attachment);
+					gl.framebufferTextureLayer(gl.FRAMEBUFFER, glAttachTarget, textureProperties.__webglTexture, renderTarget.activeMipmapLevel, renderTarget.activeLayer);
+					state.bindTexture(gl.TEXTURE_3D, null);
 				} else {
 					const renderBufferProperties = renderBuffers.setRenderBuffer(attachment);
 					gl.framebufferRenderbuffer(gl.FRAMEBUFFER, glAttachTarget, gl.RENDERBUFFER, renderBufferProperties.__webglRenderbuffer);
@@ -15807,6 +15990,22 @@
 						}
 					}
 					renderTargetProperties.__currentActiveCubeFace = activeCubeFace;
+					renderTargetProperties.__currentActiveMipmapLevel = activeMipmapLevel;
+				}
+			}
+			if (renderTarget.isRenderTarget3D) {
+				renderTargetProperties = this.get(renderTarget);
+				const activeLayer = renderTarget.activeLayer;
+				const activeMipmapLevel = renderTarget.activeMipmapLevel;
+				if (renderTargetProperties.__currentActiveLayer !== activeLayer || renderTargetProperties.__currentActiveMipmapLevel !== activeMipmapLevel) {
+					for (const attachTarget in renderTarget._attachments) {
+						const attachment = renderTarget._attachments[attachTarget];
+						if (attachment.isTexture3D) {
+							const textureProperties = textures.get(attachment);
+							gl.framebufferTextureLayer(gl.FRAMEBUFFER, attachTargetToGL[attachTarget], textureProperties.__webglTexture, activeMipmapLevel, activeLayer);
+						}
+					}
+					renderTargetProperties.__currentActiveLayer = activeLayer;
 					renderTargetProperties.__currentActiveMipmapLevel = activeMipmapLevel;
 				}
 			}
@@ -16976,6 +17175,7 @@
 	exports.RenderQueueLayer = RenderQueueLayer;
 	exports.RenderStates = RenderStates;
 	exports.RenderTarget2D = RenderTarget2D;
+	exports.RenderTarget3D = RenderTarget3D;
 	exports.RenderTargetBack = RenderTargetBack;
 	exports.RenderTargetBase = RenderTargetBase;
 	exports.RenderTargetCube = RenderTargetCube;
