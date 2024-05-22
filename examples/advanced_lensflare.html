@@ -86,16 +86,17 @@
     ]);
     scene.environment = cube_texture;
 
-    const cube = new t3d.Mesh(new t3d.BoxGeometry(15, 15, 15), new t3d.PBRMaterial());
-    cube.castShadow = true;
-    cube.material.diffuse.setHex(0xffffff);
-    scene.add(cube);
+    const box = new t3d.Mesh(new t3d.BoxGeometry(15, 50, 15), new t3d.PBRMaterial());
+    box.castShadow = true;
+    box.material.diffuse.setHex(0xffffff);
+    scene.add(box);
 
-    const plane_geometry = new t3d.PlaneGeometry(100, 100);
+    const plane_geometry = new t3d.PlaneGeometry(500, 500);
     const plane_material = new t3d.PBRMaterial();
+    plane_material.roughness = 0.8;
     plane_material.diffuse.setHex(0xffffff);
     const plane = new t3d.Mesh(plane_geometry, plane_material);
-    plane.position.y = -10;
+    plane.position.y = -15;
     plane.receiveShadow = true;
     scene.add(plane);
 
@@ -119,11 +120,11 @@
     	{ texture: textureFlare3, color: new t3d.Color3(1, 1, 1), scale: 0.06, offset: 0.7 },
     	{ texture: textureFlare3, color: new t3d.Color3(1, 1, 1), scale: 0.1, offset: 0.9 },
     	{ texture: textureFlare3, color: new t3d.Color3(1, 1, 1), scale: 0.06, offset: 1 }
-];
+    ];
     directionalLight.add(lensflareMarker);
 
     const camera = new t3d.Camera();
-    camera.position.set(80, 80, 80);
+    camera.position.set(80, 10, -60);
     camera.lookAt(new t3d.Vector3(0, 0, 0), new t3d.Vector3(0, 1, 0));
     camera.setPerspective(45 / 180 * Math.PI, width / height, 1, 1000);
     camera.add(sky_box);

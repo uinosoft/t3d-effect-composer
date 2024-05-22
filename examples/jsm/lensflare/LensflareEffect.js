@@ -154,7 +154,6 @@ const lensflareShader = {
 
 		uniform sampler2D occlusionMap;
 
-		attribute vec3 a_Position;
 		attribute vec2 a_Uv;
 
 		varying vec2 v_Uv;
@@ -163,8 +162,7 @@ const lensflareShader = {
 		void main() {
 			v_Uv = a_Uv;
 
-			vec2 pos = a_Position.xz;
-			pos.y = -pos.y;
+			vec2 pos = a_Uv * 2.0 - 1.0;
 
 			vec4 visibility = texture2D(occlusionMap, vec2(0.5, 0.5)) * 0.2;
 			visibility += texture2D(occlusionMap, vec2(0.34, 0.34)) * 0.1;
@@ -190,9 +188,8 @@ const lensflareShader = {
 
 		void main() {
 			vec4 texture = texture2D(map, v_Uv);
-			texture.a *= v_Visibility;
-			gl_FragColor = texture;
-			gl_FragColor.rgb *= color;
+			float alpha = texture.a * step(v_Uv.x, 1.0) * step(v_Uv.y, 1.0) * v_Visibility;
+			gl_FragColor = vec4(texture.rgb * color, alpha);
 		}
 	`
 };
