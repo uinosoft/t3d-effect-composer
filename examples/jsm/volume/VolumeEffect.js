@@ -1,4 +1,4 @@
-import { ShaderPostPass, ATTACHMENT, Matrix4 } from 't3d';
+import { ShaderPostPass, ATTACHMENT, Matrix4, Vector2 } from 't3d';
 import { Effect, defaultVertexShader } from 't3d-effect-composer';
 
 export default class VolumeEffect extends Effect {
@@ -41,7 +41,17 @@ export default class VolumeEffect extends Effect {
 		// means the volume data is rendered in the box region
 		this.boxMatrix = new Matrix4();
 
+		// the blue noise texture
+		this.blueNoise = null;
+		this.blueNoiseScale = new Vector2(1, 1);
+
 		this._mainPass = new ShaderPostPass(volumeShader);
+
+		this._screenSize = new Vector2(512, 512);
+	}
+
+	resize(width, height) {
+		this._screenSize.set(width, height);
 	}
 
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
@@ -83,12 +93,26 @@ export default class VolumeEffect extends Effect {
 		mainPass.material.uniforms.opacity = this.opacity;
 		mainPass.material.uniforms.alphaThreshold = this.alphaThreshold;
 		mainPass.material.uniforms.mixType = this.mixType;
+
 		boxMatrixInverse.copy(this.boxMatrix).inverse();
 		boxMatrixInverse.toArray(mainPass.material.uniforms.boxMatrixInverse);
 
 		const isTexture3D = !!(this.volumeTexture && this.volumeTexture.isTexture3D);
 		if (isTexture3D !== mainPass.material.defines.TEXTURETYPE_3D) {
 			mainPass.material.defines.TEXTURETYPE_3D = isTexture3D;
+			mainPass.material.needsUpdate = true;
+		}
+
+		const useBlueNoise = !!this.blueNoise;
+
+		if (useBlueNoise) {
+			mainPass.uniforms.blueNoise = this.blueNoise;
+			mainPass.uniforms.noiseScale[0] = this.blueNoiseScale.x * this._screenSize.x;
+			mainPass.uniforms.noiseScale[1] = this.blueNoiseScale.y * this._screenSize.y;
+		}
+
+		if (useBlueNoise !== mainPass.material.defines.USE_BLUE_NOISE) {
+			mainPass.material.defines.USE_BLUE_NOISE = useBlueNoise;
 			mainPass.material.needsUpdate = true;
 		}
 
@@ -125,7 +149,8 @@ const volumeShader = {
 		ZSLICEX: 16,
 		ZSLICEY: 16,
 		TEXTURETYPE_3D: false,
-		VALUE_OPACITY: true
+		VALUE_OPACITY: true,
+		USE_BLUE_NOISE: false
 	},
 	uniforms: {
 		id: 1,
@@ -150,7 +175,10 @@ const volumeShader = {
 		opacity: 1,
 		alphaThreshold: 0,
 		mixType: 0,
-		boxMatrixInverse: new Float32Array(16)
+		boxMatrixInverse: new Float32Array(16),
+
+		blueNoise: null,
+		noiseScale: [1, 1]
 	},
 
 	vertexShader: defaultVertexShader,
@@ -179,6 +207,11 @@ const volumeShader = {
     uniform float alphaThreshold;
     uniform float mixType;
 	uniform mat4 boxMatrixInverse;
+
+	#ifdef USE_BLUE_NOISE
+		uniform sampler2D blueNoise;
+		uniform vec2 noiseScale;
+	#endif
 
     varying vec2 v_Uv;
 
@@ -245,6 +278,14 @@ const volumeShader = {
         float alphaSample;
         float accumulatedAlpha = 0.0;
         vec4 accumulatedColor = vec4(0.0);
+		int samples = MAX_ITERATION;
+
+		#ifdef USE_BLUE_NOISE
+			float raymarchSteps = float(MAX_ITERATION);
+			vec4 blueNoiseSample = texture2D(blueNoise, v_Uv * noiseScale);
+			float samplesFloat = round(raymarchSteps + (raymarchSteps / 4.) * blueNoiseSample.x);
+			samples = int(samplesFloat);
+		#endif
 
         vec4 boxFrontPos = ProjViewInverse * vec4(v_Uv * 2.0 - 1.0, frontDepth * 2.0 - 1.0, 1.0);
         vec4 boxBackPos = ProjViewInverse * vec4(v_Uv * 2.0 - 1.0, backDepth * 2.0 - 1.0, 1.0);
@@ -252,20 +293,20 @@ const volumeShader = {
     
         float dist = length(boxFrontPos.xyz / boxFrontPos.w - boxBackPos.xyz / boxBackPos.w);
 
-        vec3 step = direction * dist / float(MAX_ITERATION);  
+        vec3 step = direction * dist / float(samples);  
 
         vec3 point = boxFrontPos.xyz / boxFrontPos.w;
 
         if(backDepth < frontDepth ||  frontDepth > backDepth) {
             point = cameraPos;
             dist = length(cameraPos.xyz - boxBackPos.xyz / boxBackPos.w);
-            step = direction * dist / float(MAX_ITERATION);  
+            step = direction * dist / float(samples);  
         }
 
 		float unitOpacity = unitDistanceOpacity * length(step);
-
+		
         // ray marching
-        for(int i = 0; i < MAX_ITERATION; i++) {
+        for(int i = 0; i < samples; i++) {
             point += step;
             vec4 screenPos = projection * view * vec4(point, 1.0);
             screenPos /= screenPos.w;
@@ -292,7 +333,7 @@ const volumeShader = {
             accumulatedAlpha += alphaSample;
         }
 
-        if(alphaThreshold > accumulatedAlpha){
+        if(alphaThreshold > accumulatedAlpha) {
             gl_FragColor = diffuseColor;
             return;
         }

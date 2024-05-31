@@ -101,6 +101,11 @@
 	volumeEffect.colorRampTexture = platte;
 	effectComposer.addEffect('volumeEffect', volumeEffect, 99);
 
+	const blueNoise = new Texture2DLoader().load('./resources/blueNoise.png');
+	blueNoise.wrapS = blueNoise.wrapT = t3d.TEXTURE_WRAP.REPEAT;
+	volumeEffect.blueNoise = blueNoise;
+	volumeEffect.blueNoiseScale.set(0.2 / 470, 0.2 / 470);
+
 	const material = new t3d.BasicMaterial();
 	material.opacity = 0.1;
 	material.transparent = true;
@@ -178,6 +183,12 @@
 		gui.add(volumeEffect, 'opacity', 0, 1, 0.01);
 		gui.add(volumeEffect, 'mixType', { normal: 0, additive: 1 });
 		gui.add(volumeEffect, 'valueAffectsOpacity');
+		gui.add({ useBlueNoise: true }, 'useBlueNoise').onChange(function(value) {
+			volumeEffect.blueNoise = value ? blueNoise : null;
+		});
+		gui.add({ blueNoiseScale: 0.2 }, 'blueNoiseScale', 0.001, 1, 0.001).onChange(function(value) {
+			volumeEffect.blueNoiseScale.set(value / 470, value / 470);
+		});
 
 		gui.add(material, 'colorWrite').name('showShape');
 	});
