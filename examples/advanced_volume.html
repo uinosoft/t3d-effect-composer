@@ -189,6 +189,10 @@
 		gui.add({ blueNoiseScale: 0.2 }, 'blueNoiseScale', 0.001, 1, 0.001).onChange(function(value) {
 			volumeEffect.blueNoiseScale.set(value / 470, value / 470);
 		});
+		gui.add(thicknessBuffer, 'backDepthFunc', {
+			'LessEqual': t3d.COMPARE_FUNC.LEQUAL,
+			'GreaterEqual': t3d.COMPARE_FUNC.GEQUAL
+		});
 
 		gui.add(material, 'colorWrite').name('showShape');
 	});

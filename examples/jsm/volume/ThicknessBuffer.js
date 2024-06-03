@@ -1,4 +1,4 @@
-import { RenderTarget2D, PIXEL_TYPE, TEXTURE_FILTER, ShaderMaterial, DRAW_SIDE } from 't3d';
+import { RenderTarget2D, PIXEL_TYPE, TEXTURE_FILTER, ShaderMaterial, DRAW_SIDE, COMPARE_FUNC } from 't3d';
 import { Buffer } from 't3d-effect-composer';
 
 export default class ThicknessBuffer extends Buffer {
@@ -56,6 +56,14 @@ export default class ThicknessBuffer extends Buffer {
 		this.layers = [0];
 	}
 
+	set backDepthFunc(value) {
+		this._backMaterial.depthFunc = value;
+	}
+
+	get backDepthFunc() {
+		return this._backMaterial.depthFunc;
+	}
+
 	setGeometryReplaceFunction(func) {
 		if (func) {
 			this._frontRenderOptions.getGeometry = func;
@@ -88,8 +96,11 @@ export default class ThicknessBuffer extends Buffer {
 
 		renderer.endRender();
 
+		const reverseDepthCompare = this._backMaterial.depthFunc === COMPARE_FUNC.GEQUAL || this._backMaterial.depthFunc === COMPARE_FUNC.GREATER;
+
 		renderer.setRenderTarget(this._backDepthRenderTarget);
 		renderer.setClearColor(0, 0, 0, 0);
+		renderer._state.depthBuffer.setClear(reverseDepthCompare ? 0 : 1);
 		renderer.clear(true, true, false);
 
 		renderer.beginRender();
@@ -101,6 +112,8 @@ export default class ThicknessBuffer extends Buffer {
 		}
 
 		renderer.endRender();
+
+		renderer._state.depthBuffer.setClear(1);
 	}
 
 	output() {
