@@ -39,6 +39,7 @@ export default class VolumeEffect extends Effect {
 
 		// the box region matrix of the volume in world space
 		// means the volume data is rendered in the box region
+		// the default size of the box is 1x1x1
 		this.boxMatrix = new Matrix4();
 
 		// the blue noise texture
@@ -145,12 +146,15 @@ const boxMatrixInverse = new Matrix4();
 const volumeShader = {
 	defines: {
 		MAX_ITERATION: 100,
+		VALUE_OPACITY: true,
+		USE_BLUE_NOISE: false,
+
+		TEXTURETYPE_3D: false,
+
 		ZSLICENUM: 256,
 		ZSLICEX: 16,
 		ZSLICEY: 16,
-		TEXTURETYPE_3D: false,
-		VALUE_OPACITY: true,
-		USE_BLUE_NOISE: false
+		TEXTURE2D_WRAP_REPEAT: false
 	},
 	uniforms: {
 		id: 1,
@@ -229,7 +233,6 @@ const volumeShader = {
 
         vec4 sampleAs3DTexture(vec3 texCoord) {
             texCoord += vec3(0.5);
-           
             return getColor(texture(volumeTexture, texCoord).r);
         }
     #else 
@@ -239,13 +242,38 @@ const volumeShader = {
         vec4 sampleAs3DTexture(vec3 texCoord) {
 			texCoord += vec3(0.5);
 
-            vec2 uvL = texCoord.xy / vec2(ZSLICEX , ZSLICEY);
-            texCoord.z = texCoord.z * float(ZSLICENUM) / float(ZSLICEX * ZSLICEY);
-            float number = floor(texCoord.z * float(ZSLICEX * ZSLICEY));
-            vec2 uuv;
-            uuv = uvL + vec2( mod(number, float(ZSLICEX)) / float(ZSLICEX) , floor((float(ZSLICEX * ZSLICEY - 1) - number ) / float(ZSLICEY)) / float(ZSLICEY));
+			#ifdef TEXTURE2D_WRAP_REPEAT
+				texCoord.xy = fract(texCoord.xy);
+			#else
+				texCoord.xy = clamp(texCoord.xy, 0.0, 1.0);
+			#endif
 
-			return getColor(texture2D(volumeTexture, uuv).a);
+			float zSliceX = float(ZSLICEX);
+			float zSliceY = float(ZSLICEY);
+
+			vec2 cellUV = texCoord.xy / vec2(zSliceX, zSliceY);
+
+			float maxZNumber = float(ZSLICENUM - 1);
+			float zNumber = texCoord.z * maxZNumber;
+
+			#ifdef TEXTURE2D_WRAP_REPEAT
+				float zIndex1 = mod(floor(zNumber), maxZNumber);
+				float zIndex2 = mod(floor(zNumber + 1.), maxZNumber);
+			#else
+				float zIndex1 = clamp(floor(zNumber), 0.0, maxZNumber);
+				float zIndex2 = clamp(floor(zIndex1 + 1.), 0.0, maxZNumber);
+			#endif
+
+			vec2 globalUV1 = vec2(mod(zIndex1, zSliceX) / zSliceX, floor((zSliceX * zSliceY - 1.0 - zIndex1) / zSliceY) / zSliceY);
+			vec2 globalUV2 = vec2(mod(zIndex2, zSliceX) / zSliceX, floor((zSliceX * zSliceY - 1.0 - zIndex2) / zSliceY) / zSliceY);
+
+			globalUV1 += cellUV;
+			globalUV2 += cellUV;
+
+			vec4 color1 = getColor(texture2D(volumeTexture, globalUV1).a);
+			vec4 color2 = getColor(texture2D(volumeTexture, globalUV2).a);
+
+			return mix(color1, color2, mod(zNumber, 1.0));
         }
     #endif
 
@@ -317,10 +345,10 @@ const volumeShader = {
             if(sampleDepth < testDepth) {
                 break;
             }
-  
-			vec3 rayPosObject = (boxMatrixInverse * vec4(point ,1.0)).xyz;
+			
+			vec3 rayPosObject = (boxMatrixInverse * vec4(point, 1.0)).xyz;
 
-            colorSum = sampleAs3DTexture(rayPosObject); 
+            colorSum = sampleAs3DTexture(rayPosObject);
 
 			alphaSample = unitOpacity;
 			#ifdef VALUE_OPACITY
@@ -345,7 +373,7 @@ const volumeShader = {
             mixColor = diffuseColor.rgb + accumulatedColor.rgb * accumulatedAlpha * opacity;
         }
 
-        gl_FragColor = vec4(mixColor, diffuseColor.a); 
+        gl_FragColor = vec4(mixColor, diffuseColor.a);
     }
 	`
 };
