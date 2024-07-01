@@ -43,6 +43,7 @@
 
     import { DefaultEffectComposer } from 't3d-effect-composer';
     import { SketchEffect } from './jsm/sketch/SketchEffect.js';
+    import { ColorSketchEffect } from './jsm/sketch/ColorSketchEffect.js';
     import { Inspector } from './jsm/Inspector.js';
 
     import { GUI } from './libs/lil-gui.esm.min.js';
@@ -124,24 +125,47 @@
     camera.add(sky_box);
     scene.add(camera);
 
-    camera.gammaFactor = 2;
-    camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.GAMMA;
-    effectComposer.getBuffer('SceneBuffer').setOutputEncoding(t3d.TEXEL_ENCODING_TYPE.GAMMA);
+    camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.SRGB;
+    effectComposer.getBuffer('SceneBuffer').setOutputEncoding(t3d.TEXEL_ENCODING_TYPE.SRGB);
 
     const sketchEffect = new SketchEffect();
+    sketchEffect.active = true;
     sketchEffect.color.setRGB(0, 0, 0);
     sketchEffect.contrast = 0.5;
     sketchEffect.threshold = 0.62;
-    sketchEffect.active = true;
-    effectComposer.addEffect('sketch', sketchEffect, 1.5);
+    effectComposer.addEffect('Sketch', sketchEffect, 1.5);
+
+    const colorSketchEffect = new ColorSketchEffect();
+    colorSketchEffect.active = false;
+    colorSketchEffect.threshold = 0.4;
+    colorSketchEffect.gamma = 0.25;
+    effectComposer.addEffect('ColorSketch', colorSketchEffect, 1.6);
+
+    const params = { enable: true, colorSketch: false };
 
     const gui = new GUI();
+    gui.add(params, 'enable').onChange(function(value) {
+    	sketchEffect.active = value && !params.colorSketch;
+    	colorSketchEffect.active = value && params.colorSketch;
+    });
+    gui.addColor(sketchEffect, 'color').onChange(function(value) {
+    	colorSketchEffect.color.copy(sketchEffect.color);
+    });
+    gui.add(params, 'colorSketch').onChange(function(value) {
+    	sketchEffect.active = !value && params.enable;
+    	colorSketchEffect.active = value && params.enable;
+    	sketchFolder.show(!value);
+    	colorSketchFolder.show(value);
+    });
     const sketchFolder = gui.addFolder('Sketch');
-    sketchFolder.add(sketchEffect, 'active');
     sketchFolder.add(sketchEffect, 'fxaa');
     sketchFolder.add(sketchEffect, 'threshold', 0, 1, 0.01);
     sketchFolder.add(sketchEffect, 'contrast', 0, 1, 0.01);
-    sketchFolder.addColor(sketchEffect, 'color');
+    const colorSketchFolder = gui.addFolder('Color Sketch');
+    colorSketchFolder.add(colorSketchEffect, 'lineWidth', 0, 2, 0.01);
+    colorSketchFolder.add(colorSketchEffect, 'threshold', 0, 2, 0.01);
+    colorSketchFolder.add(colorSketchEffect, 'gamma', 0, 0.5, 0.001);
+    colorSketchFolder.show(false);
 
     effectComposer.sceneMSAA = true;
 
