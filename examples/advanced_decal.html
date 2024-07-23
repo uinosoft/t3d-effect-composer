@@ -76,7 +76,7 @@
 
 	import { DefaultEffectComposer, RenderListMask, OutlineEffect } from 't3d-effect-composer';
 	import { Decal } from './jsm/decal/Decal.js';
-	import { DecalHelper } from './jsm/decal/DecalHelper.js';
+	import { DecalHelper, SphereCameraHelper } from './jsm/decal/DecalHelper.js';
 
 	import { GUI } from './libs/lil-gui.esm.min.js';
 	import Stats from './libs/stats.module.js';
@@ -200,6 +200,10 @@
 	decalHelper.material.diffuse.setHex(0xffdd00);
 	decal.add(decalHelper);
 
+	const sphereDecalHelper = new SphereCameraHelper(decal.$camera);
+	sphereDecalHelper.material.diffuse.setHex(0xffdd00);
+	decal.add(sphereDecalHelper);
+
 	const cube = new t3d.Mesh(new t3d.BoxGeometry(10, 10, 10), new t3d.PBRMaterial());
 	cube.material.diffuse.setHex(0xffffff);
 	cube.projectId = (decal.id + 1);
@@ -247,6 +251,10 @@
 
 	const controller = new OrbitControls(camera, canvas);
 
+	const anchorOffset = new t3d.Vector3();
+	const anchorQuaternion = new t3d.Quaternion();
+	const anchorScale = new t3d.Vector3(1, 1, 1);
+
 	// GUI
 
 	const params = {
@@ -264,8 +272,29 @@
 		occlusion: {
 			enable: true,
 			bias: -0.0004
+		},
+		anchor: {
+			enable: true,
+			offset: 0,
+			rotation: 0
 		}
 	};
+
+	function updateAnchor() {
+		anchorOffset.set(1, 1, 1).multiplyScalar(params.anchor.offset);
+
+		scene.position.copy(anchorOffset);
+
+		if (params.anchor.enable) {
+			scene.anchorMatrix.transform(anchorOffset, anchorScale, anchorQuaternion);
+		} else {
+			scene.anchorMatrix.identity();
+		}
+
+		decal.anchorMatrix = scene.anchorMatrix;
+	}
+
+	updateAnchor();
 
 	function setDecalProjection() {
 		if (params.projectType === 'Perspective') {
@@ -278,6 +307,14 @@
 		decal.$material.needsUpdate = true;
 
 		decalHelper.updateFrustum(decal);
+
+		if (params.sphere) {
+			sphereDecalHelper.visible = true;
+			decalHelper.visible = false;
+		} else {
+			sphereDecalHelper.visible = false;
+			decalHelper.visible = true;
+		}
 	}
 
 	function setDecalRotation() {
@@ -326,6 +363,10 @@
 	const occlusionFolder = gui.addFolder('Occlusion');
 	occlusionFolder.add(params.occlusion, 'enable').onChange(setDecalOcclusion);
 	occlusionFolder.add(params.occlusion, 'bias', -0.001, 0.001, 0.0001).onChange(setDecalOcclusion);
+
+	const anchorFolder = gui.addFolder('Anchor');
+	anchorFolder.add(params.anchor, 'enable').onChange(updateAnchor);
+	anchorFolder.add(params.anchor, 'offset', 0, 10000000, 1000).onChange(updateAnchor);
 
 	const depthMaterial = new t3d.DepthMaterial();
 	depthMaterial.packToRGBA = true;
