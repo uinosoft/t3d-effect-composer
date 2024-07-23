@@ -21,6 +21,7 @@ export const DecalShader = {
         uniform mat4 decalPMatrix;
         uniform mat4 decalVMatrix;
 
+        uniform mat4 u_Projection;
         uniform mat4 u_Model;
         uniform mat4 u_ProjectionView;
 
@@ -32,6 +33,10 @@ export const DecalShader = {
         #endif
 
         #include <logdepthbuf_pars_vert>
+
+        bool isPerspectiveMatrix( mat4 m ) {
+	        return m[ 2 ][ 3 ] == - 1.0;
+        }
 
         void main() {
             vec4 worldPosition = u_Model * vec4(a_Position, 1.0);
@@ -159,6 +164,10 @@ export const DecalShader = {
         #endif
 
         #include <logdepthbuf_pars_frag>
+
+        bool isPerspectiveMatrix( mat4 m ) {
+	        return m[ 2 ][ 3 ] == - 1.0;
+        }
 
         void main() {
             vec3 uvz = (vDecalProjectPosition.xyz / vDecalProjectPosition.w) * 0.5 + 0.5;
