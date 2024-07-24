@@ -5872,8 +5872,9 @@ vec3 octahedronToUnitVector(vec2 p) {
 				this._defaultColorTexture.generateMipmaps = false;
 				this._defaultColorTexture.minFilter = t3d.TEXTURE_FILTER.LINEAR;
 			}
-			this._defaultDepthRenderBuffer = new t3d.RenderBuffer(width, height, t3d.PIXEL_FORMAT.DEPTH_COMPONENT16);
-			this._defaultMSDepthRenderBuffer = new t3d.RenderBuffer(width, height, t3d.PIXEL_FORMAT.DEPTH_COMPONENT16, options.samplerNumber);
+			const defaultDepthFormat = options.webgl2 ? t3d.PIXEL_FORMAT.DEPTH_COMPONENT24 : t3d.PIXEL_FORMAT.DEPTH_COMPONENT16;
+			this._defaultDepthRenderBuffer = new t3d.RenderBuffer(width, height, defaultDepthFormat);
+			this._defaultMSDepthRenderBuffer = new t3d.RenderBuffer(width, height, defaultDepthFormat, options.samplerNumber);
 			this._defaultDepthStencilRenderBuffer = new t3d.RenderBuffer(width, height, t3d.PIXEL_FORMAT.DEPTH_STENCIL);
 			this._defaultMSDepthStencilRenderBuffer = new t3d.RenderBuffer(width, height, t3d.PIXEL_FORMAT.DEPTH24_STENCIL8, options.samplerNumber);
 			this._externalColorAttachment = null;

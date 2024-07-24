@@ -65,8 +65,9 @@ export default class EffectComposer {
 			this._defaultColorTexture.minFilter = TEXTURE_FILTER.LINEAR;
 		}
 
-		this._defaultDepthRenderBuffer = new RenderBuffer(width, height, PIXEL_FORMAT.DEPTH_COMPONENT16);
-		this._defaultMSDepthRenderBuffer = new RenderBuffer(width, height, PIXEL_FORMAT.DEPTH_COMPONENT16, options.samplerNumber);
+		const defaultDepthFormat = options.webgl2 ? PIXEL_FORMAT.DEPTH_COMPONENT24 : PIXEL_FORMAT.DEPTH_COMPONENT16;
+		this._defaultDepthRenderBuffer = new RenderBuffer(width, height, defaultDepthFormat);
+		this._defaultMSDepthRenderBuffer = new RenderBuffer(width, height, defaultDepthFormat, options.samplerNumber);
 
 		this._defaultDepthStencilRenderBuffer = new RenderBuffer(width, height, PIXEL_FORMAT.DEPTH_STENCIL);
 		this._defaultMSDepthStencilRenderBuffer = new RenderBuffer(width, height, PIXEL_FORMAT.DEPTH24_STENCIL8, options.samplerNumber);
