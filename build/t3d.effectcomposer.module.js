@@ -6468,10 +6468,14 @@ class EffectComposer {
 			this._defaultColorTexture.minFilter = TEXTURE_FILTER.LINEAR;
 		}
 
+		// Use DEPTH_COMPONENT24 in WebGL 2 for better depth precision.
 		const defaultDepthFormat = options.webgl2 ? PIXEL_FORMAT.DEPTH_COMPONENT24 : PIXEL_FORMAT.DEPTH_COMPONENT16;
 		this._defaultDepthRenderBuffer = new RenderBuffer(width, height, defaultDepthFormat);
 		this._defaultMSDepthRenderBuffer = new RenderBuffer(width, height, defaultDepthFormat, options.samplerNumber);
 
+		// Reference: https://registry.khronos.org/webgl/specs/latest/2.0/#3.7.5
+		// In WebGL 2, renderbufferStorage can accept DEPTH_STENCIL as internal format for backward compatibility, which is mapped to DEPTH24_STENCIL8 by implementations,
+		// but renderbufferStorageMultisample can only accept DEPTH24_STENCIL8 as internal format.
 		this._defaultDepthStencilRenderBuffer = new RenderBuffer(width, height, PIXEL_FORMAT.DEPTH_STENCIL);
 		this._defaultMSDepthStencilRenderBuffer = new RenderBuffer(width, height, PIXEL_FORMAT.DEPTH24_STENCIL8, options.samplerNumber);
 
