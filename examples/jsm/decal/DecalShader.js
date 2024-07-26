@@ -16,13 +16,10 @@ export const DecalShader = {
 		occlusionBias: -0.0004
 	},
 	vertexShader: `
-        attribute vec3 a_Position;
+        #include <common_vert>
 
         uniform mat4 decalPMatrix;
         uniform mat4 decalVMatrix;
-
-        uniform mat4 u_Model;
-        uniform mat4 u_ProjectionView;
 
         varying vec4 vDecalProjectPosition;
 
@@ -50,8 +47,7 @@ export const DecalShader = {
         }
     `,
 	fragmentShader: `
-        uniform vec3 u_Color;
-        uniform float u_Opacity;
+        #include <common_frag>
 
         #ifdef USE_DIFFUSE_MAP
             uniform sampler2D diffuseMap;
