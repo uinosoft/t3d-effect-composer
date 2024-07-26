@@ -18,8 +18,9 @@ export class Decal extends Object3D {
 		this.$material.opacity = 1;
 		this.$material.transparent = true;
 		this.$material.uniforms.decalPMatrix = this.$camera.projectionMatrix.elements;
-		this.$material.uniforms.decalVMatrix = this.$camera.viewMatrix.elements;
 		this.$material.uniforms.occlusionTexture = this.$depthRenderTarget.texture;
+
+		this.$anchorMatrix = new Matrix4();
 	}
 
 	lookAt(target, up) {
@@ -37,6 +38,8 @@ export class Decal extends Object3D {
 
 		this.$camera.projectionViewMatrix.multiplyMatrices(this.$camera.projectionMatrix, this.$camera.viewMatrix);
 		this.$camera.frustum.setFromMatrix(this.$camera.projectionViewMatrix);
+
+		_mat4_1.copy(this.$camera.viewMatrix).multiply(this.$anchorMatrix).toArray(this.$material.uniforms.decalVMatrix); // apply anchor matrix to view matrix
 	}
 
 }
