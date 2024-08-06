@@ -8,7 +8,8 @@
   "exports": {
     ".": "./build/t3d.effectcomposer.module.js",
     "./src/*": "./src/*",
-    "./examples/jsm/*": "./examples/jsm/*"
+    "./examples/jsm/*": "./examples/jsm/*",
+    "./addons/*": "./examples/jsm/*"
   },
   "repository": {
     "type": "git",
