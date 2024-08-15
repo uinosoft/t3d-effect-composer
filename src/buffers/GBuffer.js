@@ -211,6 +211,7 @@ function defaultMaterialReplaceFunction(renderable) {
 		const morphTargets = !!renderable.object.morphTargetInfluences;
 		const morphNormals = !!renderable.object.morphTargetInfluences && renderable.object.geometry.morphAttributes.normal;
 		const side = renderable.material.side;
+		const skipGBuffer = renderable.object.effects && renderable.object.effects.skipGBuffer;
 
 		let maxBones = 0;
 		if (useSkinning) {
@@ -229,11 +230,12 @@ function defaultMaterialReplaceFunction(renderable) {
 			'_' + maxBones +
 			'_' + morphTargets +
 			'_' + morphNormals +
-			'_' + side;
+			'_' + side +
+			'_' + skipGBuffer;
 
 		materialRef = materialMap.get(code);
 		if (!materialRef) {
-			const material = new ShaderMaterial(gBufferShader);
+			const material = skipGBuffer ? new ShaderMaterial(gBufferSpikShader) : new ShaderMaterial(gBufferShader);
 			material.shading = useFlatShading ? SHADING_TYPE.FLAT_SHADING : SHADING_TYPE.SMOOTH_SHADING;
 			material.alphaTest = useDiffuseMap ? 0.999 : 0; // ignore if alpha < 0.99
 			material.side = side;
@@ -346,6 +348,15 @@ const gBufferShader = {
             outputColor.w = saturate(roughnessFactor);
             
             gl_FragColor = outputColor;
+        }
+    `
+};
+const gBufferSpikShader = {
+	name: 'ec_gbuffer_skip',
+	vertexShader: gBufferShader.vertexShader,
+	fragmentShader: `
+        void main() {
+            gl_FragColor = vec4(-2.1, -2.1, 0.5, 0.5);
         }
     `
 };
