@@ -33,8 +33,7 @@ export default class GTAOEffect extends Effect {
 		const gBuffer = composer.getBuffer('GBuffer');
 		const gBufferRenderStates = gBuffer.getCurrentRenderStates();
 
-		projectionInv.copy(gBufferRenderStates.camera.projectionMatrix).inverse();
-		viewInv.copy(gBufferRenderStates.camera.viewMatrix).inverse();
+		projectionViewInv.copy(gBufferRenderStates.camera.projectionViewMatrix).inverse();
 
 		// Step 1: gtao pass
 
@@ -54,8 +53,8 @@ export default class GTAOEffect extends Effect {
 
 		this._gtaoPass.uniforms.cameraNear = gBufferRenderStates.camera.near;
 		this._gtaoPass.uniforms.cameraFar = gBufferRenderStates.camera.far;
-		projectionInv.toArray(this._gtaoPass.uniforms.projectionInv);
-		viewInv.toArray(this._gtaoPass.uniforms.viewInv);
+		this._gtaoPass.uniforms.isPerspective = isPerspectiveMatrix(gBufferRenderStates.camera.projectionMatrix) ? 1 : 0;
+		projectionViewInv.toArray(this._gtaoPass.uniforms.projectionViewInv);
 		this._gtaoPass.uniforms.texSize[0] = gBuffer.output().width;
 		this._gtaoPass.uniforms.texSize[1] = gBuffer.output().height;
 
@@ -111,8 +110,11 @@ export default class GTAOEffect extends Effect {
 
 }
 
-const projectionInv = new Matrix4();
-const viewInv = new Matrix4();
+const projectionViewInv = new Matrix4();
+
+function isPerspectiveMatrix(m) {
+	return m.elements[11] === -1.0;
+}
 
 const _directionsCache = {};
 
@@ -148,8 +150,8 @@ const GTAOShader = {
 		colorTex: null,
 		cameraNear: 1,
 		cameraFar: 500,
-		projectionInv: new Float32Array(16),
-		viewInv: new Float32Array(16),
+		isPerspective: 1,
+		projectionViewInv: new Float32Array(16),
 		texSize: [1024, 1024]
 	},
 
@@ -169,8 +171,8 @@ const GTAOShader = {
 
 		uniform float cameraNear;
 		uniform float cameraFar;
-		uniform mat4 projectionInv;
-		uniform mat4 viewInv;
+		uniform float isPerspective;
+		uniform mat4 projectionViewInv;
 		uniform vec2 texSize;
 
 		varying vec2 v_Uv;
@@ -196,9 +198,9 @@ const GTAOShader = {
 		vec4 getPosition(const in vec2 screenPosition) {
 			float sampleDepth = texture2D(depthTex, screenPosition).r;
 			float z = sampleDepth * 2.0 - 1.0;
-			vec4 Pos = vec4(screenPosition.xy * 2.0 - 1.0, z, 1.0);
-			Pos = viewInv * projectionInv * Pos;
-			return Pos/Pos.w;
+			vec4 pos = vec4(screenPosition.xy * 2.0 - 1.0, z, 1.0);
+			pos = projectionViewInv * pos;
+			return pos / pos.w;
 		}
 		
 		float rayMarch(float maxPixelScaled) {
@@ -238,7 +240,7 @@ const GTAOShader = {
 			}
 			
 			float ndcZ = depth * 2.0 - 1.0;
-			float maxPixelScaled = calcPixelByNDC(ndcZ);
+			float maxPixelScaled = mix(maxPixel, calcPixelByNDC(ndcZ), isPerspective);
 			float newFactor = rayMarch(maxPixelScaled);
 		
 			float factor = newFactor;
