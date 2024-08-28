@@ -14,6 +14,10 @@ export default class ColorMarkBuffer extends Buffer {
 			const rt = new RenderTarget2D(width, height);
 			rt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 			rt.texture.type = options.halfFloatMarkBuffer ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
+			if (options.halfFloatMarkBuffer == 2) {
+				rt.texture.format = PIXEL_FORMAT.RGB;
+				rt.texture.internalformat = 35898;
+			}
 			if (!bufferMipmaps) {
 				rt.texture.generateMipmaps = false;
 				rt.texture.minFilter = TEXTURE_FILTER.LINEAR;
@@ -24,8 +28,9 @@ export default class ColorMarkBuffer extends Buffer {
 		this._mrts = [];
 		for (let i = 0; i < options.maxColorAttachment; i++) {
 			const mrt = new RenderTarget2D(width, height);
+			const mrtPixelFormat = options.halfFloatMarkBuffer ? PIXEL_FORMAT.RGBA16F : PIXEL_FORMAT.RGBA8;
 			mrt.attach(
-				new RenderBuffer(width, height, options.halfFloatMarkBuffer ? PIXEL_FORMAT.RGBA16F : PIXEL_FORMAT.RGBA8, options.samplerNumber),
+				new RenderBuffer(width, height, options.halfFloatMarkBuffer === 2 ? 35898 : mrtPixelFormat, options.samplerNumber),
 				ATTACHMENT.COLOR_ATTACHMENT0
 			);
 			mrt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);

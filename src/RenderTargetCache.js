@@ -31,7 +31,12 @@ export default class RenderTargetCache {
 			texture.minFilter = TEXTURE_FILTER.LINEAR;
 			texture.magFilter = TEXTURE_FILTER.LINEAR;
 			texture.type = this._highDynamicRange ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
-			texture.format = PIXEL_FORMAT.RGBA;
+			if (this._highDynamicRange == 2) {
+				texture.internalformat = 35898;
+				texture.format = PIXEL_FORMAT.RGB;
+			} else {
+				texture.format = PIXEL_FORMAT.RGBA;
+			}
 			texture.generateMipmaps = false;
 
 			renderTarget.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);

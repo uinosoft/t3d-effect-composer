@@ -1,5 +1,5 @@
 
-import { RenderTarget2D, TEXTURE_FILTER, PIXEL_TYPE, ATTACHMENT } from 't3d';
+import { RenderTarget2D, PIXEL_FORMAT, TEXTURE_FILTER, PIXEL_TYPE, ATTACHMENT } from 't3d';
 import Buffer from './Buffer.js';
 
 // AccumulationBuffer is used to store the accumulation result of the previous frame.
@@ -13,6 +13,10 @@ export default class AccumulationBuffer extends Buffer {
 			const renderTarget = new RenderTarget2D(width, height);
 			renderTarget.texture.generateMipmaps = false;
 			renderTarget.texture.type = options.highDynamicRange ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
+			if (options.highDynamicRange == 2) {
+				renderTarget.texture.format = PIXEL_FORMAT.RGB;
+				renderTarget.texture.internalformat = 35898;
+			}
 			renderTarget.texture.minFilter = TEXTURE_FILTER.NEAREST;
 			renderTarget.texture.magFilter = TEXTURE_FILTER.NEAREST;
 			renderTarget.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
