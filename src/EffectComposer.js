@@ -15,24 +15,24 @@ export default class EffectComposer {
 	 * @param {Number} height - The height of the actual rendering size.
 	 * @param {Object} [options={}]
 	 * @param {Boolean} [options.webgl2=false] - Whether to support WebGL2 features. Turning on will improve the storage accuracy of GBuffer.
-	 * @param {Boolean} [options.bufferMipmaps=false] - Whether to generate mipmaps for buffers.
-	 * @param {Boolean} [options.floatColorBuffer=false] - Whether to support the EXT_color_buffer_float feature. Turning on will improve the storage accuracy of GBuffer.
-	 * @param {Boolean} [options.highDynamicRange=false] - Whether to use high dynamic range (HDR) rendering.
 	 * @param {Number} [options.samplerNumber=8] - MSAA sampling multiple.
 	 * @param {Number} [options.maxMarkAttachment=5] - Maximum number of mark attachments. Means that it supports up to N*4 effects that need to be marked.
 	 * @param {Number} [options.maxColorAttachment=5] - Maximum number of color buffer attachments.
+	 * @param {Boolean} [options.bufferMipmaps=false] - Whether to generate mipmaps for buffers.
+	 * @param {Boolean} [options.floatColorBuffer=false] - Whether to support the EXT_color_buffer_float feature. Turning on will improve the storage accuracy of GBuffer.
+	 * @param {Boolean} [options.highDynamicRange=false] - Whether to use high dynamic range (HDR) rendering.
 	 * @param {Boolean} [options.halfFloatMarkBuffer=false] - Determines whether to use half float for the mark buffer. This is forced to be true if `highDynamicRange` is enabled. Enable this to allow the strength of the mesh effect to exceed 1.
 	 */
 	constructor(width, height, options = {}) {
 		this._size = new Vector2(width, height);
 
 		options.webgl2 = options.webgl2 || false;
-		options.bufferMipmaps = options.bufferMipmaps || false;
-		options.floatColorBuffer = options.floatColorBuffer || false;
-		options.highDynamicRange = options.highDynamicRange || false;
 		options.samplerNumber = options.samplerNumber || 8;
 		options.maxMarkAttachment = options.maxMarkAttachment || 5;
 		options.maxColorAttachment = options.maxColorAttachment || 5;
+		options.bufferMipmaps = options.bufferMipmaps || false;
+		options.floatColorBuffer = options.floatColorBuffer || false;
+		options.highDynamicRange = options.highDynamicRange || false;
 		options.halfFloatMarkBuffer = options.halfFloatMarkBuffer || options.highDynamicRange;
 
 		// Create buffers

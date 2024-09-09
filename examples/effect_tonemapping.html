@@ -111,9 +111,6 @@
     const effectComposer = new EffectComposer(width, height, {
     	samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
     	webgl2: renderer.capabilities.version > 1,
-    	floatColorBuffer: !!renderer.capabilities.getExtension(
-    		'EXT_color_buffer_float'
-    	),
     	highDynamicRange: true
     });
     effectComposer.sceneMSAA = true;
