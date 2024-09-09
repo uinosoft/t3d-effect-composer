@@ -69,7 +69,7 @@
 	effectComposer.getBuffer('SceneBuffer').setOutputEncoding(t3d.TEXEL_ENCODING_TYPE.GAMMA);
 	effectComposer.sceneMSAA = true;
 	effectComposer.getBuffer('GBuffer').setIfRenderReplaceFunction(function normalIfRenderFunction(renderable) {
-		if (renderable.object.effects && renderable.object.effects['volume'] == 1) {
+		if (renderable.object.effects && renderable.object.effects['volume']) {
 			return false;
 		}
 		return true;
@@ -97,7 +97,7 @@
 	const platte = new Texture2DLoader().load('./resources/platte.png');
 
 	const volumeEffect = new VolumeEffect();
-	volumeEffect.id = 1;
+	volumeEffect.volumeId = 1;
 	volumeEffect.colorRampTexture = platte;
 	effectComposer.addEffect('volumeEffect', volumeEffect, 99);
 
@@ -155,7 +155,6 @@
 	}).then(() => {
 		volumeMesh = new t3d.Mesh(undefined, material);
 		volumeMesh.effects = { volume: 1 };
-		volumeMesh.volumeid = 1;
 		scene.add(volumeMesh);
 
 		params = {

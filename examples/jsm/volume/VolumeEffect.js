@@ -80,9 +80,10 @@ export default class VolumeEffect extends Effect {
 		view.toArray(mainPass.material.uniforms.view);
 		gBufferRenderStates.camera.position.toArray(mainPass.material.uniforms.cameraPos);
 
-		mainPass.material.uniforms.id = this.volumeId;
-		mainPass.material.uniforms.frontDepthTex = thicknessBuffer.output()[0]._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
-		mainPass.material.uniforms.backDepthTex = thicknessBuffer.output()[1]._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
+		mainPass.material.uniforms.volumeid = this.volumeId;
+		mainPass.material.uniforms.idTex = thicknessBuffer.output()[0]._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
+		mainPass.material.uniforms.frontDepthTex = thicknessBuffer.output()[0]._attachments[ATTACHMENT.DEPTH_ATTACHMENT];
+		mainPass.material.uniforms.backDepthTex = thicknessBuffer.output()[1]._attachments[ATTACHMENT.DEPTH_ATTACHMENT];
 		mainPass.material.uniforms.diffuseTex = inputRenderTarget.texture;
 		mainPass.material.uniforms.depthTex = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
 		mainPass.material.uniforms.volumeTexture = this.volumeTexture;
@@ -104,7 +105,7 @@ export default class VolumeEffect extends Effect {
 			mainPass.material.needsUpdate = true;
 		}
 
-		const useBlueNoise = !!this.blueNoise;
+		const useBlueNoise = !!this.blueNoise && renderer.capabilities.version > 1;
 
 		if (useBlueNoise) {
 			mainPass.uniforms.blueNoise = this.blueNoise;
@@ -157,9 +158,10 @@ const volumeShader = {
 		TEXTURE2D_WRAP_REPEAT: false
 	},
 	uniforms: {
-		id: 1,
+		volumeid: 1,
 
 		depthTex: null,
+		idTex: null,
 		backDepthTex: null,
 		frontDepthTex: null,
 
@@ -187,11 +189,10 @@ const volumeShader = {
 
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
-    precision highp sampler3D;
-
-	uniform float id;
+	uniform int volumeid;
 
     uniform sampler2D depthTex;
+	uniform sampler2D idTex;
     uniform sampler2D backDepthTex;
     uniform sampler2D frontDepthTex;
 
@@ -229,6 +230,8 @@ const volumeShader = {
     }
 
     #ifdef TEXTURETYPE_3D
+		precision highp sampler3D;
+
         uniform sampler3D volumeTexture;
 
         vec4 sampleAs3DTexture(vec3 texCoord) {
@@ -277,11 +280,20 @@ const volumeShader = {
         }
     #endif
 
+	
+	int decodeID(vec2 encodedID) {
+		int high = int(encodedID.x * 255.0);
+		int low = int(encodedID.y * 255.0);
+		return high * 256 + low;
+	}
+
     void main() {
         vec4 diffuseColor = texture2D(diffuseTex, v_Uv);
 
         float depth = texture2D(depthTex, v_Uv).r;
-        float texId = texture2D(backDepthTex, v_Uv).g;
+
+        vec2 texId = texture2D(idTex, v_Uv).rg;
+
         float backDepth = texture2D(backDepthTex, v_Uv).r;
         float frontDepth = texture2D(frontDepthTex, v_Uv).r;
         
@@ -290,8 +302,8 @@ const volumeShader = {
             return;
         }
         
-        if(int(id) != int(texId)) {
-            gl_FragColor = diffuseColor; 
+        if(volumeid != decodeID(texId)) {
+            gl_FragColor = diffuseColor;
             return;
         }
    
@@ -311,7 +323,7 @@ const volumeShader = {
 		#ifdef USE_BLUE_NOISE
 			float raymarchSteps = float(MAX_ITERATION);
 			vec4 blueNoiseSample = texture2D(blueNoise, v_Uv * noiseScale);
-			float samplesFloat = round(raymarchSteps + (raymarchSteps / 4.) * blueNoiseSample.x);
+			float samplesFloat = floor(raymarchSteps + (raymarchSteps / 4.) * blueNoiseSample.x + 0.5);
 			samples = int(samplesFloat);
 		#endif
 
@@ -334,7 +346,11 @@ const volumeShader = {
 		float unitOpacity = unitDistanceOpacity * length(step);
 		
         // ray marching
+		#ifdef USE_BLUE_NOISE
         for(int i = 0; i < samples; i++) {
+		#else
+		for(int i = 0; i < MAX_ITERATION; i++) {
+		#endif
             point += step;
             vec4 screenPos = projection * view * vec4(point, 1.0);
             screenPos /= screenPos.w;

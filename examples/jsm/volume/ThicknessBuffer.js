@@ -1,4 +1,4 @@
-import { RenderTarget2D, PIXEL_TYPE, TEXTURE_FILTER, ShaderMaterial, DRAW_SIDE, COMPARE_FUNC } from 't3d';
+import { RenderTarget2D, PIXEL_TYPE, TEXTURE_FILTER, ShaderMaterial, DRAW_SIDE, COMPARE_FUNC, PIXEL_FORMAT, ATTACHMENT, Texture2D } from 't3d';
 import { Buffer } from 't3d-effect-composer';
 
 export default class ThicknessBuffer extends Buffer {
@@ -6,29 +6,33 @@ export default class ThicknessBuffer extends Buffer {
 	constructor(width, height, options) {
 		super(width, height, options);
 
-		this._frontDepthRenderTarget = new RenderTarget2D(width, height);
-		this._frontDepthRenderTarget.texture.minFilter = TEXTURE_FILTER.NEAREST;
-		this._frontDepthRenderTarget.texture.magFilter = TEXTURE_FILTER.NEAREST;
-		this._frontDepthRenderTarget.texture.generateMipmaps = false;
+		const output = [];
+		for (let face = 0; face < 2; face++) {
+			const depthTexture = new Texture2D();
+			depthTexture.image = { data: null, width: width, height: height };
+			depthTexture.type = PIXEL_TYPE.UNSIGNED_INT;
+			depthTexture.format = PIXEL_FORMAT.DEPTH_COMPONENT;
+			depthTexture.magFilter = TEXTURE_FILTER.NEAREST;
+			depthTexture.minFilter = TEXTURE_FILTER.NEAREST;
+			depthTexture.generateMipmaps = false;
+			depthTexture.flipY = false;
 
-		if (options.floatColorBuffer) {
-			this._frontDepthRenderTarget.texture.type = PIXEL_TYPE.FLOAT;
-		} else {
-			this._frontDepthRenderTarget.texture.type = PIXEL_TYPE.HALF_FLOAT;
+			const renderTarget = new RenderTarget2D(width, height);
+			renderTarget.texture.minFilter = TEXTURE_FILTER.NEAREST;
+			renderTarget.texture.magFilter = TEXTURE_FILTER.NEAREST;
+			renderTarget.texture.generateMipmaps = false;
+			renderTarget.texture.type = PIXEL_TYPE.UNSIGNED_BYTE;
+			renderTarget.texture.format = options.webgl2 ? PIXEL_FORMAT.RG : PIXEL_FORMAT.RGB;
+
+			renderTarget.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+			renderTarget.attach(depthTexture, ATTACHMENT.DEPTH_ATTACHMENT);
+
+			output.push(renderTarget);
 		}
 
-		this._backDepthRenderTarget = new RenderTarget2D(width, height);
-		this._backDepthRenderTarget.texture.minFilter = TEXTURE_FILTER.NEAREST;
-		this._backDepthRenderTarget.texture.magFilter = TEXTURE_FILTER.NEAREST;
-		this._backDepthRenderTarget.texture.generateMipmaps = false;
-
-		if (options.floatColorBuffer) {
-			this._backDepthRenderTarget.texture.type = PIXEL_TYPE.FLOAT;
-		} else {
-			this._backDepthRenderTarget.texture.type = PIXEL_TYPE.HALF_FLOAT;
-		}
-
-		this._output = [this._frontDepthRenderTarget, this._backDepthRenderTarget];
+		this._output = output;
+		this._frontDepthRenderTarget = output[0];
+		this._backDepthRenderTarget = output[1];
 
 		this._frontMaterial = new ShaderMaterial(thicknessShader);
 		this._frontMaterial.side = DRAW_SIDE.FRONT;
@@ -174,14 +178,22 @@ const thicknessShader = {
         #include <packing>
         #include <normal_pars_frag>
 
-        uniform float volumeid;
-
 		#include <logdepthbuf_pars_frag>
+
+        uniform int volumeid;
+
+		vec2 encodeID(int id) {
+			// id = clamp(id, 0, 65535);
+
+			float high = float(id / 256) / 255.0;
+			float low = fract(float(id) / 256.0);
+
+			return vec2(high, low);
+		}
 
         void main() {
 			#include <logdepthbuf_frag>
-			float depth = gl_FragCoord.z;
-            gl_FragColor = vec4(depth, volumeid, 0., 1.);
+            gl_FragColor = vec4(encodeID(volumeid), 0., 1.);
         }
     `
 };
