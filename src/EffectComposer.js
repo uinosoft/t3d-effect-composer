@@ -1,11 +1,11 @@
-import { Vector2, Texture2D, RenderBuffer, PIXEL_FORMAT, PIXEL_TYPE, ShaderPostPass, TEXTURE_FILTER } from 't3d';
+import { Vector2, Texture2D, RenderBuffer, PIXEL_FORMAT, ShaderPostPass, TEXTURE_FILTER } from 't3d';
 import GBuffer from './buffers/GBuffer.js';
 import NonDepthMarkBuffer from './buffers/NonDepthMarkBuffer.js';
 import MarkBuffer from './buffers/MarkBuffer.js';
 import ColorMarkBuffer from './buffers/ColorMarkBuffer.js';
 import SceneBuffer from './buffers/SceneBuffer.js';
 import RenderTargetCache from './RenderTargetCache.js';
-import { copyShader, isDepthStencilAttachment } from './Utils.js';
+import { copyShader, getColorBufferFormat, HDRMode, isDepthStencilAttachment, setupColorTexture } from './Utils.js';
 import CameraJitter from './CameraJitter.js';
 
 export default class EffectComposer {
@@ -21,7 +21,7 @@ export default class EffectComposer {
 	 * @param {Boolean} [options.bufferMipmaps=false] - Whether to generate mipmaps for buffers.
 	 * @param {Boolean} [options.floatColorBuffer=false] - Whether to support the EXT_color_buffer_float feature. Turning on will improve the storage accuracy of GBuffer.
 	 * @param {Boolean} [options.highDynamicRange=false] - Whether to use high dynamic range (HDR) rendering.
-	 * @param {Boolean} [options.halfFloatMarkBuffer=false] - Determines whether to use half float for the mark buffer. This is forced to be true if `highDynamicRange` is enabled. Enable this to allow the strength of the mesh effect to exceed 1.
+	 * @param {HDRMode} [options.hdrMode=HDRMode.RGBA16] - The pixel format of the HDR buffer. Only valid when hdr is enabled.
 	 */
 	constructor(width, height, options = {}) {
 		this._size = new Vector2(width, height);
@@ -33,7 +33,16 @@ export default class EffectComposer {
 		options.bufferMipmaps = options.bufferMipmaps || false;
 		options.floatColorBuffer = options.floatColorBuffer || false;
 		options.highDynamicRange = options.highDynamicRange || false;
-		options.halfFloatMarkBuffer = options.halfFloatMarkBuffer || options.highDynamicRange;
+		options.hdrMode = options.hdrMode || HDRMode.RGBA16;
+
+		if (!options.webgl2 && options.hdrMode === HDRMode.R11G11B10) {
+			console.warn('EffectComposer: HDRMode.R11G11B10 is only supported in WebGL2, fallback to HDRMode.RGBA16.');
+			options.hdrMode = HDRMode.RGBA16;
+		}
+
+		if (options.halfFloatMarkBuffer) {
+			console.warn('EffectComposer: The `halfFloatMarkBuffer` option is deprecated. Override mark buffer class to impltement this.');
+		}
 
 		// Create buffers
 
@@ -58,8 +67,8 @@ export default class EffectComposer {
 		// Noticed that sceneBuffer and markBuffer are sharing the same DepthRenderBuffer MSDepthRenderBuffer.
 
 		this._defaultColorTexture = new Texture2D();
-		this._defaultColorTexture.type = options.highDynamicRange ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
-		this._defaultMSColorRenderBuffer = new RenderBuffer(width, height, options.highDynamicRange ? PIXEL_FORMAT.RGBA16F : PIXEL_FORMAT.RGBA8, options.samplerNumber);
+		setupColorTexture(this._defaultColorTexture, options);
+		this._defaultMSColorRenderBuffer = new RenderBuffer(width, height, getColorBufferFormat(options), options.samplerNumber);
 		if (!options.bufferMipmaps) {
 			this._defaultColorTexture.generateMipmaps = false;
 			this._defaultColorTexture.minFilter = TEXTURE_FILTER.LINEAR;
@@ -90,7 +99,7 @@ export default class EffectComposer {
 		this._copyPass = new ShaderPostPass(copyShader);
 		this._copyPass.material.premultipliedAlpha = true;
 
-		this._renderTargetCache = new RenderTargetCache(width, height, options.highDynamicRange);
+		this._renderTargetCache = new RenderTargetCache(width, height, options);
 		this._cameraJitter = new CameraJitter();
 
 		this._effectList = [];

@@ -35,60 +35,6 @@
 		}
 	}
 
-	// AccumulationBuffer is used to store the accumulation result of the previous frame.
-	// But it can not render to itself (render method is empty), need TAAEffect to help.
-	class AccumulationBuffer extends Buffer {
-		constructor(width, height, options) {
-			super(width, height, options);
-			function createSwapRenderTarget() {
-				const renderTarget = new t3d.RenderTarget2D(width, height);
-				renderTarget.texture.generateMipmaps = false;
-				renderTarget.texture.type = options.highDynamicRange ? t3d.PIXEL_TYPE.HALF_FLOAT : t3d.PIXEL_TYPE.UNSIGNED_BYTE;
-				renderTarget.texture.minFilter = t3d.TEXTURE_FILTER.NEAREST;
-				renderTarget.texture.magFilter = t3d.TEXTURE_FILTER.NEAREST;
-				renderTarget.detach(t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
-				return renderTarget;
-			}
-			this._prevRT = createSwapRenderTarget();
-			this._accumRT = createSwapRenderTarget();
-		}
-		swap() {
-			const tempRT = this._prevRT;
-			this._prevRT = this._accumRT;
-			this._accumRT = tempRT;
-		}
-		accumRT() {
-			return this._accumRT;
-		}
-		output() {
-			return this._prevRT;
-		}
-		resize(width, height) {
-			super.resize(width, height);
-			this._prevRT.resize(width, height);
-			this._accumRT.resize(width, height);
-		}
-		dispose() {
-			super.dispose();
-			this._prevRT.dispose();
-			this._accumRT.dispose();
-		}
-	}
-
-	class Effect {
-		constructor() {
-			this.name = '';
-			this.bufferDependencies = [];
-			this.active = true;
-			this.needCameraJitter = false;
-		}
-		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-			console.error('Effect: .render() must be implemented in subclass.');
-		}
-		resize(width, height) {}
-		dispose() {}
-	}
-
 	const defaultVertexShader = `
 		attribute vec3 a_Position;
 		attribute vec2 a_Uv;
@@ -1571,6 +1517,23 @@ vec3 octahedronToUnitVector(vec2 p) {
 	function isDepthStencilAttachment(attachment) {
 		return attachment.format === t3d.PIXEL_FORMAT.DEPTH_STENCIL || attachment.format === t3d.PIXEL_FORMAT.DEPTH24_STENCIL8;
 	}
+	function getColorBufferFormat(options) {
+		if (options.highDynamicRange) {
+			return options.hdrMode === HDRMode.R11G11B10 ? 35898 : t3d.PIXEL_FORMAT.RGBA16F; // use PIXEL_FORMAT.RGB11F_G11F_B10F instead of 35898 after t3d v0.2.9
+		}
+		return t3d.PIXEL_FORMAT.RGBA8;
+	}
+	function setupColorTexture(texture, options) {
+		texture.type = t3d.PIXEL_TYPE.UNSIGNED_BYTE;
+		texture.format = t3d.PIXEL_FORMAT.RGBA;
+		if (options.highDynamicRange) {
+			texture.type = t3d.PIXEL_TYPE.HALF_FLOAT;
+			if (options.hdrMode === HDRMode.R11G11B10) {
+				texture.format = t3d.PIXEL_FORMAT.RGB;
+				texture.internalformat = 35898; // use PIXEL_FORMAT.RGB11F_G11F_B10F instead of 35898 after t3d v0.2.9
+			}
+		}
+	}
 	const RenderListMask = {
 		OPAQUE: 1,
 		// 0001
@@ -1578,6 +1541,64 @@ vec3 octahedronToUnitVector(vec2 p) {
 		// 0010
 		ALL: 15 // 1111
 	};
+	const HDRMode = {
+		RGBA16: 1,
+		R11G11B10: 2
+	};
+
+	// AccumulationBuffer is used to store the accumulation result of the previous frame.
+	// But it can not render to itself (render method is empty), need TAAEffect to help.
+	class AccumulationBuffer extends Buffer {
+		constructor(width, height, options) {
+			super(width, height, options);
+			function createSwapRenderTarget() {
+				const renderTarget = new t3d.RenderTarget2D(width, height);
+				setupColorTexture(renderTarget.texture, options);
+				renderTarget.texture.minFilter = t3d.TEXTURE_FILTER.NEAREST;
+				renderTarget.texture.magFilter = t3d.TEXTURE_FILTER.NEAREST;
+				renderTarget.texture.generateMipmaps = false;
+				renderTarget.detach(t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+				return renderTarget;
+			}
+			this._prevRT = createSwapRenderTarget();
+			this._accumRT = createSwapRenderTarget();
+		}
+		swap() {
+			const tempRT = this._prevRT;
+			this._prevRT = this._accumRT;
+			this._accumRT = tempRT;
+		}
+		accumRT() {
+			return this._accumRT;
+		}
+		output() {
+			return this._prevRT;
+		}
+		resize(width, height) {
+			super.resize(width, height);
+			this._prevRT.resize(width, height);
+			this._accumRT.resize(width, height);
+		}
+		dispose() {
+			super.dispose();
+			this._prevRT.dispose();
+			this._accumRT.dispose();
+		}
+	}
+
+	class Effect {
+		constructor() {
+			this.name = '';
+			this.bufferDependencies = [];
+			this.active = true;
+			this.needCameraJitter = false;
+		}
+		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
+			console.error('Effect: .render() must be implemented in subclass.');
+		}
+		resize(width, height) {}
+		dispose() {}
+	}
 
 	class BloomEffect extends Effect {
 		constructor() {
@@ -5016,17 +5037,18 @@ vec3 octahedronToUnitVector(vec2 p) {
 			for (let i = 0; i < options.maxMarkAttachment; i++) {
 				const rt = new t3d.RenderTarget2D(width, height);
 				rt.detach(t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
-				rt.texture.type = options.halfFloatMarkBuffer ? t3d.PIXEL_TYPE.HALF_FLOAT : t3d.PIXEL_TYPE.UNSIGNED_BYTE;
+				setupColorTexture(rt.texture, options);
 				if (!bufferMipmaps) {
 					rt.texture.generateMipmaps = false;
 					rt.texture.minFilter = t3d.TEXTURE_FILTER.LINEAR;
 				}
 				this._rts.push(rt);
 			}
+			const colorBufferFormat = getColorBufferFormat(options);
 			this._mrts = [];
 			for (let i = 0; i < options.maxMarkAttachment; i++) {
 				const mrt = new t3d.RenderTarget2D(width, height);
-				mrt.attach(new t3d.RenderBuffer(width, height, options.halfFloatMarkBuffer ? t3d.PIXEL_FORMAT.RGBA16F : t3d.PIXEL_FORMAT.RGBA8, options.samplerNumber), t3d.ATTACHMENT.COLOR_ATTACHMENT0);
+				mrt.attach(new t3d.RenderBuffer(width, height, colorBufferFormat, options.samplerNumber), t3d.ATTACHMENT.COLOR_ATTACHMENT0);
 				mrt.detach(t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 				this._mrts.push(mrt);
 			}
@@ -5285,17 +5307,18 @@ vec3 octahedronToUnitVector(vec2 p) {
 			for (let i = 0; i < options.maxColorAttachment; i++) {
 				const rt = new t3d.RenderTarget2D(width, height);
 				rt.detach(t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
-				rt.texture.type = options.halfFloatMarkBuffer ? t3d.PIXEL_TYPE.HALF_FLOAT : t3d.PIXEL_TYPE.UNSIGNED_BYTE;
+				setupColorTexture(rt.texture, options);
 				if (!bufferMipmaps) {
 					rt.texture.generateMipmaps = false;
 					rt.texture.minFilter = t3d.TEXTURE_FILTER.LINEAR;
 				}
 				this._rts.push(rt);
 			}
+			const colorBufferFormat = getColorBufferFormat(options);
 			this._mrts = [];
 			for (let i = 0; i < options.maxColorAttachment; i++) {
 				const mrt = new t3d.RenderTarget2D(width, height);
-				mrt.attach(new t3d.RenderBuffer(width, height, options.halfFloatMarkBuffer ? t3d.PIXEL_FORMAT.RGBA16F : t3d.PIXEL_FORMAT.RGBA8, options.samplerNumber), t3d.ATTACHMENT.COLOR_ATTACHMENT0);
+				mrt.attach(new t3d.RenderBuffer(width, height, colorBufferFormat, options.samplerNumber), t3d.ATTACHMENT.COLOR_ATTACHMENT0);
 				mrt.detach(t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 				this._mrts.push(mrt);
 			}
@@ -5658,10 +5681,10 @@ vec3 octahedronToUnitVector(vec2 p) {
 	}
 
 	class RenderTargetCache {
-		constructor(width, height, highDynamicRange = false) {
+		constructor(width, height, options) {
 			this._width = width;
 			this._height = height;
-			this._highDynamicRange = highDynamicRange;
+			this._options = options;
 			this._map = new Map();
 		}
 		allocate(level = 0) {
@@ -5678,10 +5701,9 @@ vec3 octahedronToUnitVector(vec2 p) {
 				const height = Math.ceil(this._height / divisor);
 				const renderTarget = new t3d.RenderTarget2D(width, height);
 				const texture = renderTarget._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
+				setupColorTexture(texture, this._options);
 				texture.minFilter = t3d.TEXTURE_FILTER.LINEAR;
 				texture.magFilter = t3d.TEXTURE_FILTER.LINEAR;
-				texture.type = this._highDynamicRange ? t3d.PIXEL_TYPE.HALF_FLOAT : t3d.PIXEL_TYPE.UNSIGNED_BYTE;
-				texture.format = t3d.PIXEL_FORMAT.RGBA;
 				texture.generateMipmaps = false;
 				renderTarget.detach(t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 				return renderTarget;
@@ -5831,24 +5853,31 @@ vec3 octahedronToUnitVector(vec2 p) {
 		 * @param {Number} height - The height of the actual rendering size.
 		 * @param {Object} [options={}]
 		 * @param {Boolean} [options.webgl2=false] - Whether to support WebGL2 features. Turning on will improve the storage accuracy of GBuffer.
-		 * @param {Boolean} [options.bufferMipmaps=false] - Whether to generate mipmaps for buffers.
-		 * @param {Boolean} [options.floatColorBuffer=false] - Whether to support the EXT_color_buffer_float feature. Turning on will improve the storage accuracy of GBuffer.
-		 * @param {Boolean} [options.highDynamicRange=false] - Whether to use high dynamic range (HDR) rendering.
 		 * @param {Number} [options.samplerNumber=8] - MSAA sampling multiple.
 		 * @param {Number} [options.maxMarkAttachment=5] - Maximum number of mark attachments. Means that it supports up to N*4 effects that need to be marked.
 		 * @param {Number} [options.maxColorAttachment=5] - Maximum number of color buffer attachments.
-		 * @param {Boolean} [options.halfFloatMarkBuffer=false] - Determines whether to use half float for the mark buffer. This is forced to be true if `highDynamicRange` is enabled. Enable this to allow the strength of the mesh effect to exceed 1.
+		 * @param {Boolean} [options.bufferMipmaps=false] - Whether to generate mipmaps for buffers.
+		 * @param {Boolean} [options.floatColorBuffer=false] - Whether to support the EXT_color_buffer_float feature. Turning on will improve the storage accuracy of GBuffer.
+		 * @param {Boolean} [options.highDynamicRange=false] - Whether to use high dynamic range (HDR) rendering.
+		 * @param {HDRMode} [options.hdrMode=HDRMode.RGBA16] - The pixel format of the HDR buffer. Only valid when hdr is enabled.
 		 */
 		constructor(width, height, options = {}) {
 			this._size = new t3d.Vector2(width, height);
 			options.webgl2 = options.webgl2 || false;
-			options.bufferMipmaps = options.bufferMipmaps || false;
-			options.floatColorBuffer = options.floatColorBuffer || false;
-			options.highDynamicRange = options.highDynamicRange || false;
 			options.samplerNumber = options.samplerNumber || 8;
 			options.maxMarkAttachment = options.maxMarkAttachment || 5;
 			options.maxColorAttachment = options.maxColorAttachment || 5;
-			options.halfFloatMarkBuffer = options.halfFloatMarkBuffer || options.highDynamicRange;
+			options.bufferMipmaps = options.bufferMipmaps || false;
+			options.floatColorBuffer = options.floatColorBuffer || false;
+			options.highDynamicRange = options.highDynamicRange || false;
+			options.hdrMode = options.hdrMode || HDRMode.RGBA16;
+			if (!options.webgl2 && options.hdrMode === HDRMode.R11G11B10) {
+				console.warn('EffectComposer: HDRMode.R11G11B10 is only supported in WebGL2, fallback to HDRMode.RGBA16.');
+				options.hdrMode = HDRMode.RGBA16;
+			}
+			if (options.halfFloatMarkBuffer) {
+				console.warn('EffectComposer: The `halfFloatMarkBuffer` option is deprecated. Override mark buffer class to impltement this.');
+			}
 
 			// Create buffers
 
@@ -5866,8 +5895,8 @@ vec3 octahedronToUnitVector(vec2 p) {
 			// Noticed that sceneBuffer and markBuffer are sharing the same DepthRenderBuffer MSDepthRenderBuffer.
 
 			this._defaultColorTexture = new t3d.Texture2D();
-			this._defaultColorTexture.type = options.highDynamicRange ? t3d.PIXEL_TYPE.HALF_FLOAT : t3d.PIXEL_TYPE.UNSIGNED_BYTE;
-			this._defaultMSColorRenderBuffer = new t3d.RenderBuffer(width, height, options.highDynamicRange ? t3d.PIXEL_FORMAT.RGBA16F : t3d.PIXEL_FORMAT.RGBA8, options.samplerNumber);
+			setupColorTexture(this._defaultColorTexture, options);
+			this._defaultMSColorRenderBuffer = new t3d.RenderBuffer(width, height, getColorBufferFormat(options), options.samplerNumber);
 			if (!options.bufferMipmaps) {
 				this._defaultColorTexture.generateMipmaps = false;
 				this._defaultColorTexture.minFilter = t3d.TEXTURE_FILTER.LINEAR;
@@ -5894,7 +5923,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 
 			this._copyPass = new t3d.ShaderPostPass(copyShader);
 			this._copyPass.material.premultipliedAlpha = true;
-			this._renderTargetCache = new RenderTargetCache(width, height, options.highDynamicRange);
+			this._renderTargetCache = new RenderTargetCache(width, height, options);
 			this._cameraJitter = new CameraJitter();
 			this._effectList = [];
 			this._tempClearColor = [0, 0, 0, 1];
@@ -6493,6 +6522,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 	exports.GBufferDebugger = GBufferDebugger;
 	exports.GhostingEffect = GhostingEffect;
 	exports.GlowEffect = GlowEffect;
+	exports.HDRMode = HDRMode;
 	exports.InnerGlowEffect = InnerGlowEffect;
 	exports.MarkBufferDebugger = MarkBufferDebugger;
 	exports.NonDepthMarkBufferDebugger = NonDepthMarkBufferDebugger;
@@ -6515,6 +6545,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 	exports.copyShader = copyShader;
 	exports.defaultVertexShader = defaultVertexShader;
 	exports.fxaaShader = fxaaShader;
+	exports.getColorBufferFormat = getColorBufferFormat;
 	exports.highlightShader = highlightShader;
 	exports.horizontalBlurShader = horizontalBlurShader;
 	exports.isDepthStencilAttachment = isDepthStencilAttachment;
@@ -6522,6 +6553,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 	exports.multiplyShader = multiplyShader;
 	exports.octahedronToUnitVectorGLSL = octahedronToUnitVectorGLSL;
 	exports.seperableBlurShader = seperableBlurShader;
+	exports.setupColorTexture = setupColorTexture;
 	exports.unitVectorToOctahedronGLSL = unitVectorToOctahedronGLSL;
 	exports.verticalBlurShader = verticalBlurShader;
 

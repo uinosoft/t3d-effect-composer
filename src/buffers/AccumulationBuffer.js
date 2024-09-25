@@ -1,6 +1,7 @@
 
-import { RenderTarget2D, TEXTURE_FILTER, PIXEL_TYPE, ATTACHMENT } from 't3d';
+import { RenderTarget2D, TEXTURE_FILTER, ATTACHMENT } from 't3d';
 import Buffer from './Buffer.js';
+import { setupColorTexture } from '../Utils.js';
 
 // AccumulationBuffer is used to store the accumulation result of the previous frame.
 // But it can not render to itself (render method is empty), need TAAEffect to help.
@@ -11,10 +12,10 @@ export default class AccumulationBuffer extends Buffer {
 
 		function createSwapRenderTarget() {
 			const renderTarget = new RenderTarget2D(width, height);
-			renderTarget.texture.generateMipmaps = false;
-			renderTarget.texture.type = options.highDynamicRange ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
+			setupColorTexture(renderTarget.texture, options);
 			renderTarget.texture.minFilter = TEXTURE_FILTER.NEAREST;
 			renderTarget.texture.magFilter = TEXTURE_FILTER.NEAREST;
+			renderTarget.texture.generateMipmaps = false;
 			renderTarget.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 			return renderTarget;
 		}

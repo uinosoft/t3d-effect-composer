@@ -1,4 +1,4 @@
-import { PIXEL_FORMAT } from 't3d';
+import { PIXEL_FORMAT, PIXEL_TYPE } from 't3d';
 
 export const defaultVertexShader = `
     attribute vec3 a_Position;
@@ -1498,8 +1498,35 @@ export function isDepthStencilAttachment(attachment) {
 		|| attachment.format === PIXEL_FORMAT.DEPTH24_STENCIL8;
 }
 
+export function getColorBufferFormat(options) {
+	if (options.highDynamicRange) {
+		return options.hdrMode === HDRMode.R11G11B10 ? 35898 : PIXEL_FORMAT.RGBA16F; // use PIXEL_FORMAT.RGB11F_G11F_B10F instead of 35898 after t3d v0.2.9
+	}
+
+	return PIXEL_FORMAT.RGBA8;
+}
+
+export function setupColorTexture(texture, options) {
+	texture.type = PIXEL_TYPE.UNSIGNED_BYTE;
+	texture.format = PIXEL_FORMAT.RGBA;
+
+	if (options.highDynamicRange) {
+		texture.type = PIXEL_TYPE.HALF_FLOAT;
+
+		if (options.hdrMode === HDRMode.R11G11B10) {
+			texture.format = PIXEL_FORMAT.RGB;
+			texture.internalformat = 35898; // use PIXEL_FORMAT.RGB11F_G11F_B10F instead of 35898 after t3d v0.2.9
+		}
+	}
+}
+
 export const RenderListMask = {
 	OPAQUE: 1, // 0001
 	TRANSPARENT: 2, // 0010
 	ALL: 15 // 1111
+};
+
+export const HDRMode = {
+	RGBA16: 1,
+	R11G11B10: 2
 };

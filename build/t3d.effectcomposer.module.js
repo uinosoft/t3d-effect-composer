@@ -1,5 +1,5 @@
 // t3d-effect-composer
-import { RenderTarget2D, PIXEL_TYPE, TEXTURE_FILTER, ATTACHMENT, PIXEL_FORMAT, ShaderPostPass, Matrix4, Texture2D, TEXTURE_WRAP, Vector3, TEXEL_ENCODING_TYPE, Color3, Vector2, Vector4, SHADING_TYPE, ShaderMaterial, RenderBuffer, DRAW_SIDE, BLEND_TYPE } from 't3d';
+import { PIXEL_FORMAT, PIXEL_TYPE, RenderTarget2D, TEXTURE_FILTER, ATTACHMENT, ShaderPostPass, Matrix4, Texture2D, TEXTURE_WRAP, Vector3, TEXEL_ENCODING_TYPE, Color3, Vector2, Vector4, SHADING_TYPE, ShaderMaterial, RenderBuffer, DRAW_SIDE, BLEND_TYPE } from 't3d';
 
 class Buffer {
 
@@ -39,76 +39,6 @@ class Buffer {
 	dispose() {
 		this.needsUpdate = true;
 	}
-
-}
-
-// AccumulationBuffer is used to store the accumulation result of the previous frame.
-// But it can not render to itself (render method is empty), need TAAEffect to help.
-class AccumulationBuffer extends Buffer {
-
-	constructor(width, height, options) {
-		super(width, height, options);
-
-		function createSwapRenderTarget() {
-			const renderTarget = new RenderTarget2D(width, height);
-			renderTarget.texture.generateMipmaps = false;
-			renderTarget.texture.type = options.highDynamicRange ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
-			renderTarget.texture.minFilter = TEXTURE_FILTER.NEAREST;
-			renderTarget.texture.magFilter = TEXTURE_FILTER.NEAREST;
-			renderTarget.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
-			return renderTarget;
-		}
-
-		this._prevRT = createSwapRenderTarget();
-		this._accumRT = createSwapRenderTarget();
-	}
-
-	swap() {
-		const tempRT = this._prevRT;
-		this._prevRT = this._accumRT;
-		this._accumRT = tempRT;
-	}
-
-	accumRT() {
-		return this._accumRT;
-	}
-
-	output() {
-		return this._prevRT;
-	}
-
-	resize(width, height) {
-		super.resize(width, height);
-		this._prevRT.resize(width, height);
-		this._accumRT.resize(width, height);
-	}
-
-	dispose() {
-		super.dispose();
-		this._prevRT.dispose();
-		this._accumRT.dispose();
-	}
-
-}
-
-class Effect {
-
-	constructor() {
-		this.name = '';
-
-		this.bufferDependencies = [];
-		this.active = true;
-
-		this.needCameraJitter = false;
-	}
-
-	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-		console.error('Effect: .render() must be implemented in subclass.');
-	}
-
-	resize(width, height) {}
-
-	dispose() {}
 
 }
 
@@ -1610,11 +1540,108 @@ function isDepthStencilAttachment(attachment) {
 		|| attachment.format === PIXEL_FORMAT.DEPTH24_STENCIL8;
 }
 
+function getColorBufferFormat(options) {
+	if (options.highDynamicRange) {
+		return options.hdrMode === HDRMode.R11G11B10 ? 35898 : PIXEL_FORMAT.RGBA16F; // use PIXEL_FORMAT.RGB11F_G11F_B10F instead of 35898 after t3d v0.2.9
+	}
+
+	return PIXEL_FORMAT.RGBA8;
+}
+
+function setupColorTexture(texture, options) {
+	texture.type = PIXEL_TYPE.UNSIGNED_BYTE;
+	texture.format = PIXEL_FORMAT.RGBA;
+
+	if (options.highDynamicRange) {
+		texture.type = PIXEL_TYPE.HALF_FLOAT;
+
+		if (options.hdrMode === HDRMode.R11G11B10) {
+			texture.format = PIXEL_FORMAT.RGB;
+			texture.internalformat = 35898; // use PIXEL_FORMAT.RGB11F_G11F_B10F instead of 35898 after t3d v0.2.9
+		}
+	}
+}
+
 const RenderListMask = {
 	OPAQUE: 1, // 0001
 	TRANSPARENT: 2, // 0010
 	ALL: 15 // 1111
 };
+
+const HDRMode = {
+	RGBA16: 1,
+	R11G11B10: 2
+};
+
+// AccumulationBuffer is used to store the accumulation result of the previous frame.
+// But it can not render to itself (render method is empty), need TAAEffect to help.
+class AccumulationBuffer extends Buffer {
+
+	constructor(width, height, options) {
+		super(width, height, options);
+
+		function createSwapRenderTarget() {
+			const renderTarget = new RenderTarget2D(width, height);
+			setupColorTexture(renderTarget.texture, options);
+			renderTarget.texture.minFilter = TEXTURE_FILTER.NEAREST;
+			renderTarget.texture.magFilter = TEXTURE_FILTER.NEAREST;
+			renderTarget.texture.generateMipmaps = false;
+			renderTarget.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+			return renderTarget;
+		}
+
+		this._prevRT = createSwapRenderTarget();
+		this._accumRT = createSwapRenderTarget();
+	}
+
+	swap() {
+		const tempRT = this._prevRT;
+		this._prevRT = this._accumRT;
+		this._accumRT = tempRT;
+	}
+
+	accumRT() {
+		return this._accumRT;
+	}
+
+	output() {
+		return this._prevRT;
+	}
+
+	resize(width, height) {
+		super.resize(width, height);
+		this._prevRT.resize(width, height);
+		this._accumRT.resize(width, height);
+	}
+
+	dispose() {
+		super.dispose();
+		this._prevRT.dispose();
+		this._accumRT.dispose();
+	}
+
+}
+
+class Effect {
+
+	constructor() {
+		this.name = '';
+
+		this.bufferDependencies = [];
+		this.active = true;
+
+		this.needCameraJitter = false;
+	}
+
+	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
+		console.error('Effect: .render() must be implemented in subclass.');
+	}
+
+	resize(width, height) {}
+
+	dispose() {}
+
+}
 
 class BloomEffect extends Effect {
 
@@ -5435,7 +5462,7 @@ class NonDepthMarkBuffer extends Buffer {
 		for (let i = 0; i < options.maxMarkAttachment; i++) {
 			const rt = new RenderTarget2D(width, height);
 			rt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
-			rt.texture.type = options.halfFloatMarkBuffer ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
+			setupColorTexture(rt.texture, options);
 			if (!bufferMipmaps) {
 				rt.texture.generateMipmaps = false;
 				rt.texture.minFilter = TEXTURE_FILTER.LINEAR;
@@ -5443,11 +5470,12 @@ class NonDepthMarkBuffer extends Buffer {
 			this._rts.push(rt);
 		}
 
+		const colorBufferFormat = getColorBufferFormat(options);
 		this._mrts = [];
 		for (let i = 0; i < options.maxMarkAttachment; i++) {
 			const mrt = new RenderTarget2D(width, height);
 			mrt.attach(
-				new RenderBuffer(width, height, options.halfFloatMarkBuffer ? PIXEL_FORMAT.RGBA16F : PIXEL_FORMAT.RGBA8, options.samplerNumber),
+				new RenderBuffer(width, height, colorBufferFormat, options.samplerNumber),
 				ATTACHMENT.COLOR_ATTACHMENT0
 			);
 			mrt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
@@ -5750,7 +5778,7 @@ class ColorMarkBuffer extends Buffer {
 		for (let i = 0; i < options.maxColorAttachment; i++) {
 			const rt = new RenderTarget2D(width, height);
 			rt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
-			rt.texture.type = options.halfFloatMarkBuffer ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
+			setupColorTexture(rt.texture, options);
 			if (!bufferMipmaps) {
 				rt.texture.generateMipmaps = false;
 				rt.texture.minFilter = TEXTURE_FILTER.LINEAR;
@@ -5758,11 +5786,12 @@ class ColorMarkBuffer extends Buffer {
 			this._rts.push(rt);
 		}
 
+		const colorBufferFormat = getColorBufferFormat(options);
 		this._mrts = [];
 		for (let i = 0; i < options.maxColorAttachment; i++) {
 			const mrt = new RenderTarget2D(width, height);
 			mrt.attach(
-				new RenderBuffer(width, height, options.halfFloatMarkBuffer ? PIXEL_FORMAT.RGBA16F : PIXEL_FORMAT.RGBA8, options.samplerNumber),
+				new RenderBuffer(width, height, colorBufferFormat, options.samplerNumber),
 				ATTACHMENT.COLOR_ATTACHMENT0
 			);
 			mrt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
@@ -6202,11 +6231,11 @@ class SceneBuffer extends Buffer {
 
 class RenderTargetCache {
 
-	constructor(width, height, highDynamicRange = false) {
+	constructor(width, height, options) {
 		this._width = width;
 		this._height = height;
 
-		this._highDynamicRange = highDynamicRange;
+		this._options = options;
 
 		this._map = new Map();
 	}
@@ -6228,10 +6257,9 @@ class RenderTargetCache {
 			const renderTarget = new RenderTarget2D(width, height);
 
 			const texture = renderTarget._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
+			setupColorTexture(texture, this._options);
 			texture.minFilter = TEXTURE_FILTER.LINEAR;
 			texture.magFilter = TEXTURE_FILTER.LINEAR;
-			texture.type = this._highDynamicRange ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
-			texture.format = PIXEL_FORMAT.RGBA;
 			texture.generateMipmaps = false;
 
 			renderTarget.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
@@ -6418,25 +6446,34 @@ class EffectComposer {
 	 * @param {Number} height - The height of the actual rendering size.
 	 * @param {Object} [options={}]
 	 * @param {Boolean} [options.webgl2=false] - Whether to support WebGL2 features. Turning on will improve the storage accuracy of GBuffer.
-	 * @param {Boolean} [options.bufferMipmaps=false] - Whether to generate mipmaps for buffers.
-	 * @param {Boolean} [options.floatColorBuffer=false] - Whether to support the EXT_color_buffer_float feature. Turning on will improve the storage accuracy of GBuffer.
-	 * @param {Boolean} [options.highDynamicRange=false] - Whether to use high dynamic range (HDR) rendering.
 	 * @param {Number} [options.samplerNumber=8] - MSAA sampling multiple.
 	 * @param {Number} [options.maxMarkAttachment=5] - Maximum number of mark attachments. Means that it supports up to N*4 effects that need to be marked.
 	 * @param {Number} [options.maxColorAttachment=5] - Maximum number of color buffer attachments.
-	 * @param {Boolean} [options.halfFloatMarkBuffer=false] - Determines whether to use half float for the mark buffer. This is forced to be true if `highDynamicRange` is enabled. Enable this to allow the strength of the mesh effect to exceed 1.
+	 * @param {Boolean} [options.bufferMipmaps=false] - Whether to generate mipmaps for buffers.
+	 * @param {Boolean} [options.floatColorBuffer=false] - Whether to support the EXT_color_buffer_float feature. Turning on will improve the storage accuracy of GBuffer.
+	 * @param {Boolean} [options.highDynamicRange=false] - Whether to use high dynamic range (HDR) rendering.
+	 * @param {HDRMode} [options.hdrMode=HDRMode.RGBA16] - The pixel format of the HDR buffer. Only valid when hdr is enabled.
 	 */
 	constructor(width, height, options = {}) {
 		this._size = new Vector2(width, height);
 
 		options.webgl2 = options.webgl2 || false;
-		options.bufferMipmaps = options.bufferMipmaps || false;
-		options.floatColorBuffer = options.floatColorBuffer || false;
-		options.highDynamicRange = options.highDynamicRange || false;
 		options.samplerNumber = options.samplerNumber || 8;
 		options.maxMarkAttachment = options.maxMarkAttachment || 5;
 		options.maxColorAttachment = options.maxColorAttachment || 5;
-		options.halfFloatMarkBuffer = options.halfFloatMarkBuffer || options.highDynamicRange;
+		options.bufferMipmaps = options.bufferMipmaps || false;
+		options.floatColorBuffer = options.floatColorBuffer || false;
+		options.highDynamicRange = options.highDynamicRange || false;
+		options.hdrMode = options.hdrMode || HDRMode.RGBA16;
+
+		if (!options.webgl2 && options.hdrMode === HDRMode.R11G11B10) {
+			console.warn('EffectComposer: HDRMode.R11G11B10 is only supported in WebGL2, fallback to HDRMode.RGBA16.');
+			options.hdrMode = HDRMode.RGBA16;
+		}
+
+		if (options.halfFloatMarkBuffer) {
+			console.warn('EffectComposer: The `halfFloatMarkBuffer` option is deprecated. Override mark buffer class to impltement this.');
+		}
 
 		// Create buffers
 
@@ -6461,8 +6498,8 @@ class EffectComposer {
 		// Noticed that sceneBuffer and markBuffer are sharing the same DepthRenderBuffer MSDepthRenderBuffer.
 
 		this._defaultColorTexture = new Texture2D();
-		this._defaultColorTexture.type = options.highDynamicRange ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
-		this._defaultMSColorRenderBuffer = new RenderBuffer(width, height, options.highDynamicRange ? PIXEL_FORMAT.RGBA16F : PIXEL_FORMAT.RGBA8, options.samplerNumber);
+		setupColorTexture(this._defaultColorTexture, options);
+		this._defaultMSColorRenderBuffer = new RenderBuffer(width, height, getColorBufferFormat(options), options.samplerNumber);
 		if (!options.bufferMipmaps) {
 			this._defaultColorTexture.generateMipmaps = false;
 			this._defaultColorTexture.minFilter = TEXTURE_FILTER.LINEAR;
@@ -6493,7 +6530,7 @@ class EffectComposer {
 		this._copyPass = new ShaderPostPass(copyShader);
 		this._copyPass.material.premultipliedAlpha = true;
 
-		this._renderTargetCache = new RenderTargetCache(width, height, options.highDynamicRange);
+		this._renderTargetCache = new RenderTargetCache(width, height, options);
 		this._cameraJitter = new CameraJitter();
 
 		this._effectList = [];
@@ -7197,4 +7234,4 @@ Object.defineProperties(SSREffect.prototype, {
 // Deprecated since v0.2.0, fallback to Roughness
 GBufferDebugger.DebugTypes.Glossiness = GBufferDebugger.DebugTypes.Roughness;
 
-export { AccumulationBuffer, BloomEffect, BlurEdgeEffect, Buffer, ChromaticAberrationEffect, ColorCorrectionEffect, ColorMarkBufferDebugger, DOFEffect, Debugger, DefaultEffectComposer, Effect, EffectComposer, FXAAEffect, FilmEffect, GBufferDebugger, GhostingEffect, GlowEffect, InnerGlowEffect, MarkBufferDebugger, NonDepthMarkBufferDebugger, OutlineEffect, RadialTailingEffect, RenderListMask, SSAODebugger, SSAOEffect, SSRDebugger, SSREffect, SoftGlowEffect, TAAEffect, TailingEffect, ToneMappingEffect, ToneMappingType, VignettingEffect, additiveShader, blurShader, channelShader, copyShader, defaultVertexShader, fxaaShader, highlightShader, horizontalBlurShader, isDepthStencilAttachment, maskShader, multiplyShader, octahedronToUnitVectorGLSL, seperableBlurShader, unitVectorToOctahedronGLSL, verticalBlurShader };
+export { AccumulationBuffer, BloomEffect, BlurEdgeEffect, Buffer, ChromaticAberrationEffect, ColorCorrectionEffect, ColorMarkBufferDebugger, DOFEffect, Debugger, DefaultEffectComposer, Effect, EffectComposer, FXAAEffect, FilmEffect, GBufferDebugger, GhostingEffect, GlowEffect, HDRMode, InnerGlowEffect, MarkBufferDebugger, NonDepthMarkBufferDebugger, OutlineEffect, RadialTailingEffect, RenderListMask, SSAODebugger, SSAOEffect, SSRDebugger, SSREffect, SoftGlowEffect, TAAEffect, TailingEffect, ToneMappingEffect, ToneMappingType, VignettingEffect, additiveShader, blurShader, channelShader, copyShader, defaultVertexShader, fxaaShader, getColorBufferFormat, highlightShader, horizontalBlurShader, isDepthStencilAttachment, maskShader, multiplyShader, octahedronToUnitVectorGLSL, seperableBlurShader, setupColorTexture, unitVectorToOctahedronGLSL, verticalBlurShader };

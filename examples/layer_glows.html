@@ -34,7 +34,7 @@
     import { SkyBox } from 't3d/addons/objects/SkyBox.js';
     import { TextureCubeLoader } from 't3d/addons/loaders/TextureCubeLoader.js';
 
-    import { DefaultEffectComposer, MarkBufferDebugger, ColorMarkBufferDebugger, RenderListMask } from 't3d-effect-composer';
+    import { DefaultEffectComposer, MarkBufferDebugger, ColorMarkBufferDebugger, RenderListMask, HDRMode } from 't3d-effect-composer';
 
     import { GUI } from './libs/lil-gui.esm.min.js';
     import Stats from './libs/stats.module.js';
@@ -57,9 +57,18 @@
     const effectComposer = new DefaultEffectComposer(width, height, {
     	samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
     	webgl2: renderer.capabilities.version > 1,
-    	halfFloatMarkBuffer: true
+    	highDynamicRange: true,
+    	hdrMode: HDRMode.R11G11B10 // HDRMode.RGBA16
     });
     effectComposer.sceneMSAA = true;
+
+    if (renderer.capabilities.version < 2) {
+    	renderer.capabilities.getExtension('OES_texture_half_float');
+    	renderer.capabilities.getExtension('OES_texture_half_float_linear');
+    	renderer.capabilities.getExtension('EXT_color_buffer_half_float');
+    } else {
+    	renderer.capabilities.getExtension('EXT_color_buffer_float');
+    }
 
     const scene = new t3d.Scene();
     scene.environmentLightIntensity = 0.2;

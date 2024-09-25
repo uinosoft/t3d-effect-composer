@@ -1,5 +1,5 @@
-import { RenderTarget2D, RenderBuffer, ATTACHMENT, PIXEL_FORMAT, PIXEL_TYPE, DRAW_SIDE, ShaderMaterial, TEXTURE_FILTER } from 't3d';
-import { isDepthStencilAttachment, RenderListMask } from '../Utils.js';
+import { RenderTarget2D, RenderBuffer, ATTACHMENT, DRAW_SIDE, ShaderMaterial, TEXTURE_FILTER } from 't3d';
+import { getColorBufferFormat, isDepthStencilAttachment, RenderListMask, setupColorTexture } from '../Utils.js';
 import BufferAttachManager from './BufferAttachManager.js';
 import Buffer from './Buffer.js';
 
@@ -13,7 +13,7 @@ export default class ColorMarkBuffer extends Buffer {
 		for (let i = 0; i < options.maxColorAttachment; i++) {
 			const rt = new RenderTarget2D(width, height);
 			rt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
-			rt.texture.type = options.halfFloatMarkBuffer ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
+			setupColorTexture(rt.texture, options);
 			if (!bufferMipmaps) {
 				rt.texture.generateMipmaps = false;
 				rt.texture.minFilter = TEXTURE_FILTER.LINEAR;
@@ -21,11 +21,12 @@ export default class ColorMarkBuffer extends Buffer {
 			this._rts.push(rt);
 		}
 
+		const colorBufferFormat = getColorBufferFormat(options);
 		this._mrts = [];
 		for (let i = 0; i < options.maxColorAttachment; i++) {
 			const mrt = new RenderTarget2D(width, height);
 			mrt.attach(
-				new RenderBuffer(width, height, options.halfFloatMarkBuffer ? PIXEL_FORMAT.RGBA16F : PIXEL_FORMAT.RGBA8, options.samplerNumber),
+				new RenderBuffer(width, height, colorBufferFormat, options.samplerNumber),
 				ATTACHMENT.COLOR_ATTACHMENT0
 			);
 			mrt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);

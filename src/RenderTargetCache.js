@@ -1,12 +1,13 @@
-import { RenderTarget2D, ATTACHMENT, TEXTURE_FILTER, PIXEL_FORMAT, PIXEL_TYPE } from 't3d';
+import { RenderTarget2D, ATTACHMENT, TEXTURE_FILTER } from 't3d';
+import { setupColorTexture } from './Utils.js';
 
 export default class RenderTargetCache {
 
-	constructor(width, height, highDynamicRange = false) {
+	constructor(width, height, options) {
 		this._width = width;
 		this._height = height;
 
-		this._highDynamicRange = highDynamicRange;
+		this._options = options;
 
 		this._map = new Map();
 	}
@@ -28,10 +29,9 @@ export default class RenderTargetCache {
 			const renderTarget = new RenderTarget2D(width, height);
 
 			const texture = renderTarget._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
+			setupColorTexture(texture, this._options);
 			texture.minFilter = TEXTURE_FILTER.LINEAR;
 			texture.magFilter = TEXTURE_FILTER.LINEAR;
-			texture.type = this._highDynamicRange ? PIXEL_TYPE.HALF_FLOAT : PIXEL_TYPE.UNSIGNED_BYTE;
-			texture.format = PIXEL_FORMAT.RGBA;
 			texture.generateMipmaps = false;
 
 			renderTarget.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
