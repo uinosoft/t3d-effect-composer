@@ -7196,51 +7196,18 @@ class SSRDebugger extends Debugger {
 
 }
 
-EffectComposer.prototype.setGeometryReplaceFunction = function(func) {
-	console.warn('EffectComposer.setGeometryReplaceFunction has been removed, use SceneBuffer.setGeometryReplaceFunction instead.');
-	const sceneBuffer = this._bufferMap.get('SceneBuffer');
-	sceneBuffer.setGeometryReplaceFunction(func);
-};
-
-Object.defineProperties(EffectComposer.prototype, {
-	customRenderLayers: {
-		set: function(value) {
-			console.error('EffectComposer.customRenderLayers has been removed, use SceneBuffer.renderLayers instead.');
-		},
-		get: function() {
-			console.error('EffectComposer.customRenderLayers has been removed, use SceneBuffer.renderLayers instead.');
-			return [];
-		}
-	}
-});
-
-// Compatible with versions prior to t3d.js-v0.1.3
-if (!ShaderPostPass.prototype.dispose) {
-	ShaderPostPass.prototype.dispose = function() {
-		const renderItem = this.renderQueueLayer.opaque[0];
-		if (renderItem) {
-			renderItem.geometry.dispose();
-			renderItem.material.dispose();
-		}
-	};
-}
-
-// since v0.1.3
-// SSREffect mixType property compatibility, to be removed in the future
+// deprecated since v0.1.3, add warning since v0.3.0, to be removed in v0.4.0
 Object.defineProperties(SSREffect.prototype, {
 	mixType: {
 		set: function(value) {
-			// console.warn('SSREffect: mixType has been deprecated, use falloff instead.');
+			console.warn('SSREffect: mixType has been deprecated, use falloff instead.');
 			this.falloff = value;
 		},
 		get: function() {
-			// console.warn('SSREffect: mixType has been deprecated, use falloff instead.');
+			console.warn('SSREffect: mixType has been deprecated, use falloff instead.');
 			return this.falloff;
 		}
 	}
 });
-
-// Deprecated since v0.2.0, fallback to Roughness
-GBufferDebugger.DebugTypes.Glossiness = GBufferDebugger.DebugTypes.Roughness;
 
 export { AccumulationBuffer, BloomEffect, BlurEdgeEffect, Buffer, ChromaticAberrationEffect, ColorCorrectionEffect, ColorMarkBufferDebugger, DOFEffect, Debugger, DefaultEffectComposer, Effect, EffectComposer, FXAAEffect, FilmEffect, GBufferDebugger, GhostingEffect, GlowEffect, HDRMode, InnerGlowEffect, MarkBufferDebugger, NonDepthMarkBufferDebugger, OutlineEffect, RadialTailingEffect, RenderListMask, SSAODebugger, SSAOEffect, SSRDebugger, SSREffect, SoftGlowEffect, TAAEffect, TailingEffect, ToneMappingEffect, ToneMappingType, VignettingEffect, additiveShader, blurShader, channelShader, copyShader, defaultVertexShader, fxaaShader, getColorBufferFormat, highlightShader, horizontalBlurShader, isDepthStencilAttachment, maskShader, multiplyShader, octahedronToUnitVectorGLSL, seperableBlurShader, setupColorTexture, unitVectorToOctahedronGLSL, verticalBlurShader };
