@@ -150,6 +150,7 @@ const DeferredShader = {
 		fragmentShader: `
 			#include <common_frag>
 			#include <diffuseMap_pars_frag>
+			#include <alphaTest_pars_frag>
 
 			#include <uv_pars_frag>
 
@@ -162,7 +163,7 @@ const DeferredShader = {
 				#if defined(USE_DIFFUSE_MAP) && defined(ALPHATEST)
 					vec4 texelColor = texture2D(diffuseMap, v_Uv);
 					float alpha = texelColor.a * u_Opacity;
-					if(alpha < ALPHATEST) discard;
+					if(alpha < u_AlphaTest) discard;
 				#endif
 
 				vec3 normal = normalize(v_Normal);
@@ -188,6 +189,7 @@ const DeferredShader = {
 			#include <common_vert>
 			#include <uv_pars_vert>
 			#include <color_pars_vert>
+			#include <diffuseMap_pars_vert>
 			#include <envMap_pars_vert>
 			#include <skinning_pars_vert>
 			void main() {
@@ -196,6 +198,7 @@ const DeferredShader = {
 				#include <pvm_vert>
 				#include <uv_vert>
 				#include <color_vert>
+				#include <diffuseMap_vert>
 			}
 		`,
 
@@ -602,6 +605,7 @@ const DeferredShader = {
 		fragmentShader: `
 			#include <common_frag>
 			#include <diffuseMap_pars_frag>
+			#include <alphaTest_pars_frag>
 
 			#include <uv_pars_frag>
 			#include <packing>
@@ -618,7 +622,7 @@ const DeferredShader = {
 					vec4 texelColor = texture2D(diffuseMap, v_Uv);
 
 					float alpha = texelColor.a * u_Opacity;
-					if(alpha < ALPHATEST) discard;
+					if(alpha < u_AlphaTest) discard;
 				#endif
 
 				vec3 normal = normalize(v_Normal);

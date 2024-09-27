@@ -256,9 +256,11 @@ const colorShader = {
         #include <morphtarget_pars_vert>
         #include <skinning_pars_vert>
         #include <uv_pars_vert>
+		#include <diffuseMap_pars_vert>
 		#include <logdepthbuf_pars_vert>
         void main() {
         	#include <uv_vert>
+			#include <diffuseMap_vert>
         	#include <begin_vert>
         	#include <morphtarget_vert>
         	#include <skinning_vert>
@@ -269,6 +271,7 @@ const colorShader = {
 	fragmentShader: `
         #include <common_frag>
         #include <diffuseMap_pars_frag>
+		#include <alphaTest_pars_frag>
 
         #include <uv_pars_frag>
 
@@ -282,11 +285,11 @@ const colorShader = {
 			vec4 outColor = vec4(u_Color, u_Opacity);
 
 			#ifdef USE_DIFFUSE_MAP
-				outColor *= texture2D(diffuseMap, v_Uv);
+				outColor *= texture2D(diffuseMap, vDiffuseMapUV);
 			#endif
 
 			#ifdef ALPHATEST
-				if(outColor.a < ALPHATEST) discard;
+				if(outColor.a < u_AlphaTest) discard;
 			#endif
 
 			outColor.a *= strength;

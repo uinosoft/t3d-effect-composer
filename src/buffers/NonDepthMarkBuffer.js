@@ -246,9 +246,11 @@ const markShader = {
         #include <morphtarget_pars_vert>
         #include <skinning_pars_vert>
         #include <uv_pars_vert>
+		#include <diffuseMap_pars_vert>
 		#include <logdepthbuf_pars_vert>
         void main() {
         	#include <uv_vert>
+			#include <diffuseMap_vert>
         	#include <begin_vert>
         	#include <morphtarget_vert>
         	#include <skinning_vert>
@@ -259,6 +261,7 @@ const markShader = {
 	fragmentShader: `
         #include <common_frag>
         #include <diffuseMap_pars_frag>
+		#include <alphaTest_pars_frag>
 
         #include <uv_pars_frag>
 
@@ -270,9 +273,9 @@ const markShader = {
 			#include <logdepthbuf_frag>
 			
             #if defined(USE_DIFFUSE_MAP) && defined(ALPHATEST)
-                vec4 texelColor = texture2D(diffuseMap, v_Uv);
+                vec4 texelColor = texture2D(diffuseMap, vDiffuseMapUV);
                 float alpha = texelColor.a * u_Opacity;
-                if(alpha < ALPHATEST) discard;
+                if(alpha < u_AlphaTest) discard;
             #endif
 
             gl_FragColor = mColor;

@@ -46,7 +46,7 @@
     "rollup": "^4.18.0"
   },
   "peerDependencies": {
-    "t3d": "^0.2.0"
+    "t3d": "^0.3.0"
   },
   "scripts": {
     "dev": "rollup -c -w",

@@ -58,7 +58,7 @@
     	samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
     	webgl2: renderer.capabilities.version > 1,
     	highDynamicRange: true,
-    	hdrMode: HDRMode.R11G11B10 // HDRMode.RGBA16
+    	hdrMode: HDRMode.R11G11B10
     });
     effectComposer.sceneMSAA = true;
 
@@ -66,8 +66,6 @@
     	renderer.capabilities.getExtension('OES_texture_half_float');
     	renderer.capabilities.getExtension('OES_texture_half_float_linear');
     	renderer.capabilities.getExtension('EXT_color_buffer_half_float');
-    } else {
-    	renderer.capabilities.getExtension('EXT_color_buffer_float');
     }
 
     const scene = new t3d.Scene();

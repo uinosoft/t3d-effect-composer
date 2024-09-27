@@ -1519,7 +1519,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 	}
 	function getColorBufferFormat(options) {
 		if (options.highDynamicRange) {
-			return options.hdrMode === HDRMode.R11G11B10 ? 35898 : t3d.PIXEL_FORMAT.RGBA16F; // use PIXEL_FORMAT.RGB11F_G11F_B10F instead of 35898 after t3d v0.2.9
+			return options.hdrMode === HDRMode.R11G11B10 ? t3d.PIXEL_FORMAT.R11F_G11F_B10F : t3d.PIXEL_FORMAT.RGBA16F;
 		}
 		return t3d.PIXEL_FORMAT.RGBA8;
 	}
@@ -1530,7 +1530,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 			texture.type = t3d.PIXEL_TYPE.HALF_FLOAT;
 			if (options.hdrMode === HDRMode.R11G11B10) {
 				texture.format = t3d.PIXEL_FORMAT.RGB;
-				texture.internalformat = 35898; // use PIXEL_FORMAT.RGB11F_G11F_B10F instead of 35898 after t3d v0.2.9
+				texture.internalformat = t3d.PIXEL_FORMAT.R11F_G11F_B10F;
 			}
 		}
 	}
@@ -4895,9 +4895,11 @@ vec3 octahedronToUnitVector(vec2 p) {
 				#include <skinning_pars_vert>
 				#include <normal_pars_vert>
 				#include <uv_pars_vert>
+		#include <diffuseMap_pars_vert>
 		#include <modelPos_pars_frag>
 				void main() {
 					#include <uv_vert>
+			#include <diffuseMap_vert>
 					#include <begin_vert>
 					#include <morphtarget_vert>
 					#include <morphnormal_vert>
@@ -4911,6 +4913,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 		fragmentShader: `
 				#include <common_frag>
 				#include <diffuseMap_pars_frag>
+		#include <alphaTest_pars_frag>
 
 				#include <uv_pars_frag>
 
@@ -4935,9 +4938,9 @@ vec3 octahedronToUnitVector(vec2 p) {
 
 				void main() {
 						#if defined(USE_DIFFUSE_MAP) && defined(ALPHATEST)
-								vec4 texelColor = texture2D(diffuseMap, v_Uv);
+								vec4 texelColor = texture2D(diffuseMap, vDiffuseMapUV);
 								float alpha = texelColor.a * u_Opacity;
-								if(alpha < ALPHATEST) discard;
+								if(alpha < u_AlphaTest) discard;
 						#endif
 
 			#ifdef FLAT_SHADED
@@ -5232,9 +5235,11 @@ vec3 octahedronToUnitVector(vec2 p) {
 				#include <morphtarget_pars_vert>
 				#include <skinning_pars_vert>
 				#include <uv_pars_vert>
+		#include <diffuseMap_pars_vert>
 		#include <logdepthbuf_pars_vert>
 				void main() {
 					#include <uv_vert>
+			#include <diffuseMap_vert>
 					#include <begin_vert>
 					#include <morphtarget_vert>
 					#include <skinning_vert>
@@ -5245,6 +5250,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 		fragmentShader: `
 				#include <common_frag>
 				#include <diffuseMap_pars_frag>
+		#include <alphaTest_pars_frag>
 
 				#include <uv_pars_frag>
 
@@ -5256,9 +5262,9 @@ vec3 octahedronToUnitVector(vec2 p) {
 			#include <logdepthbuf_frag>
 			
 						#if defined(USE_DIFFUSE_MAP) && defined(ALPHATEST)
-								vec4 texelColor = texture2D(diffuseMap, v_Uv);
+								vec4 texelColor = texture2D(diffuseMap, vDiffuseMapUV);
 								float alpha = texelColor.a * u_Opacity;
-								if(alpha < ALPHATEST) discard;
+								if(alpha < u_AlphaTest) discard;
 						#endif
 
 						gl_FragColor = mColor;
@@ -5503,9 +5509,11 @@ vec3 octahedronToUnitVector(vec2 p) {
 				#include <morphtarget_pars_vert>
 				#include <skinning_pars_vert>
 				#include <uv_pars_vert>
+		#include <diffuseMap_pars_vert>
 		#include <logdepthbuf_pars_vert>
 				void main() {
 					#include <uv_vert>
+			#include <diffuseMap_vert>
 					#include <begin_vert>
 					#include <morphtarget_vert>
 					#include <skinning_vert>
@@ -5516,6 +5524,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 		fragmentShader: `
 				#include <common_frag>
 				#include <diffuseMap_pars_frag>
+		#include <alphaTest_pars_frag>
 
 				#include <uv_pars_frag>
 
@@ -5529,11 +5538,11 @@ vec3 octahedronToUnitVector(vec2 p) {
 			vec4 outColor = vec4(u_Color, u_Opacity);
 
 			#ifdef USE_DIFFUSE_MAP
-				outColor *= texture2D(diffuseMap, v_Uv);
+				outColor *= texture2D(diffuseMap, vDiffuseMapUV);
 			#endif
 
 			#ifdef ALPHATEST
-				if(outColor.a < ALPHATEST) discard;
+				if(outColor.a < u_AlphaTest) discard;
 			#endif
 
 			outColor.a *= strength;

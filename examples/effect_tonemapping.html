@@ -32,156 +32,157 @@
 </script>
 
 <script type="module">
-    import * as t3d from 't3d';
-    import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
-    import { SkyBox } from 't3d/addons/objects/SkyBox.js';
-    import { PMREM } from 't3d/addons/PMREM.js';
-    import { GLTFLoader } from 't3d/addons/loaders/glTF/GLTFLoader.js';
-    import { RGBELoader } from 't3d/addons/loaders/RGBELoader.js';
+	import * as t3d from 't3d';
+	import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
+	import { SkyBox } from 't3d/addons/objects/SkyBox.js';
+	import { PMREMGenerator } from 't3d/addons/textures/PMREMGenerator.js';
+	import { GLTFLoader } from 't3d/addons/loaders/glTF/GLTFLoader.js';
+	import { RGBELoader } from 't3d/addons/loaders/RGBELoader.js';
 
-    import { EffectComposer, ToneMappingEffect, ToneMappingType } from 't3d-effect-composer';
-    import UnrealBloomEffect from './jsm/bloom/UnrealBloomEffect.js';
+	import { EffectComposer, ToneMappingEffect, ToneMappingType, HDRMode } from 't3d-effect-composer';
+	import UnrealBloomEffect from './jsm/bloom/UnrealBloomEffect.js';
 
-    import { GUI } from './libs/lil-gui.esm.min.js';
-    import Stats from './libs/stats.module.js';
+	import { GUI } from './libs/lil-gui.esm.min.js';
+	import Stats from './libs/stats.module.js';
 
-    let width = window.innerWidth || 2;
-    let height = window.innerHeight || 2;
+	let width = window.innerWidth || 2;
+	let height = window.innerHeight || 2;
 
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    document.body.appendChild(canvas);
+	const canvas = document.createElement('canvas');
+	canvas.width = width;
+	canvas.height = height;
+	document.body.appendChild(canvas);
 
-    const contextParams = { antialias: false, alpha: false, stencil: true };
-    const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
-    const renderer = new t3d.WebGLRenderer(gl);
-    const backRenderTarget = new t3d.RenderTargetBack(canvas);
+	const contextParams = { antialias: false, alpha: false, stencil: true };
+	const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
+	const renderer = new t3d.WebGLRenderer(gl);
+	const backRenderTarget = new t3d.RenderTargetBack(canvas);
 
-    const shadowMapPass = new t3d.ShadowMapPass();
+	const shadowMapPass = new t3d.ShadowMapPass();
 
-    const scene = new t3d.Scene();
-    scene.environmentLightIntensity = 1;
+	const scene = new t3d.Scene();
+	scene.environmentLightIntensity = 1;
 
-    const loader = new GLTFLoader();
+	const loader = new GLTFLoader();
 
-    loader.load('./resources/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf').then(function(result) {
-    	const object = result.root;
-    	scene.add(object);
-    }).catch(e => console.error(e));
+	loader.load('./resources/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf').then(function(result) {
+		const object = result.root;
+		scene.add(object);
+	}).catch(e => console.error(e));
 
-    new RGBELoader().load('./resources/sky_hdr/royal_esplanade_1k.hdr', function(textureData) {
-    	let texture = new t3d.Texture2D();
-    	texture.image = { data: textureData.data, width: textureData.width, height: textureData.height };
-    	texture.type = textureData.type;
-    	if (textureData.generateMipmaps !== undefined) {
-    		texture.generateMipmaps = textureData.generateMipmaps;
-    	}
-    	if (textureData.minFilter !== undefined) {
-    		texture.minFilter = textureData.minFilter;
-    	}
-    	if (textureData.magFilter !== undefined) {
-    		texture.magFilter = textureData.magFilter;
-    	}
-    	texture.version++;
+	new RGBELoader().load('./resources/sky_hdr/royal_esplanade_1k.hdr', function(textureData) {
+		let texture = new t3d.Texture2D();
+		texture.image = { data: textureData.data, width: textureData.width, height: textureData.height };
+		texture.type = textureData.type;
+		if (textureData.generateMipmaps !== undefined) {
+			texture.generateMipmaps = textureData.generateMipmaps;
+		}
+		if (textureData.minFilter !== undefined) {
+			texture.minFilter = textureData.minFilter;
+		}
+		if (textureData.magFilter !== undefined) {
+			texture.magFilter = textureData.magFilter;
+		}
+		texture.version++;
 
-    	texture = PMREM.prefilterEnvironmentMap(renderer, texture);
+		texture = (new PMREMGenerator(128)).prefilter(renderer, texture);
 
-    	scene.background = texture;
-    	scene.environment = texture;
+		scene.background = texture;
+		scene.environment = texture;
 
-    	const sky_box = new SkyBox(texture);
-    	scene.add(sky_box);
-    });
+		const sky_box = new SkyBox(texture);
+		scene.add(sky_box);
+	});
 
-    const ambientLight = new t3d.AmbientLight(0xffffff, 0.5);
-    scene.add(ambientLight);
+	const ambientLight = new t3d.AmbientLight(0xffffff, 0.5);
+	scene.add(ambientLight);
 
-    const directionalLight = new t3d.DirectionalLight(0xffffff, 3);
-    directionalLight.position.set(8, 8, 8);
-    directionalLight.lookAt(new t3d.Vector3(), new t3d.Vector3(0, 1, 0));
-    scene.add(directionalLight);
+	const directionalLight = new t3d.DirectionalLight(0xffffff, 3);
+	directionalLight.position.set(8, 8, 8);
+	directionalLight.lookAt(new t3d.Vector3(), new t3d.Vector3(0, 1, 0));
+	scene.add(directionalLight);
 
-    const camera = new t3d.Camera();
-    camera.position.set(3, 1, 4);
-    camera.lookAt(new t3d.Vector3(0, 0, 0), new t3d.Vector3(0, 1, 0));
-    camera.setPerspective((30 / 180) * Math.PI, width / height, 1, 1000);
-    scene.add(camera);
+	const camera = new t3d.Camera();
+	camera.position.set(3, 1, 4);
+	camera.lookAt(new t3d.Vector3(0, 0, 0), new t3d.Vector3(0, 1, 0));
+	camera.setPerspective((30 / 180) * Math.PI, width / height, 1, 1000);
+	scene.add(camera);
 
-    const effectComposer = new EffectComposer(width, height, {
-    	samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
-    	webgl2: renderer.capabilities.version > 1,
-    	highDynamicRange: true
-    });
-    effectComposer.sceneMSAA = true;
+	const effectComposer = new EffectComposer(width, height, {
+		samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
+		webgl2: renderer.capabilities.version > 1,
+		highDynamicRange: true,
+		hdrMode: HDRMode.R11G11B10
+	});
+	effectComposer.sceneMSAA = true;
 
-    const bloomEffect = new UnrealBloomEffect();
-    bloomEffect.strength = 0.05;
-    bloomEffect.threshold = 0.9;
-    effectComposer.addEffect('Bloom', bloomEffect, 100);
+	const bloomEffect = new UnrealBloomEffect();
+	bloomEffect.strength = 0.05;
+	bloomEffect.threshold = 0.9;
+	effectComposer.addEffect('Bloom', bloomEffect, 100);
 
-    const toneMappingEffect = new ToneMappingEffect();
-    toneMappingEffect.toneMapping = ToneMappingType.ACESFilmic;
-    toneMappingEffect.toneMappingExposure = 1;
-    toneMappingEffect.outputColorSpace = t3d.TEXEL_ENCODING_TYPE.SRGB;
-    effectComposer.addEffect('ToneMapping', toneMappingEffect, 199);
+	const toneMappingEffect = new ToneMappingEffect();
+	toneMappingEffect.toneMapping = ToneMappingType.ACESFilmic;
+	toneMappingEffect.toneMappingExposure = 1;
+	toneMappingEffect.outputColorSpace = t3d.TEXEL_ENCODING_TYPE.SRGB;
+	effectComposer.addEffect('ToneMapping', toneMappingEffect, 199);
 
-    const gui = new GUI();
-    const toneMappingFolder = gui.addFolder('Tone Mapping');
-    toneMappingFolder.add(toneMappingEffect, 'toneMapping', ToneMappingType);
-    toneMappingFolder.add(toneMappingEffect, 'toneMappingExposure', 0, 10, 0.01);
-    toneMappingFolder.add(toneMappingEffect, 'outputColorSpace', {
-    	Linear: t3d.TEXEL_ENCODING_TYPE.LINEAR,
-    	SRGB: t3d.TEXEL_ENCODING_TYPE.SRGB
-});
-    const bloomFolder = gui.addFolder('Bloom');
-    bloomFolder.add(bloomEffect, 'active');
-    bloomFolder.add(bloomEffect, 'strength', 0, 1, 0.01);
-    bloomFolder.add(bloomEffect, 'radius', 0, 1, 0.01);
-    bloomFolder.add(bloomEffect, 'threshold', 0, 10, 0.1);
-    bloomFolder.add(bloomEffect, 'smoothWidth', 0, 10, 0.01);
-    const lightFolder = gui.addFolder('Light');
-    lightFolder.add(directionalLight, 'intensity', 0, 10, 0.01);
-    lightFolder.close();
+	const gui = new GUI();
+	const toneMappingFolder = gui.addFolder('Tone Mapping');
+	toneMappingFolder.add(toneMappingEffect, 'toneMapping', ToneMappingType);
+	toneMappingFolder.add(toneMappingEffect, 'toneMappingExposure', 0, 10, 0.01);
+	toneMappingFolder.add(toneMappingEffect, 'outputColorSpace', {
+		Linear: t3d.TEXEL_ENCODING_TYPE.LINEAR,
+		SRGB: t3d.TEXEL_ENCODING_TYPE.SRGB
+	});
+	const bloomFolder = gui.addFolder('Bloom');
+	bloomFolder.add(bloomEffect, 'active');
+	bloomFolder.add(bloomEffect, 'strength', 0, 1, 0.01);
+	bloomFolder.add(bloomEffect, 'radius', 0, 1, 0.01);
+	bloomFolder.add(bloomEffect, 'threshold', 0, 10, 0.1);
+	bloomFolder.add(bloomEffect, 'smoothWidth', 0, 10, 0.01);
+	const lightFolder = gui.addFolder('Light');
+	lightFolder.add(directionalLight, 'intensity', 0, 10, 0.01);
+	lightFolder.close();
 
-    const stats = new Stats();
-    stats.dom.style.cssText = 'position:fixed;bottom:0;left:0;cursor:pointer;opacity:0.9;z-index:10000';
-    stats.showPanel(0);
-    document.body.appendChild(stats.dom);
+	const stats = new Stats();
+	stats.dom.style.cssText = 'position:fixed;bottom:0;left:0;cursor:pointer;opacity:0.9;z-index:10000';
+	stats.showPanel(0);
+	document.body.appendChild(stats.dom);
 
-    const controller = new OrbitControls(camera, canvas);
+	const controller = new OrbitControls(camera, canvas);
 
-    function loop(count) {
-    	requestAnimationFrame(loop);
+	function loop(count) {
+		requestAnimationFrame(loop);
 
-    	stats.begin();
+		stats.begin();
 
-    	controller.update();
-    
-    	scene.updateMatrix();
-    	scene.updateRenderStates(camera);
-    	scene.updateRenderQueue(camera).getLayer(0);
+		controller.update();
 
-    	shadowMapPass.render(renderer, scene);
+		scene.updateMatrix();
+		scene.updateRenderStates(camera);
+		scene.updateRenderQueue(camera).getLayer(0);
 
-    	renderer.setClearColor(0, 0, 0, 1);
+		shadowMapPass.render(renderer, scene);
 
-    	effectComposer.render(renderer, scene, camera, backRenderTarget);
+		renderer.setClearColor(0, 0, 0, 1);
 
-    	stats.end();
-    }
-    requestAnimationFrame(loop);
+		effectComposer.render(renderer, scene, camera, backRenderTarget);
 
-    function onWindowResize() {
-    	width = window.innerWidth || 2;
-    	height = window.innerHeight || 2;
+		stats.end();
+	}
+	requestAnimationFrame(loop);
 
-    	camera.setPerspective((30 / 180) * Math.PI, width / height, 1, 1000);
+	function onWindowResize() {
+		width = window.innerWidth || 2;
+		height = window.innerHeight || 2;
 
-    	backRenderTarget.resize(width, height);
-    	effectComposer.resize(width, height);
-    }
-    window.addEventListener('resize', onWindowResize, false);
+		camera.setPerspective((30 / 180) * Math.PI, width / height, 1, 1000);
+
+		backRenderTarget.resize(width, height);
+		effectComposer.resize(width, height);
+	}
+	window.addEventListener('resize', onWindowResize, false);
 </script>
 
 </html>

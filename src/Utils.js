@@ -1500,7 +1500,7 @@ export function isDepthStencilAttachment(attachment) {
 
 export function getColorBufferFormat(options) {
 	if (options.highDynamicRange) {
-		return options.hdrMode === HDRMode.R11G11B10 ? 35898 : PIXEL_FORMAT.RGBA16F; // use PIXEL_FORMAT.RGB11F_G11F_B10F instead of 35898 after t3d v0.2.9
+		return options.hdrMode === HDRMode.R11G11B10 ? PIXEL_FORMAT.R11F_G11F_B10F : PIXEL_FORMAT.RGBA16F;
 	}
 
 	return PIXEL_FORMAT.RGBA8;
@@ -1515,7 +1515,7 @@ export function setupColorTexture(texture, options) {
 
 		if (options.hdrMode === HDRMode.R11G11B10) {
 			texture.format = PIXEL_FORMAT.RGB;
-			texture.internalformat = 35898; // use PIXEL_FORMAT.RGB11F_G11F_B10F instead of 35898 after t3d v0.2.9
+			texture.internalformat = PIXEL_FORMAT.R11F_G11F_B10F;
 		}
 	}
 }

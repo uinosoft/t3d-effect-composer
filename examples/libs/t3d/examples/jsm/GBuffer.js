@@ -490,6 +490,7 @@ const normalGlossinessShader = {
 	fragmentShader: `
         #include <common_frag>
         #include <diffuseMap_pars_frag>
+		#include <alphaTest_pars_frag>
 
         #include <uv_pars_frag>
 
@@ -508,7 +509,7 @@ const normalGlossinessShader = {
             #if defined(USE_DIFFUSE_MAP) && defined(ALPHATEST)
                 vec4 texelColor = texture2D(diffuseMap, v_Uv);
                 float alpha = texelColor.a * u_Opacity;
-                if(alpha < ALPHATEST) discard;
+                if(alpha < u_AlphaTest) discard;
             #endif
 
             #ifdef FLAT_SHADED
@@ -551,6 +552,7 @@ const albedoMetalnessShader = {
 		#include <skinning_pars_vert>
 		#include <uv_pars_vert>
 		#include <color_pars_vert>
+		#include <diffuseMap_pars_vert>
 		void main() {
 			#include <begin_vert>
 			#include <morphtarget_vert>
@@ -558,6 +560,7 @@ const albedoMetalnessShader = {
 			#include <pvm_vert>
 			#include <uv_vert>
 			#include <color_vert>
+			#include <diffuseMap_vert>
 		}
 	`,
 
@@ -726,6 +729,7 @@ const mrtShader = {
 		#include <uv_pars_vert>
 		#include <normal_pars_vert>
 		#include <color_pars_vert>
+		#include <diffuseMap_pars_vert>
 		#include <modelPos_pars_vert>
 		void main() {
 			#include <begin_vert>
@@ -738,6 +742,7 @@ const mrtShader = {
 			#include <modelPos_vert>
 			#include <uv_vert>
 			#include <color_vert>
+			#include <diffuseMap_vert>
 		}
 	`,
 
@@ -746,6 +751,7 @@ const mrtShader = {
 
 		#include <common_frag>
 		#include <diffuseMap_pars_frag>
+		#include <alphaTest_pars_frag>
 
 		#include <uv_pars_frag>
 
@@ -779,7 +785,7 @@ const mrtShader = {
 
 			#if defined(USE_DIFFUSE_MAP) && defined(ALPHATEST)
 				float alpha = outColor.a * u_Opacity;
-				if(alpha < ALPHATEST) discard;
+				if(alpha < u_AlphaTest) discard;
 			#endif
 
 			#ifdef FLAT_SHADED

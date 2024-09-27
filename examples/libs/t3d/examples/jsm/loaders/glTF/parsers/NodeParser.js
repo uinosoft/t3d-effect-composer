@@ -1,14 +1,17 @@
-import { Bone, Camera, Object3D, Mesh, SkinnedMesh, Vector4 } from 't3d';
-import { KHR_lights_punctual as _KHR_lights_punctual } from '../extensions/KHR_lights_punctual.js';
+import { Bone, Camera, Object3D, Mesh, SkinnedMesh } from 't3d';
+import { GLTFUtils } from '../GLTFUtils.js';
 
 export class NodeParser {
 
-	static parse(context) {
+	static parse(context, loader) {
 		const {
 			gltf: { nodes: gltfNodes, cameras: gltfCameras, extensions: gltfExtensions }
 		} = context;
 
 		if (!gltfNodes) return;
+
+		const lightsExt = loader.extensions.get('KHR_lights_punctual');
+		const instancingExt = loader.extensions.get('EXT_mesh_gpu_instancing');
 
 		const cameras = [];
 		const lights = [];
@@ -18,7 +21,7 @@ export class NodeParser {
 				camera: cameraID, mesh: meshID,
 				extensions = {}
 			} = gltfNode;
-			const { KHR_lights_punctual } = extensions;
+			const { KHR_lights_punctual, EXT_mesh_gpu_instancing } = extensions;
 
 			let node = null;
 
@@ -26,14 +29,18 @@ export class NodeParser {
 				// .isBone isn't in glTF spec. Marked in IndexParser
 				node = new Bone();
 			} else if (meshID !== undefined) {
-				node = createMesh(context, gltfNode);
+				if (EXT_mesh_gpu_instancing && instancingExt) {
+					node = instancingExt.getInstancedMesh(context, gltfNode);
+				} else {
+					node = createMesh(context, gltfNode);
+				}
 			} else if (cameraID !== undefined) {
 				node = createCamera(gltfCameras[cameraID]);
 				cameras.push(node);
-			} else if (KHR_lights_punctual) {
+			} else if (KHR_lights_punctual && lightsExt) {
 				const lightIndex = KHR_lights_punctual.light;
 				const gltfLights = gltfExtensions.KHR_lights_punctual.lights;
-				node = _KHR_lights_punctual.getLight(gltfLights[lightIndex]);
+				node = lightsExt.getLight(gltfLights[lightIndex]);
 				lights.push(node);
 			} else {
 				node = new Object3D();
@@ -104,7 +111,7 @@ function createMesh(context, gltfNode) {
 			mesh = new SkinnedMesh(geometry, material);
 
 			if (geometry.attributes.skinWeight && !geometry.attributes.skinWeight.normalized) {
-				normalizeSkinWeights(geometry.attributes.skinWeight);
+				GLTFUtils.normalizeSkinWeights(geometry.attributes.skinWeight);
 			}
 		} else {
 			mesh = new Mesh(geometry, material);
@@ -123,23 +130,5 @@ function createMesh(context, gltfNode) {
 		return parent;
 	} else {
 		return meshes[0];
-	}
-}
-
-const _vec4_1 = new Vector4();
-
-function normalizeSkinWeights(skinWeight) {
-	const offset = skinWeight.offset;
-	const buffer = skinWeight.buffer;
-	const stride = buffer.stride;
-	for (let i = 0, l = buffer.count; i < l; i++) {
-		_vec4_1.fromArray(buffer.array, i * stride + offset);
-		const scale = 1.0 / _vec4_1.getManhattanLength();
-		if (scale !== Infinity) {
-			_vec4_1.multiplyScalar(scale);
-		} else {
-			_vec4_1.set(1, 0, 0, 0); // do something reasonable
-		}
-		_vec4_1.toArray(buffer.array, i * stride + offset);
 	}
 }
