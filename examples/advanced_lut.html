@@ -37,7 +37,7 @@
 	import { SkyBox } from 't3d/addons/objects/SkyBox.js';
 	import { PMREMGenerator } from 't3d/addons/textures/PMREMGenerator.js';
 	import { GLTFLoader } from 't3d/addons/loaders/glTF/GLTFLoader.js';
-	import { RGBELoader } from 't3d/addons/loaders/RGBELoader.js';
+	import { RGBETexture2DLoader } from 't3d/addons/loaders/RGBELoader.js';
 
 	import { DefaultEffectComposer } from 't3d-effect-composer';
 	import { LutEffect } from './jsm/lut/LutEffect.js';
@@ -89,21 +89,7 @@
 	const file = './resources/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf';
 	const loadingManager = new t3d.LoadingManager();
 
-	new RGBELoader().load('./resources/sky_hdr/royal_esplanade_1k.hdr', function(textureData) {
-		let texture = new t3d.Texture2D();
-		texture.image = { data: textureData.data, width: textureData.width, height: textureData.height };
-		texture.type = textureData.type;
-		if (textureData.generateMipmaps !== undefined) {
-			texture.generateMipmaps = textureData.generateMipmaps;
-		}
-		if (textureData.minFilter !== undefined) {
-			texture.minFilter = textureData.minFilter;
-		}
-		if (textureData.magFilter !== undefined) {
-			texture.magFilter = textureData.magFilter;
-		}
-		texture.version++;
-
+	new RGBETexture2DLoader().load('./resources/sky_hdr/royal_esplanade_1k.hdr', function(texture) {
 		texture = (new PMREMGenerator(1024)).prefilter(renderer, texture);
 
 		scene.background = texture;
