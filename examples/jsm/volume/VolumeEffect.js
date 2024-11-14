@@ -49,6 +49,11 @@ export default class VolumeEffect extends Effect {
 		this._mainPass = new ShaderPostPass(volumeShader);
 
 		this._screenSize = new Vector2(512, 512);
+
+		// Particle based data
+		this.isParticleBased = false;
+		this.particleDensity = 0.9;
+		this.particleRadius = 1.0;
 	}
 
 	resize(width, height) {
@@ -81,7 +86,7 @@ export default class VolumeEffect extends Effect {
 		gBufferRenderStates.camera.position.toArray(mainPass.material.uniforms.cameraPos);
 
 		mainPass.material.uniforms.volumeid = this.volumeId;
-		mainPass.material.uniforms.idTex = thicknessBuffer.output()[0]._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
+		mainPass.material.uniforms.idTex = thicknessBuffer.output()[1]._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 		mainPass.material.uniforms.frontDepthTex = thicknessBuffer.output()[0]._attachments[ATTACHMENT.DEPTH_ATTACHMENT];
 		mainPass.material.uniforms.backDepthTex = thicknessBuffer.output()[1]._attachments[ATTACHMENT.DEPTH_ATTACHMENT];
 		mainPass.material.uniforms.diffuseTex = inputRenderTarget.texture;
@@ -95,6 +100,9 @@ export default class VolumeEffect extends Effect {
 		mainPass.material.uniforms.opacity = this.opacity;
 		mainPass.material.uniforms.alphaThreshold = this.alphaThreshold;
 		mainPass.material.uniforms.mixType = this.mixType;
+
+		boxMatrix.copy(this.boxMatrix);
+		boxMatrix.toArray(mainPass.material.uniforms.boxMatrix);
 
 		boxMatrixInverse.copy(this.boxMatrix).inverse();
 		boxMatrixInverse.toArray(mainPass.material.uniforms.boxMatrixInverse);
@@ -117,6 +125,17 @@ export default class VolumeEffect extends Effect {
 			mainPass.material.defines.USE_BLUE_NOISE = useBlueNoise;
 			mainPass.material.needsUpdate = true;
 		}
+
+		if (this.isParticleBased) {
+			mainPass.uniforms.particleDensity = this.particleDensity;
+			mainPass.uniforms.particleRadius = this.particleRadius;
+		}
+
+		if (this.isParticleBased !== mainPass.material.defines.PARTICLE_BASED) {
+			mainPass.material.defines.PARTICLE_BASED = this.isParticleBased;
+			mainPass.material.needsUpdate = true;
+		}
+
 
 		if (this.valueAffectsOpacity !== mainPass.material.defines.VALUE_OPACITY) {
 			mainPass.material.defines.VALUE_OPACITY = this.valueAffectsOpacity;
@@ -143,6 +162,7 @@ const projection = new Matrix4();
 const ProjViewInverse = new Matrix4();
 const view = new Matrix4();
 const boxMatrixInverse = new Matrix4();
+const boxMatrix = new Matrix4();
 
 const volumeShader = {
 	defines: {
@@ -155,7 +175,8 @@ const volumeShader = {
 		ZSLICENUM: 256,
 		ZSLICEX: 16,
 		ZSLICEY: 16,
-		TEXTURE2D_WRAP_REPEAT: false
+		TEXTURE2D_WRAP_REPEAT: false,
+		PARTICLE_BASED: false
 	},
 	uniforms: {
 		volumeid: 1,
@@ -182,9 +203,13 @@ const volumeShader = {
 		alphaThreshold: 0,
 		mixType: 0,
 		boxMatrixInverse: new Float32Array(16),
+		boxMatrix: new Float32Array(16),
 
 		blueNoise: null,
-		noiseScale: [1, 1]
+		noiseScale: [1, 1],
+
+		particleDensity: 0.9,
+		particleRadius: 0.9
 	},
 
 	vertexShader: defaultVertexShader,
@@ -212,10 +237,16 @@ const volumeShader = {
     uniform float alphaThreshold;
     uniform float mixType;
 	uniform mat4 boxMatrixInverse;
+	uniform mat4 boxMatrix;
 
 	#ifdef USE_BLUE_NOISE
 		uniform sampler2D blueNoise;
 		uniform vec2 noiseScale;
+	#endif
+
+	#ifdef PARTICLE_BASED
+		uniform float particleRadius;
+		uniform float particleDensity;
 	#endif
 
     varying vec2 v_Uv;
@@ -235,8 +266,27 @@ const volumeShader = {
         uniform sampler3D volumeTexture;
 
         vec4 sampleAs3DTexture(vec3 texCoord) {
-            texCoord += vec3(0.5);
-            return getColor(texture(volumeTexture, texCoord).r);
+			#ifdef PARTICLE_BASED
+				float size = particleDensity;
+				vec3 floatCoord = (boxMatrix * vec4(texCoord , 1.0)).xyz * size;
+				vec3 intCoord = floor(floatCoord) ;
+				
+				vec3 centerTexCoord = (texCoord + vec3(0.5));				
+				float radius = particleRadius * pow(1.0, 6.0);
+
+				vec3 cellCoord = floatCoord - intCoord;
+				cellCoord = cellCoord * 2.0 - 1.0;
+				texCoord += vec3(0.5);
+				vec4 color = getColor(texture(volumeTexture, texCoord).r);
+				if(length(cellCoord) < radius) {
+					return color;
+				} else {
+					color.a = 0.0;
+					return color;
+				}
+			#endif
+				texCoord += vec3(0.5);
+				return getColor(texture(volumeTexture, texCoord).r);
         }
     #else 
         uniform sampler2D volumeTexture;
@@ -244,6 +294,18 @@ const volumeShader = {
         // Acts like a texture3D using Z slices and trilinear filtering.
         vec4 sampleAs3DTexture(vec3 texCoord) {
 			texCoord += vec3(0.5);
+			#ifdef PARTICLE_BASED
+				float size = particleDensity;
+				vec3 floatCoord = (boxMatrix * vec4(texCoord, 1.0)).xyz * size ;
+				vec3 intCoord = floor(floatCoord);
+				vec3 centerTexCoord = (texCoord + vec3(0.5));
+				
+				float radius = particleRadius * pow(1.0, 6.0);
+
+				vec3 cellCoord = floatCoord - intCoord;
+				cellCoord = cellCoord * 2.0 - 1.0;
+			
+			#endif	
 
 			#ifdef TEXTURE2D_WRAP_REPEAT
 				texCoord.xy = fract(texCoord.xy);
@@ -275,6 +337,14 @@ const volumeShader = {
 
 			vec4 color1 = getColor(texture2D(volumeTexture, globalUV1).a);
 			vec4 color2 = getColor(texture2D(volumeTexture, globalUV2).a);
+
+			#ifdef PARTICLE_BASED
+				if(length(cellCoord) < radius) {
+					return mix(color1, color2, mod(zNumber, 1.0));
+				} else {
+					return vec4(0.0);
+				}
+			#endif
 
 			return mix(color1, color2, mod(zNumber, 1.0));
         }
@@ -384,7 +454,7 @@ const volumeShader = {
 
         vec3 mixColor; 
         if(mixType == 0.) {
-            mixColor = mix(diffuseColor.rgb, accumulatedColor.rgb, accumulatedAlpha * opacity);
+        	 mixColor = diffuseColor.rgb * max(1.- accumulatedAlpha * opacity, 0.0)+ accumulatedColor.rgb;
         } else {
             mixColor = diffuseColor.rgb + accumulatedColor.rgb * accumulatedAlpha * opacity;
         }
