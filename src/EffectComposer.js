@@ -1,4 +1,4 @@
-import { Vector2, Texture2D, RenderBuffer, PIXEL_FORMAT, ShaderPostPass, TEXTURE_FILTER } from 't3d';
+import { Vector2, Texture2D, RenderBuffer, PIXEL_FORMAT, ShaderPostPass, TEXTURE_FILTER, PIXEL_TYPE } from 't3d';
 import GBuffer from './buffers/GBuffer.js';
 import NonDepthMarkBuffer from './buffers/NonDepthMarkBuffer.js';
 import MarkBuffer from './buffers/MarkBuffer.js';
@@ -74,15 +74,34 @@ export default class EffectComposer {
 			this._defaultColorTexture.minFilter = TEXTURE_FILTER.LINEAR;
 		}
 
+		const depthTexture = new Texture2D();
+		depthTexture.image = { data: null, width: width, height: height };
+		depthTexture.type = PIXEL_TYPE.UNSIGNED_INT;
+		depthTexture.format = PIXEL_FORMAT.DEPTH_COMPONENT;
+		depthTexture.magFilter = TEXTURE_FILTER.NEAREST;
+		depthTexture.minFilter = TEXTURE_FILTER.NEAREST;
+		depthTexture.generateMipmaps = false;
+		depthTexture.flipY = false;
+
+		const depthTexture2 = new Texture2D();
+		depthTexture2.image = { data: null, width: width, height: height };
+		depthTexture2.type = PIXEL_TYPE.UNSIGNED_INT_24_8;
+		depthTexture2.format = PIXEL_FORMAT.DEPTH_STENCIL;
+		depthTexture2.magFilter = TEXTURE_FILTER.NEAREST;
+		depthTexture2.minFilter = TEXTURE_FILTER.NEAREST;
+		depthTexture2.generateMipmaps = false;
+		depthTexture2.flipY = false;
+
+
 		// Use DEPTH_COMPONENT24 in WebGL 2 for better depth precision.
 		const defaultDepthFormat = options.webgl2 ? PIXEL_FORMAT.DEPTH_COMPONENT24 : PIXEL_FORMAT.DEPTH_COMPONENT16;
-		this._defaultDepthRenderBuffer = new RenderBuffer(width, height, defaultDepthFormat);
+		this._defaultDepthRenderBuffer = depthTexture;
 		this._defaultMSDepthRenderBuffer = new RenderBuffer(width, height, defaultDepthFormat, options.samplerNumber);
 
 		// Reference: https://registry.khronos.org/webgl/specs/latest/2.0/#3.7.5
 		// In WebGL 2, renderbufferStorage can accept DEPTH_STENCIL as internal format for backward compatibility, which is mapped to DEPTH24_STENCIL8 by implementations,
 		// but renderbufferStorageMultisample can only accept DEPTH24_STENCIL8 as internal format.
-		this._defaultDepthStencilRenderBuffer = new RenderBuffer(width, height, PIXEL_FORMAT.DEPTH_STENCIL);
+		this._defaultDepthStencilRenderBuffer = depthTexture2;
 		this._defaultMSDepthStencilRenderBuffer = new RenderBuffer(width, height, PIXEL_FORMAT.DEPTH24_STENCIL8, options.samplerNumber);
 
 		this._externalColorAttachment = null;

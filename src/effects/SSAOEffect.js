@@ -52,6 +52,7 @@ export default class SSAOEffect extends Effect {
 		const tempRT2 = composer._renderTargetCache.allocate(0);
 
 		const gBuffer = composer.getBuffer('GBuffer');
+		const sceneBuffer = composer.getBuffer('SceneBuffer');
 		const gBufferRenderStates = gBuffer.getCurrentRenderStates();
 
 		projection.copy(gBufferRenderStates.camera.projectionMatrix);
@@ -65,7 +66,7 @@ export default class SSAOEffect extends Effect {
 		renderer.clear(true, true, false);
 
 		this._ssaoPass.uniforms.normalTex = gBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
-		this._ssaoPass.uniforms.depthTex = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
+		this._ssaoPass.uniforms.depthTex = sceneBuffer.output()._attachments[ATTACHMENT.DEPTH_ATTACHMENT];
 		this._ssaoPass.uniforms.texSize[0] = gBuffer.output().width;
 		this._ssaoPass.uniforms.texSize[1] = gBuffer.output().height;
 
@@ -94,7 +95,8 @@ export default class SSAOEffect extends Effect {
 		renderer.clear(true, true, false);
 
 		this._blurPass.uniforms.normalTex = gBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
-		this._blurPass.uniforms.depthTex = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
+		// this._blurPass.uniforms.depthTex = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
+		this._blurPass.uniforms.depthTex = sceneBuffer.output()._attachments[ATTACHMENT.DEPTH_ATTACHMENT];
 		this._blurPass.uniforms.textureSize[0] = gBuffer.output().width;
 		this._blurPass.uniforms.textureSize[1] = gBuffer.output().height;
 

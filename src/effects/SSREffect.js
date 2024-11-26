@@ -89,7 +89,8 @@ export default class SSREffect extends Effect {
 
 		this._ssrPass.uniforms.colorTex = sceneBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 		this._ssrPass.uniforms.gBufferTexture1 = gBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
-		this._ssrPass.uniforms.gBufferTexture2 = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
+		this._ssrPass.uniforms.gBufferTexture2 = sceneBuffer.output()._attachments[ATTACHMENT.DEPTH_ATTACHMENT];
+		// this._ssrPass.uniforms.gBufferTexture2 = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
 		this._ssrPass.uniforms.viewportSize[0] = gBuffer.output().width;
 		this._ssrPass.uniforms.viewportSize[1] = gBuffer.output().height;
 
