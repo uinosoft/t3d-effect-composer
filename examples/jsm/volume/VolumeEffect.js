@@ -384,9 +384,9 @@ const volumeShader = {
 
         vec3 mixColor; 
         if(mixType == 0.) {
-            mixColor = mix(diffuseColor.rgb, accumulatedColor.rgb, accumulatedAlpha * opacity);
+			mixColor = accumulatedColor.rgb * opacity + diffuseColor.rgb * (1.0 - accumulatedAlpha * opacity);
         } else {
-            mixColor = diffuseColor.rgb + accumulatedColor.rgb * accumulatedAlpha * opacity;
+            mixColor = diffuseColor.rgb + accumulatedColor.rgb * opacity;
         }
 
         gl_FragColor = vec4(mixColor, diffuseColor.a);
