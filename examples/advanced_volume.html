@@ -98,6 +98,7 @@
 	const volumeEffect = new VolumeEffect();
 	volumeEffect.volumeId = 1;
 	volumeEffect.colorRampTexture = platte;
+	
 	effectComposer.addEffect('volumeEffect', volumeEffect, 99);
 
 	const blueNoise = new Texture2DLoader().load('./resources/blueNoise.png');
@@ -113,6 +114,12 @@
 		['TorusKnot', new t3d.TorusKnotGeometry(5, 1.5)],
 		['Cylinder', new t3d.CylinderGeometry(5, 5, 10, 20, 1)]
 	]);
+
+	const clipShapes = new Map([
+		['sphere', generateSphereVolumeData(32)],
+		['triangle', generateTriangleVolumeData(32)],
+		['box', generateBoxVolumeData(32)]
+]);
 	const textures = new Map();
 
 	let volumeMesh, params;
@@ -158,6 +165,7 @@
 
 		params = {
 			shape: 'Box',
+			clipShape: 'null',
 			texture: 'heart',
 			size: 20,
 			offsetZ: 0
@@ -166,6 +174,27 @@
 		function refreshVolumeObject() {
 			volumeMesh.geometry = shapes.get(params.shape);
 			volumeEffect.volumeTexture = textures.get(params.texture);
+		}
+		function refreshClipShape() {
+			if (clipShapes.has(params.clipShape)) {
+				if (!volumeEffect.cropTexture) {
+					const cropTexture = new t3d.Texture3D();
+					cropTexture.image = {
+						data: null,
+						width: 32,
+						height: 32,
+						depth: 32
+					};
+					cropTexture.wrapS = cropTexture.wrapT = cropTexture.wrapR = t3d.TEXTURE_WRAP.REPEAT;
+					cropTexture.magFilter = t3d.TEXTURE_FILTER.LINEAR;
+					cropTexture.minFilter = t3d.TEXTURE_FILTER.LINEAR;
+					volumeEffect.cropTexture = cropTexture;
+				}
+				volumeEffect.cropTexture.image.data = clipShapes.get(params.clipShape);
+				volumeEffect.cropTexture.version++;
+			} else {
+				volumeEffect.cropTexture = null;
+			}
 		}
 		volumeEffect.unitAlphaCorrection = 2.0;
 		refreshVolumeObject();
@@ -191,6 +220,11 @@
 			'LessEqual': t3d.COMPARE_FUNC.LEQUAL,
 			'GreaterEqual': t3d.COMPARE_FUNC.GEQUAL
 		});
+		gui.add(params, 'clipShape', Array.from([...clipShapes.keys(), 'null'])).onChange(refreshClipShape);
+		gui.add({ cropTextureScale: 10 }, 'cropTextureScale', 1, 20, 1).onChange(function(value) {
+			volumeEffect.cropTextureScale.set(value, value, value);
+		});
+
 
 		gui.add(material, 'colorWrite').name('showShape');
 	});
@@ -234,6 +268,118 @@
 		effectComposer.resize(width, height);
 	}
 	window.addEventListener('resize', onWindowResize, false);
+	function generateSphereVolumeData(size = 32) {
+		const data = new Uint8Array(size * size * size);
+		const radius = size * 0.45; // 球体半径设为体素大小的40%
+		const center = size / 2; // 中心点
+
+		// 遍历所有体素点
+		for (let z = 0; z < size; z++) {
+			for (let y = 0; y < size; y++) {
+				for (let x = 0; x < size; x++) {
+					// 计算当前点到中心的距离
+					const dx = x - center;
+					const dy = y - center;
+					const dz = z - center;
+					const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+					// 如果在球体内部，设置为1，否则为0
+					const index = x + y * size + z * size * size;
+					data[index] = distance <= radius ? 255 : 0;
+				}
+			}
+		}
+
+		return data;
+	}
+	function generateTriangleVolumeData(size = 32) {
+		const data = new Uint8Array(size * size * size);
+		const center = size / 2;
+
+		// 三角形的三个顶点 (在xz平面上定义)
+		const vertices = [
+			{ x: -0.4, z: -0.3 }, // 左下
+			{ x: 0.4, z: -0.3 }, // 右下
+			{ x: 0.0, z: 0.4 } // 顶部
+		];
+
+		// 将相对坐标转换为实际坐标
+		vertices.forEach(v => {
+			v.x = v.x * size + center;
+			v.z = v.z * size + center;
+		});
+
+		// 计算三角形的边界框
+		const minY = size * 0.2; // 从20%高度开始
+		const maxY = size * 0.8; // 到80%高度结束
+
+		// 遍历所有体素点
+		for (let z = 0; z < size; z++) {
+			for (let y = 0; y < size; y++) {
+				for (let x = 0; x < size; x++) {
+					const index = x + y * size + z * size * size;
+
+					// 首先检查y轴范围
+					if (y >= minY && y <= maxY) {
+						// 检查点是否在三角形内部
+						if (isPointInTriangle(
+							x, z,
+							vertices[0].x, vertices[0].z,
+							vertices[1].x, vertices[1].z,
+							vertices[2].x, vertices[2].z
+						)) {
+							data[index] = 255;
+						}
+					}
+				}
+			}
+		}
+
+		return data;
+	}
+
+	function isPointInTriangle(px, pz, x1, z1, x2, z2, x3, z3) {
+		// 使用重心坐标法判断点是否在三角形内部
+		const denominator = ((z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3));
+		const a = ((z2 - z3) * (px - x3) + (x3 - x2) * (pz - z3)) / denominator;
+		const b = ((z3 - z1) * (px - x3) + (x1 - x3) * (pz - z3)) / denominator;
+		const c = 1 - a - b;
+
+		// 如果所有重心坐标都在0到1之间，则点在三角形内部
+		return a >= 0 && a <= 1 && b >= 0 && b <= 1 && c >= 0 && c <= 1;
+	}
+
+	function generateBoxVolumeData(size = 32) {
+		const data = new Uint8Array(size * size * size);
+
+		// 定义立方体的边界（相对于整体尺寸的比例）
+		const minBound = 0.25; // 25%
+		const maxBound = 0.75; // 75%
+
+		// 计算实际的边界像素位置
+		const min = Math.floor(size * minBound);
+		const max = Math.floor(size * maxBound);
+
+		// 遍历所有体素点
+		for (let z = 0; z < size; z++) {
+			for (let y = 0; y < size; y++) {
+				for (let x = 0; x < size; x++) {
+					const index = x + y * size + z * size * size;
+
+					// 检查点是否在立方体边界内
+					if (x >= min && x <= max &&
+						y >= min && y <= max &&
+						z >= min && z <= max) {
+						data[index] = 255;
+					} else {
+						data[index] = 0;
+					}
+				}
+			}
+		}
+
+		return data;
+	}
 </script>
 
 </html>

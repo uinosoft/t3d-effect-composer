@@ -1,4 +1,4 @@
-import { ShaderPostPass, ATTACHMENT, Matrix4, Vector2 } from 't3d';
+import { ShaderPostPass, ATTACHMENT, Matrix4, Vector2, Vector3 } from 't3d';
 import { Effect, defaultVertexShader } from 't3d-effect-composer';
 
 export default class VolumeEffect extends Effect {
@@ -46,6 +46,10 @@ export default class VolumeEffect extends Effect {
 		this.blueNoise = null;
 		this.blueNoiseScale = new Vector2(1, 1);
 
+		// the crop texture
+		this.cropTexture = null;
+		this.cropTextureScale = new Vector3(10, 10, 10);
+
 		this._mainPass = new ShaderPostPass(volumeShader);
 
 		this._screenSize = new Vector2(512, 512);
@@ -81,7 +85,7 @@ export default class VolumeEffect extends Effect {
 		gBufferRenderStates.camera.position.toArray(mainPass.material.uniforms.cameraPos);
 
 		mainPass.material.uniforms.volumeid = this.volumeId;
-		mainPass.material.uniforms.idTex = thicknessBuffer.output()[0]._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
+		mainPass.material.uniforms.idTex = thicknessBuffer.output()[1]._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 		mainPass.material.uniforms.frontDepthTex = thicknessBuffer.output()[0]._attachments[ATTACHMENT.DEPTH_ATTACHMENT];
 		mainPass.material.uniforms.backDepthTex = thicknessBuffer.output()[1]._attachments[ATTACHMENT.DEPTH_ATTACHMENT];
 		mainPass.material.uniforms.diffuseTex = inputRenderTarget.texture;
@@ -111,6 +115,20 @@ export default class VolumeEffect extends Effect {
 			mainPass.uniforms.blueNoise = this.blueNoise;
 			mainPass.uniforms.noiseScale[0] = this.blueNoiseScale.x * this._screenSize.x;
 			mainPass.uniforms.noiseScale[1] = this.blueNoiseScale.y * this._screenSize.y;
+		}
+
+		const useCropTexture = !!this.cropTexture && renderer.capabilities.version > 1;
+
+		if (useCropTexture) {
+			mainPass.material.uniforms.cropTexture = this.cropTexture;
+			mainPass.material.uniforms.cropTextureScale[0] = this.cropTextureScale.x;
+			mainPass.material.uniforms.cropTextureScale[1] = this.cropTextureScale.y;
+			mainPass.material.uniforms.cropTextureScale[2] = this.cropTextureScale.z;
+		}
+
+		if (useCropTexture !== mainPass.material.defines.USE_CROP_TEXTURE) {
+			mainPass.material.defines.USE_CROP_TEXTURE = useCropTexture;
+			mainPass.material.needsUpdate = true;
 		}
 
 		if (useBlueNoise !== mainPass.material.defines.USE_BLUE_NOISE) {
@@ -155,7 +173,9 @@ const volumeShader = {
 		ZSLICENUM: 256,
 		ZSLICEX: 16,
 		ZSLICEY: 16,
-		TEXTURE2D_WRAP_REPEAT: false
+		TEXTURE2D_WRAP_REPEAT: false,
+
+		USE_CROP_TEXTURE: false
 	},
 	uniforms: {
 		volumeid: 1,
@@ -184,11 +204,15 @@ const volumeShader = {
 		boxMatrixInverse: new Float32Array(16),
 
 		blueNoise: null,
-		noiseScale: [1, 1]
+		noiseScale: [1, 1],
+
+		cropTexture: null,
+		cropTextureScale: [10, 10, 10]
 	},
 
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
+	precision highp sampler3D;
 	uniform int volumeid;
 
     uniform sampler2D depthTex;
@@ -218,6 +242,11 @@ const volumeShader = {
 		uniform vec2 noiseScale;
 	#endif
 
+	#ifdef USE_CROP_TEXTURE
+		uniform sampler3D cropTexture;
+		uniform vec3 cropTextureScale;
+	#endif
+
     varying vec2 v_Uv;
 
     float linearizeDepth(float depth) {
@@ -230,13 +259,18 @@ const volumeShader = {
     }
 
     #ifdef TEXTURETYPE_3D
-		precision highp sampler3D;
 
         uniform sampler3D volumeTexture;
 
         vec4 sampleAs3DTexture(vec3 texCoord) {
-            texCoord += vec3(0.5);
-            return getColor(texture(volumeTexture, texCoord).r);
+			texCoord += vec3(0.5);
+			#ifdef USE_CROP_TEXTURE
+				float cropCoord = texture(cropTexture, texCoord * cropTextureScale).r;
+				if(cropCoord == 0.0) {
+					return vec4(0.0);
+				}
+			#endif
+				return getColor(texture(volumeTexture, texCoord).r);
         }
     #else 
         uniform sampler2D volumeTexture;
@@ -244,7 +278,12 @@ const volumeShader = {
         // Acts like a texture3D using Z slices and trilinear filtering.
         vec4 sampleAs3DTexture(vec3 texCoord) {
 			texCoord += vec3(0.5);
-
+			#ifdef USE_CROP_TEXTURE
+				float cropCoord = texture(cropTexture, texCoord * cropTextureScale).r;
+				if(cropCoord == 0.0) {
+					return vec4(0.0);
+				}
+			#endif
 			#ifdef TEXTURE2D_WRAP_REPEAT
 				texCoord.xy = fract(texCoord.xy);
 			#else
