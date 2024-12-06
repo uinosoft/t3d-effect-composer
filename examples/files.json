@@ -31,7 +31,8 @@
 		"advanced_sharpness",
 		"advanced_volume",
 		"advanced_skyline",
-		"advanced_godrays"
+		"advanced_godrays",
+		"advanced_transmission"
 	],
 	"debugger": [
 		"debugger_uv"
