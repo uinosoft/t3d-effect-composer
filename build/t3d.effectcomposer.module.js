@@ -1,5 +1,5 @@
 // t3d-effect-composer
-import { PIXEL_FORMAT, PIXEL_TYPE, RenderTarget2D, TEXTURE_FILTER, ATTACHMENT, ShaderPostPass, Matrix4, Texture2D, TEXTURE_WRAP, Vector3, TEXEL_ENCODING_TYPE, Color3, Vector2, Vector4, SHADING_TYPE, ShaderMaterial, RenderBuffer, DRAW_SIDE, BLEND_TYPE } from 't3d';
+import { PIXEL_FORMAT, PIXEL_TYPE, TEXTURE_FILTER, RenderTarget2D, ATTACHMENT, ShaderPostPass, Matrix4, Texture2D, TEXTURE_WRAP, Vector3, TEXEL_ENCODING_TYPE, Color3, Vector2, Vector4, SHADING_TYPE, ShaderMaterial, RenderBuffer, DRAW_SIDE, BLEND_TYPE } from 't3d';
 
 class Buffer {
 
@@ -1560,6 +1560,14 @@ function setupColorTexture(texture, options) {
 			texture.internalformat = PIXEL_FORMAT.R11F_G11F_B10F;
 		}
 	}
+}
+
+function setupDepthTexture(texture, stencil = false) {
+	texture.type = stencil ? PIXEL_TYPE.UNSIGNED_INT_24_8 : PIXEL_TYPE.UNSIGNED_INT;
+	texture.format = stencil ? PIXEL_FORMAT.DEPTH_STENCIL : PIXEL_FORMAT.DEPTH_COMPONENT;
+	texture.magFilter = texture.minFilter = TEXTURE_FILTER.NEAREST;
+	texture.generateMipmaps = false;
+	texture.flipY = false;
 }
 
 const RenderListMask = {
@@ -5055,13 +5063,7 @@ class GBuffer extends Buffer {
 		}
 
 		const depthTexture = new Texture2D();
-		depthTexture.image = { data: null, width: width, height: height };
-		depthTexture.type = PIXEL_TYPE.UNSIGNED_INT_24_8;
-		depthTexture.format = PIXEL_FORMAT.DEPTH_STENCIL;
-		depthTexture.magFilter = TEXTURE_FILTER.NEAREST;
-		depthTexture.minFilter = TEXTURE_FILTER.NEAREST;
-		depthTexture.generateMipmaps = false;
-		depthTexture.flipY = false;
+		setupDepthTexture(depthTexture, true);
 
 		this._rt.attach(
 			depthTexture,
@@ -6094,6 +6096,8 @@ class SceneBuffer extends Buffer {
 		];
 
 		this._sceneRenderOptions = {};
+
+		this._renderStates = null;
 	}
 
 	syncAttachments(colorAttachment, depthAttachment, msColorRenderBuffer, msDepthRenderBuffer) {
@@ -6182,10 +6186,17 @@ class SceneBuffer extends Buffer {
 
 		// generate mipmaps for down sampler
 		renderer.updateRenderTargetMipmap(this._rt);
+
+		// save render states for effects to get camera and scene info from this buffer
+		this._renderStates = renderStates;
 	}
 
 	output() {
 		return this._rt;
+	}
+
+	getCurrentRenderStates() {
+		return this._renderStates;
 	}
 
 	resize(width, height) {
@@ -6458,6 +6469,7 @@ class EffectComposer {
 	 * @param {Number} [options.samplerNumber=8] - MSAA sampling multiple.
 	 * @param {Number} [options.maxMarkAttachment=5] - Maximum number of mark attachments. Means that it supports up to N*4 effects that need to be marked.
 	 * @param {Number} [options.maxColorAttachment=5] - Maximum number of color buffer attachments.
+	 * @param {Boolean} [options.depthTextureAttachment=false] - Whether to use depth texture as default depth attachment. Turning on will allow you to get the depth texture of the scene buffer.
 	 * @param {Boolean} [options.bufferMipmaps=false] - Whether to generate mipmaps for buffers.
 	 * @param {Boolean} [options.floatColorBuffer=false] - Whether to support the EXT_color_buffer_float feature. Turning on will improve the storage accuracy of GBuffer.
 	 * @param {Boolean} [options.highDynamicRange=false] - Whether to use high dynamic range (HDR) rendering.
@@ -6470,6 +6482,7 @@ class EffectComposer {
 		options.samplerNumber = options.samplerNumber || 8;
 		options.maxMarkAttachment = options.maxMarkAttachment || 5;
 		options.maxColorAttachment = options.maxColorAttachment || 5;
+		options.depthTextureAttachment = options.depthTextureAttachment || false;
 		options.bufferMipmaps = options.bufferMipmaps || false;
 		options.floatColorBuffer = options.floatColorBuffer || false;
 		options.highDynamicRange = options.highDynamicRange || false;
@@ -6516,13 +6529,23 @@ class EffectComposer {
 
 		// Use DEPTH_COMPONENT24 in WebGL 2 for better depth precision.
 		const defaultDepthFormat = options.webgl2 ? PIXEL_FORMAT.DEPTH_COMPONENT24 : PIXEL_FORMAT.DEPTH_COMPONENT16;
-		this._defaultDepthRenderBuffer = new RenderBuffer(width, height, defaultDepthFormat);
+		if (options.depthTextureAttachment) {
+			this._defaultDepthAttachment = new Texture2D();
+			setupDepthTexture(this._defaultDepthAttachment);
+		} else {
+			this._defaultDepthAttachment = new RenderBuffer(width, height, defaultDepthFormat);
+		}
 		this._defaultMSDepthRenderBuffer = new RenderBuffer(width, height, defaultDepthFormat, options.samplerNumber);
 
-		// Reference: https://registry.khronos.org/webgl/specs/latest/2.0/#3.7.5
-		// In WebGL 2, renderbufferStorage can accept DEPTH_STENCIL as internal format for backward compatibility, which is mapped to DEPTH24_STENCIL8 by implementations,
-		// but renderbufferStorageMultisample can only accept DEPTH24_STENCIL8 as internal format.
-		this._defaultDepthStencilRenderBuffer = new RenderBuffer(width, height, PIXEL_FORMAT.DEPTH_STENCIL);
+		if (options.depthTextureAttachment) {
+			this._defaultDepthStencilAttachment = new Texture2D();
+			setupDepthTexture(this._defaultDepthStencilAttachment, true);
+		} else {
+			// Reference: https://registry.khronos.org/webgl/specs/latest/2.0/#3.7.5
+			// In WebGL 2, renderbufferStorage can accept DEPTH_STENCIL as internal format for backward compatibility, which is mapped to DEPTH24_STENCIL8 by implementations,
+			// but renderbufferStorageMultisample can only accept DEPTH24_STENCIL8 as internal format.
+			this._defaultDepthStencilAttachment = new RenderBuffer(width, height, PIXEL_FORMAT.DEPTH_STENCIL);
+		}
 		this._defaultMSDepthStencilRenderBuffer = new RenderBuffer(width, height, PIXEL_FORMAT.DEPTH24_STENCIL8, options.samplerNumber);
 
 		this._externalColorAttachment = null;
@@ -6614,7 +6637,7 @@ class EffectComposer {
 			stencilBuffer = isDepthStencilAttachment(externalDepthAttachment);
 		}
 
-		const defaultDepthRenderBuffer = stencilBuffer ? this._defaultDepthStencilRenderBuffer : this._defaultDepthRenderBuffer;
+		const defaultDepthRenderBuffer = stencilBuffer ? this._defaultDepthStencilAttachment : this._defaultDepthAttachment;
 		const defaultMSDepthRenderBuffer = stencilBuffer ? this._defaultMSDepthStencilRenderBuffer : this._defaultMSDepthRenderBuffer;
 
 		let sceneColorAttachment, sceneDepthAttachment, sceneMColorAttachment, sceneMDepthAttachment, depthAttachment, mDepthAttachment;
@@ -7210,4 +7233,4 @@ Object.defineProperties(SSREffect.prototype, {
 	}
 });
 
-export { AccumulationBuffer, BloomEffect, BlurEdgeEffect, Buffer, ChromaticAberrationEffect, ColorCorrectionEffect, ColorMarkBufferDebugger, DOFEffect, Debugger, DefaultEffectComposer, Effect, EffectComposer, FXAAEffect, FilmEffect, GBufferDebugger, GhostingEffect, GlowEffect, HDRMode, InnerGlowEffect, MarkBufferDebugger, NonDepthMarkBufferDebugger, OutlineEffect, RadialTailingEffect, RenderListMask, SSAODebugger, SSAOEffect, SSRDebugger, SSREffect, SoftGlowEffect, TAAEffect, TailingEffect, ToneMappingEffect, ToneMappingType, VignettingEffect, additiveShader, blurShader, channelShader, copyShader, defaultVertexShader, fxaaShader, getColorBufferFormat, highlightShader, horizontalBlurShader, isDepthStencilAttachment, maskShader, multiplyShader, octahedronToUnitVectorGLSL, seperableBlurShader, setupColorTexture, unitVectorToOctahedronGLSL, verticalBlurShader };
+export { AccumulationBuffer, BloomEffect, BlurEdgeEffect, Buffer, ChromaticAberrationEffect, ColorCorrectionEffect, ColorMarkBufferDebugger, DOFEffect, Debugger, DefaultEffectComposer, Effect, EffectComposer, FXAAEffect, FilmEffect, GBufferDebugger, GhostingEffect, GlowEffect, HDRMode, InnerGlowEffect, MarkBufferDebugger, NonDepthMarkBufferDebugger, OutlineEffect, RadialTailingEffect, RenderListMask, SSAODebugger, SSAOEffect, SSRDebugger, SSREffect, SoftGlowEffect, TAAEffect, TailingEffect, ToneMappingEffect, ToneMappingType, VignettingEffect, additiveShader, blurShader, channelShader, copyShader, defaultVertexShader, fxaaShader, getColorBufferFormat, highlightShader, horizontalBlurShader, isDepthStencilAttachment, maskShader, multiplyShader, octahedronToUnitVectorGLSL, seperableBlurShader, setupColorTexture, setupDepthTexture, unitVectorToOctahedronGLSL, verticalBlurShader };

@@ -1,5 +1,5 @@
-import { RenderTarget2D, Texture2D, ATTACHMENT, PIXEL_FORMAT, PIXEL_TYPE, TEXTURE_FILTER, SHADING_TYPE, ShaderMaterial, Vector3, Matrix4, Vector4 } from 't3d';
-import { unitVectorToOctahedronGLSL } from '../Utils.js';
+import { RenderTarget2D, Texture2D, ATTACHMENT, PIXEL_TYPE, TEXTURE_FILTER, SHADING_TYPE, ShaderMaterial, Vector3, Matrix4, Vector4 } from 't3d';
+import { unitVectorToOctahedronGLSL, setupDepthTexture } from '../Utils.js';
 import Buffer from './Buffer.js';
 
 export default class GBuffer extends Buffer {
@@ -21,13 +21,7 @@ export default class GBuffer extends Buffer {
 		}
 
 		const depthTexture = new Texture2D();
-		depthTexture.image = { data: null, width: width, height: height };
-		depthTexture.type = PIXEL_TYPE.UNSIGNED_INT_24_8;
-		depthTexture.format = PIXEL_FORMAT.DEPTH_STENCIL;
-		depthTexture.magFilter = TEXTURE_FILTER.NEAREST;
-		depthTexture.minFilter = TEXTURE_FILTER.NEAREST;
-		depthTexture.generateMipmaps = false;
-		depthTexture.flipY = false;
+		setupDepthTexture(depthTexture, true);
 
 		this._rt.attach(
 			depthTexture,

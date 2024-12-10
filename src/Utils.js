@@ -1,4 +1,4 @@
-import { PIXEL_FORMAT, PIXEL_TYPE } from 't3d';
+import { PIXEL_FORMAT, PIXEL_TYPE, TEXTURE_FILTER } from 't3d';
 
 export const defaultVertexShader = `
     attribute vec3 a_Position;
@@ -1518,6 +1518,14 @@ export function setupColorTexture(texture, options) {
 			texture.internalformat = PIXEL_FORMAT.R11F_G11F_B10F;
 		}
 	}
+}
+
+export function setupDepthTexture(texture, stencil = false) {
+	texture.type = stencil ? PIXEL_TYPE.UNSIGNED_INT_24_8 : PIXEL_TYPE.UNSIGNED_INT;
+	texture.format = stencil ? PIXEL_FORMAT.DEPTH_STENCIL : PIXEL_FORMAT.DEPTH_COMPONENT;
+	texture.magFilter = texture.minFilter = TEXTURE_FILTER.NEAREST;
+	texture.generateMipmaps = false;
+	texture.flipY = false;
 }
 
 export const RenderListMask = {

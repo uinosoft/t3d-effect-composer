@@ -5,7 +5,7 @@ import MarkBuffer from './buffers/MarkBuffer.js';
 import ColorMarkBuffer from './buffers/ColorMarkBuffer.js';
 import SceneBuffer from './buffers/SceneBuffer.js';
 import RenderTargetCache from './RenderTargetCache.js';
-import { copyShader, getColorBufferFormat, HDRMode, isDepthStencilAttachment, setupColorTexture } from './Utils.js';
+import { copyShader, getColorBufferFormat, HDRMode, isDepthStencilAttachment, setupColorTexture, setupDepthTexture } from './Utils.js';
 import CameraJitter from './CameraJitter.js';
 
 export default class EffectComposer {
@@ -18,6 +18,7 @@ export default class EffectComposer {
 	 * @param {Number} [options.samplerNumber=8] - MSAA sampling multiple.
 	 * @param {Number} [options.maxMarkAttachment=5] - Maximum number of mark attachments. Means that it supports up to N*4 effects that need to be marked.
 	 * @param {Number} [options.maxColorAttachment=5] - Maximum number of color buffer attachments.
+	 * @param {Boolean} [options.depthTextureAttachment=false] - Whether to use depth texture as default depth attachment. Turning on will allow you to get the depth texture of the scene buffer.
 	 * @param {Boolean} [options.bufferMipmaps=false] - Whether to generate mipmaps for buffers.
 	 * @param {Boolean} [options.floatColorBuffer=false] - Whether to support the EXT_color_buffer_float feature. Turning on will improve the storage accuracy of GBuffer.
 	 * @param {Boolean} [options.highDynamicRange=false] - Whether to use high dynamic range (HDR) rendering.
@@ -30,6 +31,7 @@ export default class EffectComposer {
 		options.samplerNumber = options.samplerNumber || 8;
 		options.maxMarkAttachment = options.maxMarkAttachment || 5;
 		options.maxColorAttachment = options.maxColorAttachment || 5;
+		options.depthTextureAttachment = options.depthTextureAttachment || false;
 		options.bufferMipmaps = options.bufferMipmaps || false;
 		options.floatColorBuffer = options.floatColorBuffer || false;
 		options.highDynamicRange = options.highDynamicRange || false;
@@ -76,13 +78,23 @@ export default class EffectComposer {
 
 		// Use DEPTH_COMPONENT24 in WebGL 2 for better depth precision.
 		const defaultDepthFormat = options.webgl2 ? PIXEL_FORMAT.DEPTH_COMPONENT24 : PIXEL_FORMAT.DEPTH_COMPONENT16;
-		this._defaultDepthRenderBuffer = new RenderBuffer(width, height, defaultDepthFormat);
+		if (options.depthTextureAttachment) {
+			this._defaultDepthAttachment = new Texture2D();
+			setupDepthTexture(this._defaultDepthAttachment);
+		} else {
+			this._defaultDepthAttachment = new RenderBuffer(width, height, defaultDepthFormat);
+		}
 		this._defaultMSDepthRenderBuffer = new RenderBuffer(width, height, defaultDepthFormat, options.samplerNumber);
 
-		// Reference: https://registry.khronos.org/webgl/specs/latest/2.0/#3.7.5
-		// In WebGL 2, renderbufferStorage can accept DEPTH_STENCIL as internal format for backward compatibility, which is mapped to DEPTH24_STENCIL8 by implementations,
-		// but renderbufferStorageMultisample can only accept DEPTH24_STENCIL8 as internal format.
-		this._defaultDepthStencilRenderBuffer = new RenderBuffer(width, height, PIXEL_FORMAT.DEPTH_STENCIL);
+		if (options.depthTextureAttachment) {
+			this._defaultDepthStencilAttachment = new Texture2D();
+			setupDepthTexture(this._defaultDepthStencilAttachment, true);
+		} else {
+			// Reference: https://registry.khronos.org/webgl/specs/latest/2.0/#3.7.5
+			// In WebGL 2, renderbufferStorage can accept DEPTH_STENCIL as internal format for backward compatibility, which is mapped to DEPTH24_STENCIL8 by implementations,
+			// but renderbufferStorageMultisample can only accept DEPTH24_STENCIL8 as internal format.
+			this._defaultDepthStencilAttachment = new RenderBuffer(width, height, PIXEL_FORMAT.DEPTH_STENCIL);
+		}
 		this._defaultMSDepthStencilRenderBuffer = new RenderBuffer(width, height, PIXEL_FORMAT.DEPTH24_STENCIL8, options.samplerNumber);
 
 		this._externalColorAttachment = null;
@@ -174,7 +186,7 @@ export default class EffectComposer {
 			stencilBuffer = isDepthStencilAttachment(externalDepthAttachment);
 		}
 
-		const defaultDepthRenderBuffer = stencilBuffer ? this._defaultDepthStencilRenderBuffer : this._defaultDepthRenderBuffer;
+		const defaultDepthRenderBuffer = stencilBuffer ? this._defaultDepthStencilAttachment : this._defaultDepthAttachment;
 		const defaultMSDepthRenderBuffer = stencilBuffer ? this._defaultMSDepthStencilRenderBuffer : this._defaultMSDepthRenderBuffer;
 
 		let sceneColorAttachment, sceneDepthAttachment, sceneMColorAttachment, sceneMDepthAttachment, depthAttachment, mDepthAttachment;

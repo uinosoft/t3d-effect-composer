@@ -1534,6 +1534,13 @@ vec3 octahedronToUnitVector(vec2 p) {
 			}
 		}
 	}
+	function setupDepthTexture(texture, stencil = false) {
+		texture.type = stencil ? t3d.PIXEL_TYPE.UNSIGNED_INT_24_8 : t3d.PIXEL_TYPE.UNSIGNED_INT;
+		texture.format = stencil ? t3d.PIXEL_FORMAT.DEPTH_STENCIL : t3d.PIXEL_FORMAT.DEPTH_COMPONENT;
+		texture.magFilter = texture.minFilter = t3d.TEXTURE_FILTER.NEAREST;
+		texture.generateMipmaps = false;
+		texture.flipY = false;
+	}
 	const RenderListMask = {
 		OPAQUE: 1,
 		// 0001
@@ -4692,17 +4699,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 				this._rt.texture.type = t3d.PIXEL_TYPE.HALF_FLOAT;
 			}
 			const depthTexture = new t3d.Texture2D();
-			depthTexture.image = {
-				data: null,
-				width: width,
-				height: height
-			};
-			depthTexture.type = t3d.PIXEL_TYPE.UNSIGNED_INT_24_8;
-			depthTexture.format = t3d.PIXEL_FORMAT.DEPTH_STENCIL;
-			depthTexture.magFilter = t3d.TEXTURE_FILTER.NEAREST;
-			depthTexture.minFilter = t3d.TEXTURE_FILTER.NEAREST;
-			depthTexture.generateMipmaps = false;
-			depthTexture.flipY = false;
+			setupDepthTexture(depthTexture, true);
 			this._rt.attach(depthTexture, t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 			this._renderOptions = {
 				getMaterial: createGetMaterialFunction$2()
@@ -5571,6 +5568,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 				mask: RenderListMask.ALL
 			}];
 			this._sceneRenderOptions = {};
+			this._renderStates = null;
 		}
 		syncAttachments(colorAttachment, depthAttachment, msColorRenderBuffer, msDepthRenderBuffer) {
 			this._rt.dispose();
@@ -5639,9 +5637,15 @@ vec3 octahedronToUnitVector(vec2 p) {
 
 			// generate mipmaps for down sampler
 			renderer.updateRenderTargetMipmap(this._rt);
+
+			// save render states for effects to get camera and scene info from this buffer
+			this._renderStates = renderStates;
 		}
 		output() {
 			return this._rt;
+		}
+		getCurrentRenderStates() {
+			return this._renderStates;
 		}
 		resize(width, height) {
 			super.resize(width, height);
@@ -5865,6 +5869,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 		 * @param {Number} [options.samplerNumber=8] - MSAA sampling multiple.
 		 * @param {Number} [options.maxMarkAttachment=5] - Maximum number of mark attachments. Means that it supports up to N*4 effects that need to be marked.
 		 * @param {Number} [options.maxColorAttachment=5] - Maximum number of color buffer attachments.
+		 * @param {Boolean} [options.depthTextureAttachment=false] - Whether to use depth texture as default depth attachment. Turning on will allow you to get the depth texture of the scene buffer.
 		 * @param {Boolean} [options.bufferMipmaps=false] - Whether to generate mipmaps for buffers.
 		 * @param {Boolean} [options.floatColorBuffer=false] - Whether to support the EXT_color_buffer_float feature. Turning on will improve the storage accuracy of GBuffer.
 		 * @param {Boolean} [options.highDynamicRange=false] - Whether to use high dynamic range (HDR) rendering.
@@ -5876,6 +5881,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 			options.samplerNumber = options.samplerNumber || 8;
 			options.maxMarkAttachment = options.maxMarkAttachment || 5;
 			options.maxColorAttachment = options.maxColorAttachment || 5;
+			options.depthTextureAttachment = options.depthTextureAttachment || false;
 			options.bufferMipmaps = options.bufferMipmaps || false;
 			options.floatColorBuffer = options.floatColorBuffer || false;
 			options.highDynamicRange = options.highDynamicRange || false;
@@ -5913,13 +5919,22 @@ vec3 octahedronToUnitVector(vec2 p) {
 
 			// Use DEPTH_COMPONENT24 in WebGL 2 for better depth precision.
 			const defaultDepthFormat = options.webgl2 ? t3d.PIXEL_FORMAT.DEPTH_COMPONENT24 : t3d.PIXEL_FORMAT.DEPTH_COMPONENT16;
-			this._defaultDepthRenderBuffer = new t3d.RenderBuffer(width, height, defaultDepthFormat);
+			if (options.depthTextureAttachment) {
+				this._defaultDepthAttachment = new t3d.Texture2D();
+				setupDepthTexture(this._defaultDepthAttachment);
+			} else {
+				this._defaultDepthAttachment = new t3d.RenderBuffer(width, height, defaultDepthFormat);
+			}
 			this._defaultMSDepthRenderBuffer = new t3d.RenderBuffer(width, height, defaultDepthFormat, options.samplerNumber);
-
-			// Reference: https://registry.khronos.org/webgl/specs/latest/2.0/#3.7.5
-			// In WebGL 2, renderbufferStorage can accept DEPTH_STENCIL as internal format for backward compatibility, which is mapped to DEPTH24_STENCIL8 by implementations,
-			// but renderbufferStorageMultisample can only accept DEPTH24_STENCIL8 as internal format.
-			this._defaultDepthStencilRenderBuffer = new t3d.RenderBuffer(width, height, t3d.PIXEL_FORMAT.DEPTH_STENCIL);
+			if (options.depthTextureAttachment) {
+				this._defaultDepthStencilAttachment = new t3d.Texture2D();
+				setupDepthTexture(this._defaultDepthStencilAttachment, true);
+			} else {
+				// Reference: https://registry.khronos.org/webgl/specs/latest/2.0/#3.7.5
+				// In WebGL 2, renderbufferStorage can accept DEPTH_STENCIL as internal format for backward compatibility, which is mapped to DEPTH24_STENCIL8 by implementations,
+				// but renderbufferStorageMultisample can only accept DEPTH24_STENCIL8 as internal format.
+				this._defaultDepthStencilAttachment = new t3d.RenderBuffer(width, height, t3d.PIXEL_FORMAT.DEPTH_STENCIL);
+			}
 			this._defaultMSDepthStencilRenderBuffer = new t3d.RenderBuffer(width, height, t3d.PIXEL_FORMAT.DEPTH24_STENCIL8, options.samplerNumber);
 			this._externalColorAttachment = null;
 			this._externalDepthAttachment = null;
@@ -5999,7 +6014,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 			if (external) {
 				stencilBuffer = isDepthStencilAttachment(externalDepthAttachment);
 			}
-			const defaultDepthRenderBuffer = stencilBuffer ? this._defaultDepthStencilRenderBuffer : this._defaultDepthRenderBuffer;
+			const defaultDepthRenderBuffer = stencilBuffer ? this._defaultDepthStencilAttachment : this._defaultDepthAttachment;
 			const defaultMSDepthRenderBuffer = stencilBuffer ? this._defaultMSDepthStencilRenderBuffer : this._defaultMSDepthRenderBuffer;
 			let sceneColorAttachment, sceneDepthAttachment, sceneMColorAttachment, sceneMDepthAttachment, depthAttachment, mDepthAttachment;
 			if (external) {
@@ -6531,6 +6546,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 	exports.octahedronToUnitVectorGLSL = octahedronToUnitVectorGLSL;
 	exports.seperableBlurShader = seperableBlurShader;
 	exports.setupColorTexture = setupColorTexture;
+	exports.setupDepthTexture = setupDepthTexture;
 	exports.unitVectorToOctahedronGLSL = unitVectorToOctahedronGLSL;
 	exports.verticalBlurShader = verticalBlurShader;
 
