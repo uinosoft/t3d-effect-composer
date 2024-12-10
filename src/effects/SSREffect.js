@@ -46,6 +46,11 @@ export default class SSREffect extends Effect {
 		// the falloff of base color when mix with ssr color
 		this.falloff = 0;
 
+		// When turned on, the reflection effect will become more blurred as the Roughness increases,
+		// but it will also cause more noise.
+		// Noise can be reduced by turning on TAA.
+		this.importanceSampling = false;
+
 		this.blurSize = 2;
 		this.depthRange = 1;
 
@@ -114,6 +119,12 @@ export default class SSREffect extends Effect {
 			this._ssrPass.material.needsUpdate = true;
 			this._ssrPass.material.defines.MAX_ITERATION = this.maxSteps;
 			this._ssrPass.material.defines.MAX_BINARY_SEARCH_ITERATION = this.maxIteration;
+		}
+
+		const importanceSampling = !!this.importanceSampling;
+		if (importanceSampling !== this._ssrPass.material.defines.IMPORTANCE_SAMPLING) {
+			this._ssrPass.material.needsUpdate = true;
+			this._ssrPass.material.defines.IMPORTANCE_SAMPLING = importanceSampling;
 		}
 
 		this._ssrPass.render(renderer);
@@ -197,7 +208,8 @@ const ssrShader = {
 	name: 'ec_ssr',
 	defines: {
 		MAX_ITERATION: 50,
-		MAX_BINARY_SEARCH_ITERATION: 5
+		MAX_BINARY_SEARCH_ITERATION: 5,
+		IMPORTANCE_SAMPLING: false
 	},
 	uniforms: {
 		colorTex: null,
@@ -278,6 +290,28 @@ const ssrShader = {
 			// Cross z
 			return rayZFar <= cameraZ && rayZNear >= cameraZ - zThicknessThreshold;
 		}
+
+		#ifdef IMPORTANCE_SAMPLING
+			float interleavedGradientNoise(const in vec2 fragCoord, const in float frameMod) {
+				vec3 magic = vec3(0.06711056, 0.00583715, 52.9829189);
+				return fract(magic.z * fract(dot(fragCoord.xy + frameMod * vec2(47.0, 17.0) * 0.695, magic.xy)));
+			}
+
+			vec3 unrealImportanceSampling(const in float frameMod, const in vec3 tangentX, const in vec3 tangentY, const in vec3 tangentZ, const in vec3 eyeVector, const in float rough4) {
+				vec2 E;
+				E.x = interleavedGradientNoise(gl_FragCoord.yx, frameMod);
+				E.y = fract(E.x * 52.9829189);
+				E.y = mix(E.y, 1.0, 0.7);
+
+				float phi = 2.0 * 3.14159 * E.x;
+				float cosTheta = pow(max(E.y, 0.000001), rough4 / (2.0 - rough4));
+				float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+
+				vec3 h = vec3(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);
+				h = h.x * tangentX + h.y * tangentY + h.z * tangentZ;
+				return normalize((2.0 * dot(eyeVector, h)) * h - eyeVector);
+			}
+		#endif
 
 		// Trace a ray in screenspace from rayOrigin (in camera space) pointing in rayDir (in camera space)
 		//
@@ -462,7 +496,17 @@ const ssrShader = {
 			vec4 pos = projectionInv * projectedPos;
 			vec3 rayOrigin = pos.xyz / pos.w;
 
-			vec3 rayDir = normalize(reflect(normalize(rayOrigin), N));
+			vec3 rayDir;
+			#ifdef IMPORTANCE_SAMPLING
+				vec3 upVector = abs(N.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+				vec3 tangentX = normalize(cross(upVector, N));
+				vec3 tangentY = normalize(cross(N, tangentX));
+				vec3 tangentZ = N;
+				rayDir = unrealImportanceSampling(jitterOffset * 20., tangentX, tangentY, tangentZ, -rayOrigin, pow(gBufferTexel.a, 4.0));
+			#else
+				rayDir = normalize(reflect(normalize(rayOrigin), N));
+			#endif
+
 			vec2 hitPixel;
 			vec3 hitPoint;
 			float iterationCount;

@@ -5,6 +5,7 @@
 		"effect_taa",
 		"effect_tonemapping",
 		"effect_ssao",
+		"effect_ssr",
 		"effect_transition"
 	],
 	"layer": [

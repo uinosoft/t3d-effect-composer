@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>t3d-effect-composer</title>
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <link type="text/css" rel="stylesheet" href="main.css">
+</head>
+
+<body>
+    <div id="info">SSR Effect</div>
+</body>
+
+<!-- Import maps polyfill -->
+<!-- Remove this when import maps will be widely supported -->
+<script async src="./libs/es-module-shims.js"></script>
+<script src="./libs/nanobar.min.js"></script>
+
+<script type="importmap">
+    {
+      	"imports": {
+			"t3d": "./libs/t3d/build/t3d.module.js",
+			"t3d/addons/": "./libs/t3d/examples/jsm/",
+			"t3d-effect-composer": "../build/t3d.effectcomposer.module.js"
+      	}
+    }
+</script>
+
+<script type="module">
+    import * as t3d from 't3d';
+    import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 't3d/addons/loaders/glTF/GLTFLoader.js';
+    import { SkyBox } from 't3d/addons/objects/SkyBox.js';
+    import { EnvTextureCubeLoader } from 't3d/addons/loaders/EnvLoader.js';
+    import { Texture2DLoader } from 't3d/addons/loaders/Texture2DLoader.js';
+
+    import { EffectComposer, SSREffect, SSRDebugger, TAAEffect, AccumulationBuffer } from 't3d-effect-composer';
+    
+    import { GUI } from './libs/lil-gui.esm.min.js';
+    import Stats from './libs/stats.module.js';
+
+    let width = window.innerWidth || 2;
+    let height = window.innerHeight || 2;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    document.body.appendChild(canvas);
+
+    const contextParams = { antialias: false, alpha: false, stencil: false };
+    const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
+    const renderer = new t3d.WebGLRenderer(gl);
+    const backRenderTarget = new t3d.RenderTargetBack(canvas);
+    const shadowMapPass = new t3d.ShadowMapPass();
+
+    const composerOptions = {
+    	samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
+    	webgl2: renderer.capabilities.version > 1
+    };
+    const effectComposer = new EffectComposer(width, height, composerOptions);
+
+    const scene = new t3d.Scene();
+    scene.envDiffuseIntensity = 0.8;
+    scene.envSpecularIntensity = 0.2;
+
+    const envTextureLoader = new EnvTextureCubeLoader();
+    envTextureLoader.setRenderer(renderer);
+    envTextureLoader.loadAsync('./resources/sky_hdr/pisa.env').then(cubeTexture => {
+    	scene.environment = cubeTexture;
+
+    	const skyBox = new SkyBox(cubeTexture);
+    	skyBox.gamma = true;
+    	skyBox.level = 3;
+    	scene.add(skyBox);
+
+    	taaReset();
+    });
+
+    const camera = new t3d.Camera();
+    camera.position.set(-100, 30, 180);
+    camera.lookAt(new t3d.Vector3(0, 0, 0), new t3d.Vector3(0, 1, 0));
+    camera.setPerspective(30 / 180 * Math.PI, width / height, 0.1, 1000);
+    scene.add(camera);
+
+    const controller = new OrbitControls(camera, canvas);
+    controller.dampingFactor = 0.6;
+
+    camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.SRGB;
+    effectComposer.getBuffer('SceneBuffer').setOutputEncoding(t3d.TEXEL_ENCODING_TYPE.SRGB);
+
+    // Light
+
+    const directionalLight = new t3d.DirectionalLight(0xeeeeff, 0.7);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.windowSize = 150;
+    directionalLight.shadow.mapSize.set(512, 512);
+    directionalLight.shadow.bias = -0.001;
+    directionalLight.shadow.normalBias = 0.2;
+    directionalLight.shadow.cameraNear = 10;
+    directionalLight.position.set(-30, 20, 10);
+    directionalLight.lookAt(new t3d.Vector3(), new t3d.Vector3(0, 1, 0));
+    scene.add(directionalLight);
+
+    // Load model
+
+    const nanobar = new Nanobar();
+    nanobar.el.style.background = 'gray';
+
+    const loadingManager = new t3d.LoadingManager(function() {
+    	nanobar.go(100);
+    	nanobar.el.style.background = 'transparent';
+    }, function(url, itemsLoaded, itemsTotal) {
+    	if (itemsLoaded < itemsTotal) {
+    		nanobar.go(itemsLoaded / itemsTotal * 100);
+    	}
+    });
+
+    const loader = new GLTFLoader(loadingManager);
+    const modelUrl = './resources/gltf/bust_of_woman/glTF-Binary/bust_of_woman.glb';
+    loader.load(modelUrl).then(function(result) {
+    	console.timeEnd('GLTFLoader');
+
+    	result.root.traverse(node => {
+    		if (node.isMesh) {
+    			node.castShadow = true;
+    			node.receiveShadow = true;
+    		}
+    	});
+    	result.root.position.y -= 25;
+    	scene.add(result.root);
+
+    	plane.visible = true;
+
+    	taaReset();
+    }).catch(e => console.error(e));
+
+    const textureLoader = new Texture2DLoader();
+    const textureBaseUri = './resources/SlateFloorTile/';
+    Promise.all([
+    	textureLoader.loadAsync(textureBaseUri + 'BaseColor.jpg'),
+    	textureLoader.loadAsync(textureBaseUri + 'Roughness.jpg'),
+    	textureLoader.loadAsync(textureBaseUri + 'Normal.png')
+    ]).then(([diffuseMap, roughnessMap, normalMap]) => {
+    	diffuseMap.wrapS = diffuseMap.wrapT = t3d.TEXTURE_WRAP.REPEAT;
+    	diffuseMap.encoding = t3d.TEXEL_ENCODING_TYPE.SRGB;
+    	diffuseMap.anisotropy = 8;
+
+    	roughnessMap.wrapS = roughnessMap.wrapT = t3d.TEXTURE_WRAP.REPEAT;
+    	normalMap.wrapS = normalMap.wrapT = t3d.TEXTURE_WRAP.REPEAT;
+
+    	planeMaterial.diffuseMap = diffuseMap;
+    	planeMaterial.roughnessMap = roughnessMap;
+    	planeMaterial.normalMap = normalMap;
+
+    	taaReset();
+    });
+
+    const planeGeometry = new t3d.PlaneGeometry(150, 150);
+    const planeMaterial = new t3d.PBRMaterial();
+    planeMaterial.diffuseMapTransform.setUvTransform(0, 0, 3, 3, 0, 0.5, 0.5);
+    planeMaterial.roughness = 0.5;
+    planeMaterial.metalness = 0.01;
+    planeMaterial.dithering = true;
+    const plane = new t3d.Mesh(planeGeometry, planeMaterial);
+    plane.position.y -= 25;
+    plane.receiveShadow = true;
+    plane.visible = false;
+    scene.add(plane);
+
+    // SSR
+
+    const ssrEffect = new SSREffect();
+    ssrEffect.active = true;
+    ssrEffect.enablePixelStrideZCutoff = false;
+    ssrEffect.strength = 0.8;
+    ssrEffect.falloff = 0.8;
+    ssrEffect.importanceSampling = true;
+    effectComposer.addEffect('SSR', ssrEffect, 1);
+
+    const ssrDebugger = new SSRDebugger();
+
+    // TAA
+
+    const sceneBuffer = effectComposer.getBuffer('SceneBuffer');
+    const accumBuffer = new AccumulationBuffer(width, height, composerOptions);
+    const taaEffect = new TAAEffect();
+    taaEffect.onFinish = () => {
+    	sceneBuffer.autoUpdate = false;
+    	console.log('accumulation finished.');
+    };
+
+    effectComposer.addBuffer('AccumulationBuffer', accumBuffer);
+    effectComposer.addEffect('TAA', taaEffect, 2); // After SSR
+
+    function taaReset() {
+    	sceneBuffer.autoUpdate = true;
+    	taaEffect.reset();
+    }
+
+    // GUI
+
+    const gui = new GUI();
+    gui.add(taaEffect, 'active').name('taa').onChange(taaReset);
+
+    const materialFolder = gui.addFolder('Ground Material').onChange(taaReset);
+    materialFolder.add(planeMaterial, 'roughness', 0, 1, 0.01);
+
+    const ssrFolder = gui.addFolder('SSR').onChange(taaReset).close();
+    ssrFolder.add(ssrEffect, 'active');
+    ssrFolder.add(ssrEffect, 'pixelStride', 1, 100, 1);
+    ssrFolder.add(ssrEffect, 'maxIteration', 1, 10, 1);
+    ssrFolder.add(ssrEffect, 'maxSteps', 20, 200, 1);
+    ssrFolder.add(ssrEffect, 'maxRayDistance', 1, 1000, 0.01);
+    ssrFolder.add(ssrEffect, 'enablePixelStrideZCutoff');
+    ssrFolder.add(ssrEffect, 'pixelStrideZCutoff', 1, 300, 1);
+    ssrFolder.add(ssrEffect, 'screenEdgeFadeStart', 0, 1, 0.01);
+    ssrFolder.add(ssrEffect, 'eyeFadeStart', 0, 1, 0.01);
+    ssrFolder.add(ssrEffect, 'eyeFadeEnd', 0, 1, 0.01);
+    ssrFolder.add(ssrEffect, 'minGlossiness', 0, 1, 0.01);
+    ssrFolder.add(ssrEffect, 'strength', 0, 1, 0.01);
+    ssrFolder.add(ssrEffect, 'falloff', 0, 1, 0.01);
+    ssrFolder.add(ssrEffect, 'importanceSampling');
+
+    ssrFolder.add(ssrEffect, 'blurSize', 0, 5, 0.01).name('denoise');
+
+    const debugFolder = gui.addFolder('Debug');
+    debugFolder.add({ debugger: false }, 'debugger').onChange(value => {
+    	effectComposer.debugger = value ? ssrDebugger : null;
+    });
+
+    // Stats
+
+    const stats = new Stats();
+    stats.dom.style.cssText = 'position:fixed;bottom:0;left:0;cursor:pointer;opacity:0.9;z-index:10000';
+    stats.showPanel(0);
+    document.body.appendChild(stats.dom);
+
+    //
+
+    let staticCount = -1;
+
+    function loop(count) {
+    	requestAnimationFrame(loop);
+
+    	stats.begin();
+
+    	// Delay 10 frames to wait for the real static,
+    	// because of the dampingFactor of OrbitControls
+    	if (controller.update()) {
+    		staticCount = 10;
+    		taaReset();
+    	} else {
+    		staticCount--;
+    		if (staticCount > 0) {
+    			taaReset();
+    		}
+    	}
+    
+    	scene.updateMatrix();
+    	scene.updateRenderStates(camera);
+    	scene.updateRenderQueue(camera);
+
+    	shadowMapPass.render(renderer, scene);
+
+    	renderer.setClearColor(0, 0, 0, 1);
+    	effectComposer.render(renderer, scene, camera, backRenderTarget);
+
+    	stats.end();
+    }
+    requestAnimationFrame(loop);
+
+    function onWindowResize() {
+    	width = window.innerWidth || 2;
+    	height = window.innerHeight || 2;
+
+    	camera.setPerspective(30 / 180 * Math.PI, width / height, 0.1, 1000);
+
+    	backRenderTarget.resize(width, height);
+    	effectComposer.resize(width, height);
+
+    	taaReset();
+    }
+    window.addEventListener('resize', onWindowResize, false);
+</script>
+</html>
