@@ -46,6 +46,7 @@
     import SkylineEffect from './jsm/SkylineEffect.js';
     import { DefaultEffectComposer } from 't3d-effect-composer';
     import { Inspector } from './jsm/Inspector.js';
+    import { FastGBuffer } from './jsm/FastGBuffer.js';
 
     import { GUI } from './libs/lil-gui.esm.min.js';
     import Stats from './libs/stats.module.js';
@@ -67,11 +68,12 @@
 
     const shadowMapPass = new t3d.ShadowMapPass();
 
-    const effectComposer = new DefaultEffectComposer(width * window.devicePixelRatio, height * window.devicePixelRatio, {
+    const composerOptions = {
     	samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
     	webgl2: renderer.capabilities.version > 1,
     	depthTextureAttachment: true
-    });
+    };
+    const effectComposer = new DefaultEffectComposer(width * window.devicePixelRatio, height * window.devicePixelRatio, composerOptions);
     effectComposer.sceneMSAA = true;
 
     const skylineEffect = new SkylineEffect();
@@ -151,11 +153,18 @@
     camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.GAMMA;
     effectComposer.getBuffer('SceneBuffer').setOutputEncoding(t3d.TEXEL_ENCODING_TYPE.GAMMA);
 
+    const gBuffer = effectComposer.getBuffer('GBuffer');
+    const fastGBuffer = new FastGBuffer(width * window.devicePixelRatio, height * window.devicePixelRatio, composerOptions);
+
     const gui = new GUI();
     gui.addColor(skylineEffect, 'lineColor');
     gui.add(skylineEffect, 'lineWidth', 0, 5, 0.01);
     gui.add(skylineEffect, 'threshold', 0, 0.5, 0.000001);
-    gui.add(skylineEffect, 'performanceMode');
+    gui.add({ fastGBuffer: false }, 'fastGBuffer').onChange(value => {
+    	const currentBuffer = value ? fastGBuffer : gBuffer;
+    	effectComposer.addBuffer('GBuffer', currentBuffer);
+    	effectComposer._syncAttachments();
+    });
 
     let inspector;
     document.addEventListener('keydown', e => {

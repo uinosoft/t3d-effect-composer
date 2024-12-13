@@ -6140,8 +6140,6 @@ class SceneBuffer extends Buffer {
 		];
 
 		this._sceneRenderOptions = {};
-
-		this._renderStates = null;
 	}
 
 	syncAttachments(colorAttachment, depthAttachment, msColorRenderBuffer, msDepthRenderBuffer) {
@@ -6230,17 +6228,10 @@ class SceneBuffer extends Buffer {
 
 		// generate mipmaps for down sampler
 		renderer.updateRenderTargetMipmap(this._rt);
-
-		// save render states for effects to get camera and scene info from this buffer
-		this._renderStates = renderStates;
 	}
 
 	output() {
 		return this._rt;
-	}
-
-	getCurrentRenderStates() {
-		return this._renderStates;
 	}
 
 	resize(width, height) {

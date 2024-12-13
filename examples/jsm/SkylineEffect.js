@@ -17,17 +17,6 @@ export default class SkylineEffect extends Effect {
 		this._skylinePass = new ShaderPostPass(SkylineShader);
 		this._skylinePass.material.depthTest = false;
 		this._skylinePass.material.depthWrite = false;
-
-		this._performanceMode = false;
-	}
-
-	set performanceMode(value) {
-		this._performanceMode = value;
-		this.bufferDependencies = value ? [] : [{ key: 'GBuffer' }];
-	}
-
-	get performanceMode() {
-		return this._performanceMode;
 	}
 
 	resize(width, height) {
@@ -36,10 +25,9 @@ export default class SkylineEffect extends Effect {
 	}
 
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-		const depthBuffer = composer.getBuffer(this._performanceMode ? 'SceneBuffer' : 'GBuffer');
-		const renderStates = depthBuffer.getCurrentRenderStates();
-		const depthTexture = depthBuffer.output()._attachments[ATTACHMENT.DEPTH_ATTACHMENT]
-			|| depthBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
+		const gBuffer = composer.getBuffer('GBuffer');
+		const renderStates = gBuffer.getCurrentRenderStates();
+		const depthTexture = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
 
 		const projectionMatrix = renderStates.camera.projectionMatrix;
 		const cameraNear = renderStates.camera.near;
