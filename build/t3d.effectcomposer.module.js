@@ -2718,6 +2718,9 @@ class SSREffect extends Effect {
 		// the falloff of base color when mix with ssr color
 		this.falloff = 0;
 
+		// the threshold of z thickness
+		this.zThicknessThreshold = 0.5;
+
 		// When turned on, the reflection effect will become more blurred as the Roughness increases,
 		// but it will also cause more noise.
 		// Noise can be reduced by turning on TAA.
@@ -2783,6 +2786,7 @@ class SSREffect extends Effect {
 		this._ssrPass.uniforms.eyeFadeEnd = this.eyeFadeEnd;
 		this._ssrPass.uniforms.minGlossiness = this.minGlossiness;
 		this._ssrPass.uniforms.nearZ = gBufferRenderStates.camera.near;
+		this._ssrPass.uniforms.zThicknessThreshold = this.zThicknessThreshold;
 
 		const cameraJitter = composer.$cameraJitter;
 		this._ssrPass.uniforms.jitterOffset = (this.jitter && cameraJitter.accumulating()) ? (cameraJitter.frame() * 0.5 / cameraJitter.totalFrame()) : 0;
@@ -2906,7 +2910,7 @@ const ssrShader = {
 		minGlossiness: 0.2,
 		nearZ: 0.1,
 
-		zThicknessThreshold: 0.1,
+		zThicknessThreshold: 0.5,
 		jitterOffset: 0,
 		viewportSize: [512, 512]
 	},
