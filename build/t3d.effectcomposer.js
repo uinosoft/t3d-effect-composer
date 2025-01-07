@@ -4773,6 +4773,31 @@ vec3 octahedronToUnitVector(vec2 p) {
 			this.layers = [0];
 			this.cameraNear = -1;
 			this.cameraFar = -1;
+			this._supportLogDepth = false;
+			this._renderLogDepth = false;
+			this._logDepthRenderTarget = null;
+			this._logDepthPass = null;
+		}
+
+		// only support webGL2
+		set supportLogDepth(value) {
+			this._supportLogDepth = value;
+			if (!this._logDepthRenderTarget) {
+				this._logDepthRenderTarget = new t3d.RenderTarget2D(this._rt.width, this._rt.height);
+				this._logDepthRenderTarget.attach(this._rt.texture, t3d.ATTACHMENT.COLOR_ATTACHMENT0);
+				const depthTexture = new t3d.Texture2D();
+				setupDepthTexture(depthTexture, true);
+				this._logDepthRenderTarget.attach(depthTexture, t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+
+				// only use this pass to render depth texture
+				this._logDepthPass = new t3d.ShaderPostPass(logDepthShader);
+				this._logDepthPass.material.colorWrite = false;
+				// If depth test is disabled, gl_FragDepthEXT will not work
+				// this._logDepthPass.material.depthTest = false;
+			}
+		}
+		get supportLogDepth() {
+			return this._supportLogDepth;
 		}
 		setIfRenderReplaceFunction(func) {
 			if (func) {
@@ -4806,6 +4831,9 @@ vec3 octahedronToUnitVector(vec2 p) {
 			const renderStates = scene.getRenderStates(camera);
 			const renderQueue = scene.getRenderQueue(camera);
 			const fixedRenderStates = this._getFixedRenderStates(renderStates);
+			const renderLogDepth = this._supportLogDepth && fixedRenderStates.scene.logarithmicDepthBuffer && isPerspectiveMatrix(fixedRenderStates.camera.projectionMatrix);
+			const oldLogDepthState = fixedRenderStates.scene.logarithmicDepthBuffer;
+			fixedRenderStates.scene.logarithmicDepthBuffer = renderLogDepth;
 			enableCameraJitter && cameraJitter.jitterProjectionMatrix(fixedRenderStates.camera, this._rt.width, this._rt.height);
 			renderer.beginRender();
 			const layers = this.layers;
@@ -4815,9 +4843,25 @@ vec3 octahedronToUnitVector(vec2 p) {
 				renderer.renderRenderableList(renderQueueLayer.transparent, fixedRenderStates, renderOptions);
 			}
 			renderer.endRender();
+			fixedRenderStates.scene.logarithmicDepthBuffer = oldLogDepthState; // restore
+
+			if (renderLogDepth) {
+				renderer.setRenderTarget(this._logDepthRenderTarget);
+				renderer.clear(false, true, true);
+				const {
+					near,
+					far
+				} = fixedRenderStates.camera;
+				this._logDepthPass.uniforms.depthTexture = this._rt._attachments[t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
+				this._logDepthPass.uniforms.depthFactors[0] = far / (far - near); // a
+				this._logDepthPass.uniforms.depthFactors[1] = far * near / (near - far); // b
+				this._logDepthPass.uniforms.depthFactors[2] = far; // far
+				this._logDepthPass.render(renderer);
+			}
+			this._renderLogDepth = renderLogDepth;
 		}
 		output() {
-			return this._rt;
+			return this._renderLogDepth ? this._logDepthRenderTarget : this._rt;
 		}
 		getCurrentRenderStates() {
 			return this._fixedRenderStates;
@@ -4825,10 +4869,13 @@ vec3 octahedronToUnitVector(vec2 p) {
 		resize(width, height) {
 			super.resize(width, height);
 			this._rt.resize(width, height);
+			this._logDepthRenderTarget && this._logDepthRenderTarget.resize(width, height);
 		}
 		dispose() {
 			super.dispose();
 			this._rt.dispose();
+			this._logDepthRenderTarget && this._logDepthRenderTarget.dispose();
+			this._logDepthPass && this._logDepthPass.dispose();
 		}
 		_getFixedRenderStates(renderStates) {
 			const output = this._fixedRenderStates;
@@ -4926,6 +4973,9 @@ vec3 octahedronToUnitVector(vec2 p) {
 		}
 		return materialRef.material;
 	}
+	function isPerspectiveMatrix(m) {
+		return m.elements[11] === -1.0;
+	}
 	const gBufferShader = {
 		name: 'ec_gbuffer',
 		defines: {},
@@ -4941,6 +4991,8 @@ vec3 octahedronToUnitVector(vec2 p) {
 				#include <uv_pars_vert>
 		#include <diffuseMap_pars_vert>
 		#include <modelPos_pars_frag>
+		#include <logdepthbuf_pars_vert>
+
 				void main() {
 					#include <uv_vert>
 			#include <diffuseMap_vert>
@@ -4952,6 +5004,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 					#include <normal_vert>
 					#include <pvm_vert>
 			#include <modelPos_vert>
+			#include <logdepthbuf_vert>
 				}
 		`,
 		fragmentShader: `
@@ -4978,6 +5031,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 						uniform sampler2D roughnessMap;
 				#endif
 
+		#include <logdepthbuf_pars_frag>
 		#include <modelPos_pars_frag>
 
 				void main() {
@@ -4986,6 +5040,8 @@ vec3 octahedronToUnitVector(vec2 p) {
 								float alpha = texelColor.a * u_Opacity;
 								if(alpha < u_AlphaTest) discard;
 						#endif
+
+			#include <logdepthbuf_frag>
 
 			#ifdef FLAT_SHADED
 				vec3 fdx = dFdx(v_modelPos);
@@ -5016,6 +5072,31 @@ vec3 octahedronToUnitVector(vec2 p) {
 						gl_FragColor = outputColor;
 				}
 		`
+	};
+	const logDepthShader = {
+		name: 'ec_logdepth',
+		uniforms: {
+			depthTexture: null,
+			depthFactors: [] // a, b, far
+		},
+		vertexShader: defaultVertexShader,
+		fragmentShader: `
+		uniform sampler2D depthTexture;
+		uniform vec3 depthFactors;
+		
+		varying vec2 v_Uv;
+
+		void main() {
+			float logDepth = texture2D(depthTexture, v_Uv).r;
+
+			float depth = pow(2.0, logDepth * log2(depthFactors.z + 1.0));
+			depth = depthFactors.x + depthFactors.y / depth;
+
+			gl_FragDepthEXT = depth;
+
+			gl_FragColor = vec4(0.0);
+		}
+	`
 	};
 
 	class BufferAttachManager {
