@@ -5405,7 +5405,7 @@ function defaultMaterialReplaceFunction$2(renderable) {
 }
 
 function isPerspectiveMatrix(m) {
-	return m.elements[11] === -1.0;
+	return m.elements[11] === -1;
 }
 
 const gBufferShader = {

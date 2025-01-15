@@ -4976,7 +4976,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 		return materialRef.material;
 	}
 	function isPerspectiveMatrix(m) {
-		return m.elements[11] === -1.0;
+		return m.elements[11] === -1;
 	}
 	const gBufferShader = {
 		name: 'ec_gbuffer',

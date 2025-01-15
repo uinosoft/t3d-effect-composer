@@ -27,6 +27,7 @@ import { KHR_materials_pbrSpecularGlossiness } from './extensions/KHR_materials_
 import { KHR_materials_unlit } from './extensions/KHR_materials_unlit.js';
 import { KHR_texture_basisu } from './extensions/KHR_texture_basisu.js';
 import { KHR_texture_transform } from './extensions/KHR_texture_transform.js';
+import { KHR_animation_pointer } from './extensions/KHR_animation_pointer.js';
 
 const DefaultParsePipeline = [
 	IndexParser,
@@ -54,7 +55,8 @@ const DefaultExtensions = new Map([
 	['KHR_materials_unlit', KHR_materials_unlit],
 	['KHR_mesh_quantization', {}], // This is supported by default
 	['KHR_texture_basisu', KHR_texture_basisu],
-	['KHR_texture_transform', KHR_texture_transform]
+	['KHR_texture_transform', KHR_texture_transform],
+	['KHR_animation_pointer', KHR_animation_pointer]
 ]);
 
 export class GLTFLoader {
@@ -70,6 +72,11 @@ export class GLTFLoader {
 		this.autoLogError = true;
 
 		this.extensions = new Map(extensions);
+
+		// Indicate which extensions can be parsed in a uniform way.
+		this.autoParseConfig = {
+			materials: ['KHR_materials_clearcoat', 'KHR_materials_pbrSpecularGlossiness', 'KHR_materials_unlit', 'KHR_materials_transmission', 'KHR_materials_ior', 'KHR_materials_volume', 'KHR_materials_dispersion']
+		};
 
 		this._parsers = parsers.slice(0);
 
