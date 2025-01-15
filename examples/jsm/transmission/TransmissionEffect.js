@@ -62,7 +62,7 @@ const blendShader = {
             vec4 dstTexel = texture2D(dstTex, v_Uv);
             
             vec4 color;
-            color.rgb = srcTexel.rgb + dstTexel.rgb * (1. - srcTexel.a);
+            color.rgb = srcTexel.rgb * srcTexel.a + dstTexel.rgb * (1. - srcTexel.a);
 			color.a = srcTexel.a + dstTexel.a * (1. - srcTexel.a);
 
             gl_FragColor = color;
