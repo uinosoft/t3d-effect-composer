@@ -2164,12 +2164,13 @@ vec3 octahedronToUnitVector(vec2 p) {
 			this.blurSize = 1;
 			this.depthRange = 1;
 			this.jitter = true;
+			this.downScaleLevel = 0;
 			this._blendPass = new t3d.ShaderPostPass(multiplyShader);
 			this._blendPass.material.premultipliedAlpha = true;
 		}
 		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-			const tempRT1 = composer._renderTargetCache.allocate(0);
-			const tempRT2 = composer._renderTargetCache.allocate(0);
+			const tempRT1 = composer._renderTargetCache.allocate(this.downScaleLevel);
+			const tempRT2 = composer._renderTargetCache.allocate(this.downScaleLevel);
 			const gBuffer = composer.getBuffer('GBuffer');
 			const gBufferRenderStates = gBuffer.getCurrentRenderStates();
 			projection$1.copy(gBufferRenderStates.camera.projectionMatrix);
@@ -2247,8 +2248,8 @@ vec3 octahedronToUnitVector(vec2 p) {
 					this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
 				}
 			}
-			composer._renderTargetCache.release(tempRT1, 0);
-			composer._renderTargetCache.release(tempRT2, 0);
+			composer._renderTargetCache.release(tempRT1, this.downScaleLevel);
+			composer._renderTargetCache.release(tempRT2, this.downScaleLevel);
 		}
 		dispose() {
 			this._ssaoPass.dispose();
@@ -2563,6 +2564,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 			this.importanceSampling = false;
 			this.blurSize = 2;
 			this.depthRange = 1;
+			this.downScaleLevel = 0;
 			this.jitter = true;
 			this._copyRGBPass = new t3d.ShaderPostPass(copyRGBShader);
 			this._ssrPass = new t3d.ShaderPostPass(ssrShader);
@@ -2573,8 +2575,8 @@ vec3 octahedronToUnitVector(vec2 p) {
 			this._blendPass.material.premultipliedAlpha = true;
 		}
 		render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-			const tempRT1 = composer._renderTargetCache.allocate(0);
-			const tempRT2 = composer._renderTargetCache.allocate(0);
+			const tempRT1 = composer._renderTargetCache.allocate(this.downScaleLevel);
+			const tempRT2 = composer._renderTargetCache.allocate(this.downScaleLevel);
 			const sceneBuffer = composer.getBuffer('SceneBuffer');
 			const gBuffer = composer.getBuffer('GBuffer');
 			const gBufferRenderStates = gBuffer.getCurrentRenderStates();
@@ -2673,8 +2675,8 @@ vec3 octahedronToUnitVector(vec2 p) {
 					this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
 				}
 			}
-			composer._renderTargetCache.release(tempRT1, 0);
-			composer._renderTargetCache.release(tempRT2, 0);
+			composer._renderTargetCache.release(tempRT1, this.downScaleLevel);
+			composer._renderTargetCache.release(tempRT2, this.downScaleLevel);
 		}
 		dispose() {
 			this._ssrPass.dispose();

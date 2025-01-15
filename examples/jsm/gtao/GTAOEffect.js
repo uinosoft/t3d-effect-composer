@@ -21,13 +21,15 @@ export default class GTAOEffect extends Effect {
 		this.rayMarchSegment = 10;
 		this.darkFactor = 1.;
 
+		this.downScaleLevel = 0;
+
 		this._gtaoPass = new ShaderPostPass(GTAOShader);
 		this._blendPass = new ShaderPostPass(multiplyShader);
 		this._blendPass.material.premultipliedAlpha = true;
 	}
 
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-		const tempRT1 = composer._renderTargetCache.allocate(0);
+		const tempRT1 = composer._renderTargetCache.allocate(this.downScaleLevel);
 
 		const sceneBuffer = composer.getBuffer('SceneBuffer');
 		const gBuffer = composer.getBuffer('GBuffer');
@@ -90,7 +92,7 @@ export default class GTAOEffect extends Effect {
 			}
 		}
 
-		composer._renderTargetCache.release(tempRT1, 0);
+		composer._renderTargetCache.release(tempRT1, this.downScaleLevel);
 	}
 
 	dispose() {

@@ -2286,13 +2286,15 @@ class SSAOEffect extends Effect {
 		this.depthRange = 1;
 		this.jitter = true;
 
+		this.downScaleLevel = 0;
+
 		this._blendPass = new ShaderPostPass(multiplyShader);
 		this._blendPass.material.premultipliedAlpha = true;
 	}
 
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-		const tempRT1 = composer._renderTargetCache.allocate(0);
-		const tempRT2 = composer._renderTargetCache.allocate(0);
+		const tempRT1 = composer._renderTargetCache.allocate(this.downScaleLevel);
+		const tempRT2 = composer._renderTargetCache.allocate(this.downScaleLevel);
 
 		const gBuffer = composer.getBuffer('GBuffer');
 		const gBufferRenderStates = gBuffer.getCurrentRenderStates();
@@ -2387,8 +2389,8 @@ class SSAOEffect extends Effect {
 			}
 		}
 
-		composer._renderTargetCache.release(tempRT1, 0);
-		composer._renderTargetCache.release(tempRT2, 0);
+		composer._renderTargetCache.release(tempRT1, this.downScaleLevel);
+		composer._renderTargetCache.release(tempRT2, this.downScaleLevel);
 	}
 
 	dispose() {
@@ -2729,6 +2731,8 @@ class SSREffect extends Effect {
 		this.blurSize = 2;
 		this.depthRange = 1;
 
+		this.downScaleLevel = 0;
+
 		this.jitter = true;
 
 		this._copyRGBPass = new ShaderPostPass(copyRGBShader);
@@ -2744,8 +2748,8 @@ class SSREffect extends Effect {
 	}
 
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-		const tempRT1 = composer._renderTargetCache.allocate(0);
-		const tempRT2 = composer._renderTargetCache.allocate(0);
+		const tempRT1 = composer._renderTargetCache.allocate(this.downScaleLevel);
+		const tempRT2 = composer._renderTargetCache.allocate(this.downScaleLevel);
 
 		const sceneBuffer = composer.getBuffer('SceneBuffer');
 
@@ -2864,8 +2868,8 @@ class SSREffect extends Effect {
 			}
 		}
 
-		composer._renderTargetCache.release(tempRT1, 0);
-		composer._renderTargetCache.release(tempRT2, 0);
+		composer._renderTargetCache.release(tempRT1, this.downScaleLevel);
+		composer._renderTargetCache.release(tempRT2, this.downScaleLevel);
 	}
 
 	dispose() {
