@@ -78,7 +78,7 @@ export class TransmissionBuffer extends Buffer {
 
 		renderer.setRenderTarget(renderTarget);
 		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, true);
+		renderer.clear(true, false, false);
 
 		const renderStates = scene.getRenderStates(camera);
 		const renderQueue = scene.getRenderQueue(camera);
