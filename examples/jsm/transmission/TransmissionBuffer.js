@@ -26,6 +26,9 @@ export class TransmissionBuffer extends Buffer {
 		this.renderLayers = [
 			{ id: 20, mask: RenderListMask.ALL }
 		];
+		this.sceneRenderLayers = [
+			{ id: 0, mask: RenderListMask.ALL }
+		];
 
 		this._colorTexture = null;
 
@@ -78,7 +81,7 @@ export class TransmissionBuffer extends Buffer {
 
 		renderer.setRenderTarget(renderTarget);
 		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, false, false);
+		renderer.clear(true, true, true);
 
 		const renderStates = scene.getRenderStates(camera);
 		const renderQueue = scene.getRenderQueue(camera);
@@ -88,6 +91,7 @@ export class TransmissionBuffer extends Buffer {
 		renderer.beginRender();
 
 		const renderLayers = this.renderLayers;
+		const sceneRenderLayers = this.sceneRenderLayers;
 		for (let i = 0, l = renderLayers.length; i < l; i++) {
 			const { id, mask } = renderLayers[i];
 			const layer = renderQueue.getLayer(id);
@@ -101,6 +105,18 @@ export class TransmissionBuffer extends Buffer {
 			}
 		}
 
+		for (let i = 0, l = sceneRenderLayers.length; i < l; i++) {
+			const { id, mask } = sceneRenderLayers[i];
+			const layer = renderQueue.getLayer(id);
+			if (layer) {
+				if (layer.opaqueCount > 0 && (mask & RenderListMask.OPAQUE)) {
+					renderer.renderRenderableList(layer.opaque, renderStates);
+				}
+				if (layer.transparentCount > 0 && (mask & RenderListMask.TRANSPARENT)) {
+					renderer.renderRenderableList(layer.transparent, renderStates);
+				}
+			}
+		}
 		renderer.endRender();
 
 		if (useMSAA) {
