@@ -35,8 +35,6 @@
     import { TextureCubeLoader } from 't3d/addons/loaders/TextureCubeLoader.js';
     import { Texture2DLoader } from 't3d/addons/loaders/Texture2DLoader.js';
     import { DefaultEffectComposer } from 't3d-effect-composer';
-    import { TransmissionBuffer } from './jsm/transmission/TransmissionBuffer.js';
-    import { TransmissionEffect } from './jsm/transmission/TransmissionEffect.js';
     import { TransmissionPBRMaterial } from 't3d/addons/materials/TransmissionPBRMaterial.js';
 
     import { GUI } from './libs/lil-gui.esm.min.js';
@@ -62,6 +60,12 @@
 
     const effectComposer = new DefaultEffectComposer(width, height, options);
     effectComposer.getBuffer('SceneBuffer').setOutputEncoding(t3d.TEXEL_ENCODING_TYPE.SRGB);
+    effectComposer.getBuffer('SceneBuffer').setSkipTransmissionRenderFunction(function normalIfRenderFunction(renderable) {
+    	if (renderable.object.effects && renderable.object.effects['skipTransmissionRender']) {
+    		return false;
+    	}
+    	return true;
+    });
     effectComposer.sceneMSAA = true;
 
     const cubeTexture = new TextureCubeLoader().load([
@@ -98,29 +102,21 @@
     controller.target.set(0, 1, 0);
 
     const box = new t3d.BoxGeometry(1, 1, 1);
-    const material2 = new t3d.BasicMaterial();
-    material2.diffuse.setRGB(1, 0, 0);
-    material2.opacity = 0.4;
-    material2.transparent = true;
-    // material2.depthWrite = false;
-    const mesh = new t3d.Mesh(box, material2);
+    const transmissionMaterial = new t3d.BasicMaterial();
+    transmissionMaterial.diffuse.setRGB(1, 0, 0);
+    transmissionMaterial.opacity = 0.4;
+    transmissionMaterial.transparent = true;
+    const mesh = new t3d.Mesh(box, transmissionMaterial);
     mesh.position.set(0, 0, 1);
+    mesh.effects = { skipTransmissionRender: true };
     scene.add(mesh);
-    const box2 = new t3d.BoxGeometry(1, 1, 1);
-    const material3 = new t3d.BasicMaterial();
-    material3.diffuse.setRGB(1, 0, 0);
 
-    const mesh2 = new t3d.Mesh(box2, material3);
+    const opaqueMaterial = new t3d.BasicMaterial();
+    opaqueMaterial.diffuse.setRGB(1, 0, 0);
+    const mesh2 = new t3d.Mesh(box, opaqueMaterial);
     mesh2.position.set(0, 2, 1);
+    mesh2.effects = { skipTransmissionRender: true };
     scene.add(mesh2);
-    const transmissionBuffer = new TransmissionBuffer(width, height, options);
-    effectComposer.addBuffer('TransmissionBuffer', transmissionBuffer);
-    effectComposer._syncAttachments();
-
-    const transmissionEffect = new TransmissionEffect();
-    effectComposer.addEffect('TransmissionEffect', transmissionEffect);
-
-    // load model
 
     let material;
 
@@ -156,12 +152,10 @@
     			material = new TransmissionPBRMaterial(node.material);
 
     			material.uniforms.transmission = 1;
-
     			material.uniforms.thickness = 2.27;
     			material.uniforms.thicknessMap = thicknessMap;
     			material.uniforms.attenuationColor = [246 / 255, 209 / 255, 72 / 255];
     			material.uniforms.attenuationDistance = 0.155;
-
     			material.uniforms.ior = 1.5;
 
     			material.defines.USE_THICKNESSMAP = true;
@@ -179,7 +173,6 @@
     	const gui = new GUI();
     	const basicFolder = gui.addFolder('Basic');
     	basicFolder.addColor(material, 'diffuse');
-    	basicFolder.add(material, 'opacity', 0, 1, 0.01);
     	basicFolder.add(material, 'metalness', 0, 1, 0.01);
     	basicFolder.add(material, 'roughness', 0, 1, 0.01);
     	basicFolder.close();

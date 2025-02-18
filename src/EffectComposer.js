@@ -421,7 +421,7 @@ export default class EffectComposer {
 			const renderQueue = scene.getRenderQueue(camera);
 
 			const sceneBuffer = this._bufferMap.get('SceneBuffer');
-			sceneBuffer.$renderScene(renderer, renderQueue, renderStates);
+			sceneBuffer.$renderScene(renderer, renderQueue, renderStates, target);
 		}
 
 		renderer.setClearColor(...this._tempClearColor); // restore clear color

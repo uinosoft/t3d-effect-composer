@@ -1,4 +1,4 @@
-import { RenderTarget2D, ATTACHMENT } from 't3d';
+import { RenderTarget2D, ATTACHMENT, TEXTURE_FILTER } from 't3d';
 import { isDepthStencilAttachment, RenderListMask } from '../Utils.js';
 import Buffer from './Buffer.js';
 
@@ -11,6 +11,10 @@ export default class SceneBuffer extends Buffer {
 
 		this._rt = new RenderTarget2D(width, height);
 		this._rt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+
+		this._rt_copy = new RenderTarget2D(width, height);
+		this._rt_copy.texture.generateMipmaps = false;
+		this._rt_copy.texture.minFilter = TEXTURE_FILTER.LINEAR;
 
 		this._mrt = new RenderTarget2D(width, height);
 		this._mrt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
@@ -26,6 +30,20 @@ export default class SceneBuffer extends Buffer {
 		];
 
 		this._sceneRenderOptions = {};
+
+		this._transmissionRenderOptions = {
+			getMaterial: renderable => {
+				const colorTexture = this._rt_copy.texture;
+				renderable.material.uniforms.transmissionSamplerMap = colorTexture;
+				renderable.material.uniforms.transmissionSamplerSize[0] = colorTexture.image.width;
+				renderable.material.uniforms.transmissionSamplerSize[1] = colorTexture.image.height;
+				return renderable.material;
+			},
+			ifRender: renderable => {
+				return renderable.material.shaderName === 'TransmissionPBR';
+			}
+		};
+		this._skipTransmissionRenderOptions = {};
 	}
 
 	syncAttachments(colorAttachment, depthAttachment, msColorRenderBuffer, msDepthRenderBuffer) {
@@ -63,6 +81,14 @@ export default class SceneBuffer extends Buffer {
 		}
 	}
 
+	setSkipTransmissionRenderFunction(func) {
+		if (func) {
+			this._skipTransmissionRenderOptions.ifRender = func;
+		} else {
+			delete this._skipTransmissionRenderOptions.ifRender;
+		}
+	}
+
 	setGeometryReplaceFunction(func) {
 		if (func) {
 			this._sceneRenderOptions.getGeometry = func;
@@ -73,6 +99,7 @@ export default class SceneBuffer extends Buffer {
 
 	setOutputEncoding(encoding) {
 		this._rt.texture.encoding = encoding;
+		this._rt_copy.texture.encoding = encoding;
 	}
 
 	getOutputEncoding() {
@@ -103,7 +130,7 @@ export default class SceneBuffer extends Buffer {
 
 		enableCameraJitter && cameraJitter.jitterProjectionMatrix(renderStates.camera, this._rt.width, this._rt.height);
 
-		this.$renderScene(renderer, renderQueue, renderStates);
+		this.$renderScene(renderer, renderQueue, renderStates, this._rt);
 
 		enableCameraJitter && cameraJitter.restoreProjectionMatrix(renderStates.camera);
 
@@ -124,22 +151,31 @@ export default class SceneBuffer extends Buffer {
 		super.resize(width, height);
 		this._rt.resize(width, height);
 		this._mrt.resize(width, height);
+		this._rt_copy.resize(width, height);
 	}
 
 	dispose() {
 		super.dispose();
 		this._rt.dispose();
 		this._mrt.dispose();
+		this._rt_copy.dispose();
 	}
 
-	$renderScene(renderer, renderQueue, renderStates) {
-		const sceneRenderOptions = this._sceneRenderOptions;
+	$renderScene(renderer, renderQueue, renderStates, target) {
+		const transmissionLayer = renderQueue.getLayer(20);
+		const hasTransmission = transmissionLayer && (transmissionLayer.opaqueCount + transmissionLayer.transparentCount) > 0;
+		const sceneRenderOptions = this._sceneRenderOption;
+		const skipTransmissionRenderOptions = this._skipTransmissionRenderOptions;
 
 		renderer.beginRender();
+		if (hasTransmission) {
+			renderer.setRenderTarget(this._rt_copy);
+			renderer.clear(true, true, true);
+		}
 
 		const renderLayers = this.renderLayers;
 		for (let i = 0, l = renderLayers.length; i < l; i++) {
-			const { id, mask, options = sceneRenderOptions } = renderLayers[i];
+			const { id, mask, options = hasTransmission ? skipTransmissionRenderOptions : sceneRenderOptions } = renderLayers[i];
 			const layer = renderQueue.getLayer(id);
 			if (layer) {
 				if (layer.opaqueCount > 0 && (mask & RenderListMask.OPAQUE)) {
@@ -152,6 +188,31 @@ export default class SceneBuffer extends Buffer {
 		}
 
 		renderer.endRender();
+
+		// TODO Transmission layer
+
+		if (hasTransmission) {
+			renderer.setRenderTarget(target);
+			renderer.beginRender();
+
+			renderer.renderRenderableList(transmissionLayer.opaque, renderStates, this._transmissionRenderOptions);
+			renderer.renderRenderableList(transmissionLayer.transparent, renderStates, this._transmissionRenderOptions);
+
+			for (let i = 0, l = renderLayers.length; i < l; i++) {
+				const { id, mask, options = sceneRenderOptions } = renderLayers[i];
+				const layer = renderQueue.getLayer(id);
+				if (layer) {
+					if (layer.opaqueCount > 0 && (mask & RenderListMask.OPAQUE)) {
+						renderer.renderRenderableList(layer.opaque, renderStates, options);
+					}
+					if (layer.transparentCount > 0 && (mask & RenderListMask.TRANSPARENT)) {
+						renderer.renderRenderableList(layer.transparent, renderStates, options);
+					}
+				}
+			}
+
+			renderer.endRender();
+		}
 
 		// TODO Overlay layer
 
