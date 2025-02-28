@@ -66,7 +66,7 @@
     });
 
     const scene = new t3d.Scene();
-    scene.environmentLightIntensity = 1;
+    scene.envDiffuseIntensity = 1;
 
     const cube_texture = new TextureCubeLoader().load([
     	'./resources/cube/BlueSky/posx.jpg',
@@ -142,7 +142,7 @@
     effectComposer.getBuffer('SceneBuffer').setOutputEncoding(t3d.TEXEL_ENCODING_TYPE.GAMMA);
 
     const gui = new GUI();
-    gui.add(scene, 'environmentLightIntensity', 0, 1, 0.01);
+    gui.add(scene, 'envDiffuseIntensity', 0, 1, 0.01);
     gui.add({ glow: 0.5 }, 'glow', 0, 10, 0.01).name('Detail Glow').onChange(value => {
     	scene.children.forEach(child => {
     		if (child.control) {

@@ -87,7 +87,7 @@
     });
 
     const scene = new t3d.Scene();
-    scene.environmentLightIntensity = 1;
+    scene.envDiffuseIntensity = 1;
 
     const cube_texture = new TextureCubeLoader().load([
     	'./resources/cube/BlueSky/posx.jpg',
@@ -196,7 +196,7 @@
     setRenderQuality(isPC() ? 'High' : 'Low');
 
     const gui = new GUI();
-    gui.add(scene, 'environmentLightIntensity', 0, 1, 0.01);
+    gui.add(scene, 'envDiffuseIntensity', 0, 1, 0.01);
     gui.add(ambientLight, 'intensity', 0, 1, 0.01);
     gui.add({ quality: (isPC() ? 'High' : 'Low') }, 'quality', ['Low', 'Medium', 'High']).onChange(setRenderQuality);
 

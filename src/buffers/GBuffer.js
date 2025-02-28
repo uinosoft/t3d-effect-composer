@@ -192,7 +192,15 @@ export default class GBuffer extends Buffer {
 		// copy others
 
 		output.scene = renderStates.scene;
-		output.lights = renderStates.lights;
+
+		// copy lights
+		if (renderStates.lighting) { // for t3d v0.4.x or later
+			output.lighting = renderStates.lighting;
+			output.lights = renderStates.lighting.getGroup(0);
+		} else { // for t3d v0.3.x
+			output.lights = renderStates.lights;
+		}
+
 		output.gammaFactor = renderStates.gammaFactor;
 		output.outputEncoding = renderStates.outputEncoding;
 

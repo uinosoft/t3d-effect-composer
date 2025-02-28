@@ -1,5 +1,7 @@
 import { PIXEL_TYPE, PIXEL_FORMAT, Texture2D, TEXTURE_FILTER, MathUtils, Sphere, Box3, Vector3 } from 't3d';
 
+console.warn('ClusteredLightingManager is deprecated since v0.4.0, use renderer.lightingOptions to enable clustered lighting instead.');
+
 /**
  * ClusteredLightingManager.
  * Supports point and spot lights.
@@ -8,13 +10,13 @@ class ClusteredLightingManager {
 
 	/**
 	 * Constructs a new ClusteredLightingManager.
-	 * @param {Object} [options] - The options.
-	 * @param {Number} [options.maxLights=256] - The maximum number of lights.
-	 * @param {Boolean} [options.floatLights=false] - Whether the lights are stored as floats.
-	 * @param {Number[]} [options.cells=[16, 8, 32]] - The number of cells in each dimension.
-	 * @param {Number} [options.maxLightsPerCell=256] - The maximum number of lights per cell.
-	 * @param {Number} [options.clipNear=-1] - The near clipping plane for the cells.
-	 * @param {Number} [options.clipFar=-1] - The far clipping plane for the cells.
+	 * @param {object} [options] - The options.
+	 * @param {number} [options.maxLights=256] - The maximum number of lights.
+	 * @param {boolean} [options.floatLights=false] - Whether the lights are stored as floats.
+	 * @param {number[]} [options.cells=[16, 8, 32]] - The number of cells in each dimension.
+	 * @param {number} [options.maxLightsPerCell=256] - The maximum number of lights per cell.
+	 * @param {number} [options.clipNear=-1] - The near clipping plane for the cells.
+	 * @param {number} [options.clipFar=-1] - The far clipping plane for the cells.
 	 */
 	constructor({
 		maxLights = 256,
@@ -67,7 +69,7 @@ class ClusteredLightingManager {
 		this.lightsTexture.dispose();
 	}
 
-	update(cameraData, lightData, lightsNeedsUpdate = true) {
+	update(cameraData, lightingGroup, lightsNeedsUpdate = true) {
 		this._updateCellsTransform(cameraData);
 
 		this.cellsTexture.resetLightIndices();
@@ -77,8 +79,8 @@ class ClusteredLightingManager {
 
 		let lightIndicesWritten = false;
 
-		for (let i = 0; i < lightData.pointsNum; i++) {
-			const pointLight = lightData.point[i];
+		for (let i = 0; i < lightingGroup.pointsNum; i++) {
+			const pointLight = lightingGroup.point[i];
 
 			getPointLightBoundingSphere(pointLight, _lightSphere);
 			_lightSphere.center.applyMatrix4(cameraData.viewMatrix);
@@ -90,16 +92,16 @@ class ClusteredLightingManager {
 			}
 		}
 
-		for (let i = 0; i < lightData.spotsNum; i++) {
-			const spotLight = lightData.spot[i];
+		for (let i = 0; i < lightingGroup.spotsNum; i++) {
+			const spotLight = lightingGroup.spot[i];
 
 			getSpotLightBoundingSphere(spotLight, _lightSphere);
 			_lightSphere.center.applyMatrix4(cameraData.viewMatrix);
 			_lightSphere.center.z *= -1;
 
 			if (getCellsRange(_lightSphere, cellsTable, cellsTransform, _cellsRange)) {
-				lightIndicesWritten = this.cellsTexture.setLightIndex(_cellsRange, i + lightData.pointsNum) || lightIndicesWritten;
-				lightsNeedsUpdate && this.lightsTexture.setSpotLight(i + lightData.pointsNum, spotLight);
+				lightIndicesWritten = this.cellsTexture.setLightIndex(_cellsRange, i + lightingGroup.pointsNum) || lightIndicesWritten;
+				lightsNeedsUpdate && this.lightsTexture.setSpotLight(i + lightingGroup.pointsNum, spotLight);
 			}
 		}
 
@@ -246,12 +248,12 @@ class LightsTexture extends Texture2D {
 		this.flipY = false;
 	}
 
-	setPointLight(index, lightData) {
+	setPointLight(index, lightInfo) {
 		const data = this.image.data;
 		const halfFloat = this.type === PIXEL_TYPE.HALF_FLOAT;
 
 		const start = index * LIGHT_STRIDE * 4;
-		const { color, decay, position, distance } = lightData;
+		const { color, decay, position, distance } = lightInfo;
 
 		// pixel 0 - R: lightType, G: -, B: -, A: -
 
@@ -274,12 +276,12 @@ class LightsTexture extends Texture2D {
 		// pixel 3 - R: -, G: -, B: -, A: -
 	}
 
-	setSpotLight(index, lightData) {
+	setSpotLight(index, lightInfo) {
 		const data = this.image.data;
 		const halfFloat = this.type === PIXEL_TYPE.HALF_FLOAT;
 
 		const start = index * LIGHT_STRIDE * 4;
-		const { color, decay, position, distance, direction, coneCos, penumbraCos } = lightData;
+		const { color, decay, position, distance, direction, coneCos, penumbraCos } = lightInfo;
 
 		// pixel 0 - R: lightType, G: penumbraCos, B: -, A: -
 
