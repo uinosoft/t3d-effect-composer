@@ -231,7 +231,7 @@ const fogShader = {
 
 			#ifdef SUN_LIGHT
 				float inscatterFactor = pow(clamp(dot(-normalize(viewDir), -normalize(sunDir)), 0.0, 1.0), fogInscatteringExp);
-				finalFogColor = mix(fogColor, sunColor, clamp(inscatterFactor, 0.0, 1.0));
+				finalFogColor = mix(finalFogColor, sunColor, clamp(inscatterFactor, 0.0, 1.0));
 			#endif
 
 			vec4 finalColor = texture2D(sceneTexture, v_Uv);
