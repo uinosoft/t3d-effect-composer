@@ -9,10 +9,10 @@ export class HeightFogEffect extends Effect {
 		this.fogColor = new Color3(173 / 255, 216 / 255, 230 / 255);
 		this.fogDensity = 1;
 		this.heightFallOff = 0.168;
-		this.fogHeight = 1.7;
+		this.fogHeight = 10;
 		this.fogStartDis = 10;
-		this.fogGradientDis = 50;
-		this.maxOpacity = 0.8;
+		this.fogGradientDis = 20;
+		this.maxOpacity = 1.0;
 
 		this.enableSunLight = false;
 		this.sunDir = new Vector3(0.6, 0.1, 1);
@@ -30,6 +30,8 @@ export class HeightFogEffect extends Effect {
 
 		this._fogPass = new ShaderPostPass(fogShader);
 		this._fogPass.material.premultipliedAlpha = true;
+
+		this.envTexture = null;
 	}
 
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
@@ -75,6 +77,12 @@ export class HeightFogEffect extends Effect {
 			this._fogPass.material.uniforms['flowStrength'] = this.flowStrength;
 		}
 
+		if (this.envTexture != this._fogPass.material.uniforms.envTexture) {
+			this._fogPass.material.uniforms.envTexture = this.envTexture;
+			this._fogPass.material.defines['USE_ENV_MAP'] = this.envTexture !== null;
+			this._fogPass.material.needsUpdate = true;
+		}
+
 		renderer.setRenderTarget(outputRenderTarget);
 		renderer.setClearColor(0, 0, 0, 0);
 		if (finish) {
@@ -107,12 +115,14 @@ const fogShader = {
 	name: 'ec_heightfog',
 	defines: {
 		'SUN_LIGHT': false,
-		'FOG_FLOW': false
+		'FOG_FLOW': false,
+		'USE_ENV_MAP': false
 	},
 	uniforms: {
 		depthTexture: null,
 		sceneTexture: null,
 		noiseTexture: null,
+		envTexture: null,
 
 		cameraPosition: [0, 0, 0],
 		projectionviewInverse: new Float32Array(16),
@@ -134,7 +144,8 @@ const fogShader = {
 		fogInscatteringExp: 12.9,
 
 		flowOffset: [0, 0],
-		flowStrength: 1
+		flowStrength: 1,
+		flowScale: 100.0
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
@@ -142,6 +153,10 @@ const fogShader = {
 
         uniform sampler2D depthTexture;
 		uniform sampler2D sceneTexture;
+
+		#ifdef USE_ENV_MAP
+			uniform samplerCube envTexture;
+		#endif
 
 		uniform vec3 cameraPosition;
 		uniform mat4 projectionviewInverse;
@@ -168,6 +183,7 @@ const fogShader = {
 			uniform sampler2D noiseTexture;
 			uniform vec2 flowOffset;
 			uniform float flowStrength;
+			uniform float flowScale;
 		#endif
 
 		float applyFog(float distance, vec3 rayOri, vec3 rayDir){
@@ -178,7 +194,9 @@ const fogShader = {
 			float opticalThickness = c * expData.x * (1.0 - expData.y) / rayDir.y;
 			float extinction = exp(-opticalThickness);
 			float fogAmount = 1. - extinction;
-			float distanceFactor = clamp(distance / fogGradientDis, 0.0, 1.0);
+			// float distanceFactor = clamp(distance / fogGradientDis, 0.0, 1.0);
+			float distanceFactor = clamp(1.0 - exp(-distance / fogGradientDis), 0.0, 1.0);
+			
 			return fogAmount * distanceFactor;
 		}
 
@@ -201,20 +219,28 @@ const fogShader = {
             float rayLength = length(viewDir);
 	
 			float fog = applyFog(rayLength, cap, -normalize(viewDir));
-			fog = clamp(fog, 0.0, maxOpacity);
-
+			// fog = clamp(fog, 0.0, maxOpacity);
+			fog = fog * maxOpacity;
+	
             vec3 finalFogColor = fogColor;
 
+			#ifdef USE_ENV_MAP
+				vec3 envColor = textureCubeLodEXT(envTexture, -normalize(viewDir), 9.).rgb;
+				finalFogColor = envColor;
+			#endif
+
 			#ifdef SUN_LIGHT
-				float inscatterFactor = pow(clamp(dot(-normalize(viewDir), -normalize(sunDir)) ,0.0, 1.0), fogInscatteringExp);
-                finalFogColor = mix(fogColor, sunColor, clamp(inscatterFactor, 0.0, 1.0));
+				float inscatterFactor = pow(clamp(dot(-normalize(viewDir), -normalize(sunDir)), 0.0, 1.0), fogInscatteringExp);
+				finalFogColor = mix(fogColor, sunColor, clamp(inscatterFactor, 0.0, 1.0));
 			#endif
 
 			vec4 finalColor = texture2D(sceneTexture, v_Uv);
 			
 			#ifdef FOG_FLOW
-				float noise = texture2D(noiseTexture, v_Uv + flowOffset).r;
-				fog = fog * mix(1., noise, flowStrength);
+				if(depthTexel.r < 0.999999){
+					float noise = texture2D(noiseTexture, posWorld.xz / flowScale + flowOffset).r;
+					fog = fog * mix(1., noise, flowStrength);
+				}
 			#endif
 			
 			finalColor.rgb = mix(finalColor.rgb, finalFogColor, fog);

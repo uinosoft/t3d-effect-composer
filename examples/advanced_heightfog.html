@@ -113,12 +113,12 @@
 	effectComposer.getBuffer('SceneBuffer').setOutputEncoding(t3d.TEXEL_ENCODING_TYPE.GAMMA);
 	effectComposer.sceneMSAA = true;
 
-	const texture = new Texture2DLoader().load('./resources/noise.png');
+	const texture = new Texture2DLoader().load('./resources/noise.jpg');
 	texture.wrapS = texture.wrapT = t3d.TEXTURE_WRAP.REPEAT;
 
 	const fogEffect = new HeightFogEffect();
 	fogEffect.fogDensity = 0.2;
-	// fogEffect.enableFlow = true;
+	fogEffect.envTexture = cube_texture;
 	fogEffect.noiseTexture = texture;
 	fogEffect.flowStrength = 0.4;
 
@@ -136,6 +136,9 @@
 	fogEffectFolder.add(fogEffect, 'fogStartDis', 0, 100, 0.01);
 	fogEffectFolder.add(fogEffect, 'fogGradientDis', 0, 100, 0.1);
 	fogEffectFolder.add(fogEffect, 'maxOpacity', 0, 1, 0.01);
+	fogEffectFolder.add({ useEnvMap: true }, 'useEnvMap').onChange(value => {
+		fogEffect.envTexture = value ? cube_texture : null;
+	});
 	const fogFlowFolder = gui.addFolder('Fog Flow');
 	fogFlowFolder.add(fogEffect, 'enableFlow');
 	fogFlowFolder.add(fogEffect.flowSpeed, 'x', -4, 4, 0.01).name('flowX');
@@ -150,6 +153,7 @@
 	sunLightFolder.add(spherical, 'phi', 0, Math.PI).onChange(setSunDir);
 	sunLightFolder.add(spherical, 'theta', 0, Math.PI * 2).onChange(setSunDir);
 	sunLightFolder.close();
+	
 
 	const stats = new Stats();
 	stats.dom.style.cssText =
