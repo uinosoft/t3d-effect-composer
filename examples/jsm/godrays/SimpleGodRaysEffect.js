@@ -156,7 +156,6 @@ const radialBlurShader = {
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
         uniform sampler2D tDiffuse;
-        uniform int samples;
 
         uniform vec3 sunDir;
         
