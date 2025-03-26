@@ -161,14 +161,12 @@ const thicknessShader = {
         #include <skinning_pars_vert>
         #include <normal_pars_vert>
         #include <uv_pars_vert>
-		#include <logdepthbuf_pars_vert>
         void main() {
         	#include <uv_vert>
         	#include <begin_vert>
         	#include <morphtarget_vert>
         	#include <morphnormal_vert>
         	#include <pvm_vert>
-			#include <logdepthbuf_vert>
         }
     `,
 	fragmentShader: `
@@ -177,8 +175,6 @@ const thicknessShader = {
 
         #include <packing>
         #include <normal_pars_frag>
-
-		#include <logdepthbuf_pars_frag>
 
         uniform int volumeid;
 
@@ -192,7 +188,6 @@ const thicknessShader = {
 		}
 
         void main() {
-			#include <logdepthbuf_frag>
             gl_FragColor = vec4(encodeID(volumeid), 0., 1.);
         }
     `
