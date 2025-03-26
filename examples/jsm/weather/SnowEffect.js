@@ -11,7 +11,6 @@ export default class SnowEffect extends Effect {
 		this.angle = 0;
 		this.density = 1;
 		this.strength = 1;
-		this.cover = 1;
 		this.color = new Color3(1, 1, 1);
 		this.fxaa = true;
 
@@ -24,14 +23,54 @@ export default class SnowEffect extends Effect {
 		this._fxaaPass = new ShaderPostPass(fxaaShader);
 		this._snowMixPass = new ShaderPostPass(snowMixShader);
 
-		this._renderCover = false;
+		this._volumeId = 0;
+		this._cover = 1;
+	}
+
+	set cover(value) {
+		const oldValue = this._cover;
+
+		this._cover = value;
+
+		if ((oldValue == 0) !== (value == 0)) {
+			this._setBufferDependencies();
+		}
+	}
+
+	get cover() {
+		return this._cover;
+	}
+
+	set volumeId(value) {
+		const oldValue = this._volumeId;
+
+		this._volumeId = value;
+
+		if (oldValue > 0 !== value > 0) {
+			this._setBufferDependencies();
+			this._snowCoverPass.material.defines.USE_VOLUME = value > 0;
+			this._snowCoverPass.material.needsUpdate = true;
+		}
+	}
+
+	get volumeId() {
+		return this._volumeId;
+	}
+
+	_setBufferDependencies() {
+		this.bufferDependencies.length = 0;
+		if (this._cover != 0) {
+			this.bufferDependencies.push({ key: 'GBuffer' });
+			if (this._volumeId > 0) {
+				this.bufferDependencies.push({ key: 'ThicknessBuffer' });
+			}
+		}
 	}
 
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
 		const tempRT1 = composer._renderTargetCache.allocate(0);
 		const tempRT2 = composer._renderTargetCache.allocate(0);
 		const tempRT3 = composer._renderTargetCache.allocate(0);
-		const gBuffer = composer.getBuffer('GBuffer');
 
 		// Render snow pass
 
@@ -53,36 +92,44 @@ export default class SnowEffect extends Effect {
 		// Render snow cover pass
 
 		renderer.setRenderTarget(tempRT2);
-		renderer.setClearColor(1, 1, 1, 1);
+		renderer.setClearColor(this._cover !== 0 ? 1 : 0, 1, 1, 1);
 		renderer.clear(true, true, false);
 
-		this._snowCoverPass.uniforms.normalTexture = gBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
-		this._snowCoverPass.uniforms.cover = this.cover;
+		let useRT3 = false;
 
-		this._snowCoverPass.render(renderer);
+		if (this._cover != 0) {
+			const gBuffer = composer.getBuffer('GBuffer');
+			this._snowCoverPass.uniforms.normalTexture = gBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
+			this._snowCoverPass.uniforms.cover = this._cover;
 
-		// (Optional) Render fxaa pass
+			if (this._volumeId > 0) {
+				const thicknessBuffer = composer.getBuffer('ThicknessBuffer');
+				this._snowCoverPass.uniforms.volumeId = this._volumeId;
+				this._snowCoverPass.uniforms.idTex = thicknessBuffer.output()[1]._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
+				this._snowCoverPass.uniforms.frontDepthTex = thicknessBuffer.output()[0]._attachments[ATTACHMENT.DEPTH_ATTACHMENT];
+				this._snowCoverPass.uniforms.backDepthTex = thicknessBuffer.output()[1]._attachments[ATTACHMENT.DEPTH_ATTACHMENT];
+				this._snowCoverPass.uniforms.depthTex = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
+			}
 
-		if (this.fxaa) 		{
-			renderer.setRenderTarget(tempRT3);
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, true, true);
+			this._snowCoverPass.render(renderer);
 
-			this._fxaaPass.uniforms.resolution[0] = 1 / gBuffer.output().width;
-			this._fxaaPass.uniforms.resolution[1] = 1 / gBuffer.output().height;
-			this._fxaaPass.uniforms.tDiffuse = tempRT2.texture;
-			this._fxaaPass.render(renderer);
+			// (Optional) Render fxaa pass
+
+			if (this.fxaa) 		{
+				renderer.setRenderTarget(tempRT3);
+				renderer.setClearColor(0, 0, 0, 0);
+				renderer.clear(true, true, true);
+
+				this._fxaaPass.uniforms.resolution[0] = 1 / tempRT2.width;
+				this._fxaaPass.uniforms.resolution[1] = 1 / tempRT2.height;
+				this._fxaaPass.uniforms.tDiffuse = tempRT2.texture;
+				this._fxaaPass.render(renderer);
+
+				useRT3 = true;
+			}
 		}
 
 		// Render snow mix pass
-
-		if (this.cover != 0) {
-			this.bufferDependencies = [
-				{ key: 'GBuffer' }
-			];
-		} else {
-			this.bufferDependencies = [];
-		}
 
 		renderer.setRenderTarget(outputRenderTarget);
 		renderer.setClearColor(0, 0, 0, 0);
@@ -92,7 +139,7 @@ export default class SnowEffect extends Effect {
 			renderer.clear(true, true, false);
 		}
 		this._snowMixPass.uniforms.texture1 = inputRenderTarget.texture;
-		this._snowMixPass.uniforms.texture2 = this.fxaa ? tempRT3.texture : tempRT2.texture;
+		this._snowMixPass.uniforms.texture2 = useRT3 ? tempRT3.texture : tempRT2.texture;
 		this._snowMixPass.uniforms.texture3 = tempRT1.texture;
 		this.color.toArray(this._snowMixPass.uniforms.uColor);
 
@@ -178,22 +225,61 @@ const snowShader = {
 
 const snowCoverShader = {
 	name: 'ec_snow_cover',
-	defines: {},
+	defines: {
+		USE_VOLUME: false
+	},
 	uniforms: {
 		normalTexture: null,
-		cover: 1.0
+		cover: 1.0,
+		volumeId: 1,
+		depthTex: null,
+		idTex: null,
+		backDepthTex: null,
+		frontDepthTex: null
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
 		uniform sampler2D normalTexture;
+
 		uniform float cover;
+
+		#ifdef USE_VOLUME
+			uniform int volumeId;
+			uniform sampler2D depthTex;
+			uniform sampler2D idTex;
+			uniform sampler2D backDepthTex;
+			uniform sampler2D frontDepthTex;
+
+			int decodeID(vec2 encodedID) {
+				int high = int(encodedID.x * 255.0);
+				int low = int(encodedID.y * 255.0);
+				return high * 256 + low;
+			}
+		#endif
+
 		varying vec2 v_Uv;
 
 		${octahedronToUnitVectorGLSL}
 
 		void main() {
 			vec3 normal = octahedronToUnitVector(texture2D(normalTexture, v_Uv).rg);
-			float coverDensity = step(0.1, normal.y) * normal.y;
+			float coverDensity = max(0.0, normal.y) * step(0.1, normal.y);
+
+			#ifdef USE_VOLUME
+				float depth = texture2D(depthTex, v_Uv).r;
+				vec2 texId = texture2D(idTex, v_Uv).rg;
+				float backDepth = texture2D(backDepthTex, v_Uv).r;
+				float frontDepth = texture2D(frontDepthTex, v_Uv).r;
+				
+				// Combine all conditions into a single multiplier
+				float volumeMask = 
+					float(volumeId == decodeID(texId)) * 
+					float(depth >= frontDepth) * 
+					float(depth <= backDepth);
+				
+				coverDensity *= volumeMask;
+			#endif
+			
 			gl_FragColor = vec4(vec3(coverDensity * cover), 1.0);
 		}
 	`

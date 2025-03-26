@@ -42,6 +42,7 @@
 	import { TextureCubeLoader } from 't3d/addons/loaders/TextureCubeLoader.js';
 
 	import { DefaultEffectComposer } from 't3d-effect-composer';
+	import ThicknessBuffer from './jsm/volume/ThicknessBuffer.js';
 	import SnowEffect from './jsm/weather/SnowEffect.js';
 	import { Inspector } from './jsm/Inspector.js';
 
@@ -63,16 +64,30 @@
 
 	const shadowMapPass = new t3d.ShadowMapPass();
 
-	const effectComposer = new DefaultEffectComposer(width, height, {
+	const composerOptions = {
 		samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
 		webgl2: renderer.capabilities.version > 1
-	});
+	};
+	const effectComposer = new DefaultEffectComposer(width, height, composerOptions);
 	effectComposer.sceneMSAA = true;
+	effectComposer.getBuffer('GBuffer').setIfRenderReplaceFunction(function(renderable) {
+		if (renderable.object.effects && renderable.object.effects['volume']) {
+			return false;
+		}
+		return true;
+	});
+
+	const snowEffect = new SnowEffect();
+	effectComposer.addEffect('snow', snowEffect, 99);
+
+	const thicknessBuffer = new ThicknessBuffer(width, height, composerOptions);
+	thicknessBuffer.layers = [5];
+	effectComposer.addBuffer('ThicknessBuffer', thicknessBuffer);
 
 	const scene = new t3d.Scene();
 	scene.envDiffuseIntensity = 1;
 
-	const cube_texture = new TextureCubeLoader().load([
+	const cubeTexture = new TextureCubeLoader().load([
 		'./resources/cube/BlueSky/posx.jpg',
 		'./resources/cube/BlueSky/negx.jpg',
 		'./resources/cube/BlueSky/posy.jpg',
@@ -80,9 +95,38 @@
 		'./resources/cube/BlueSky/posz.jpg',
 		'./resources/cube/BlueSky/negz.jpg'
 	]);
-	scene.environment = cube_texture;
+	scene.environment = cubeTexture;
 
-	const sky_box = new SkyBox(cube_texture);
+	const skyBox = new SkyBox(cubeTexture);
+	scene.add(skyBox);
+
+	const ambientLight = new t3d.AmbientLight(0xffffff, 0.2);
+	scene.add(ambientLight);
+
+	const directionalLight = new t3d.DirectionalLight(0xffffff, 1.5);
+	directionalLight.position.set(-180, 180, -180);
+	directionalLight.lookAt(new t3d.Vector3(), new t3d.Vector3(0, 1, 0));
+	directionalLight.shadow.windowSize = 50;
+	directionalLight.shadow.bias = -0.0007;
+	directionalLight.shadow.cameraNear = 1;
+	directionalLight.shadow.cameraFar = 500;
+	directionalLight.shadow.mapSize.set(1024, 1024);
+	directionalLight.castShadow = true;
+	scene.add(directionalLight);
+
+	const camera = new t3d.Camera();
+	camera.position.set(30, 20, 30);
+	camera.lookAt(new t3d.Vector3(0, 0, 0), new t3d.Vector3(0, 1, 0));
+	camera.setPerspective(30 / 180 * Math.PI, width / height, 1, 1000);
+	scene.add(camera);
+
+	camera.gammaFactor = 2;
+	camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.GAMMA;
+	effectComposer.getBuffer('SceneBuffer').setOutputEncoding(t3d.TEXEL_ENCODING_TYPE.GAMMA);
+
+	const controller = new OrbitControls(camera, canvas);
+
+	// scene
 
 	const loader = new GLTFLoader();
 	console.time('GLTFLoader');
@@ -103,44 +147,28 @@
 		scene.add(object);
 	});
 
-	const ambientLight = new t3d.AmbientLight(0xffffff, 0.2);
-	scene.add(ambientLight);
+	const clipMesh = new t3d.Mesh(new t3d.BoxGeometry(15, 15, 15), new t3d.BasicMaterial());
+	clipMesh.effects = { volume: 1 };
+	clipMesh.renderLayer = 5;
+	scene.add(clipMesh);
 
-	const directionalLight = new t3d.DirectionalLight(0xffffff, 1.5);
-	directionalLight.position.set(-180, 180, -180);
-	directionalLight.lookAt(new t3d.Vector3(), new t3d.Vector3(0, 1, 0));
-	directionalLight.shadow.windowSize = 50;
-	directionalLight.shadow.bias = -0.0007;
-	directionalLight.shadow.cameraNear = 1;
-	directionalLight.shadow.cameraFar = 500;
-	directionalLight.shadow.mapSize.set(1024, 1024);
-	directionalLight.castShadow = true;
-	scene.add(directionalLight);
-
-	const camera = new t3d.Camera();
-	camera.position.set(30, 20, 30);
-	camera.lookAt(new t3d.Vector3(0, 0, 0), new t3d.Vector3(0, 1, 0));
-	camera.setPerspective(30 / 180 * Math.PI, width / height, 1, 1000);
-	camera.add(sky_box);
-	scene.add(camera);
-
-	camera.gammaFactor = 2;
-	camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.GAMMA;
-	effectComposer.getBuffer('SceneBuffer').setOutputEncoding(t3d.TEXEL_ENCODING_TYPE.GAMMA);
-
-	const snowEffect = new SnowEffect();
-	effectComposer.addEffect('snow', snowEffect, 99);
+	// gui
 
 	const gui = new GUI();
 	gui.add(snowEffect, 'active');
-	gui.add(snowEffect, 'fxaa');
-	gui.addColor(snowEffect, 'color');
-	gui.add(snowEffect, 'cover', 0, 1, 0.01);
 	gui.add(snowEffect, 'size', 0, 5, 0.1);
 	gui.add(snowEffect, 'speed', 0, 10, 0.1);
 	gui.add(snowEffect, 'angle', -60, 60, 1);
 	gui.add(snowEffect, 'density', 0, 5, 0.1);
 	gui.add(snowEffect, 'strength', 0, 1, 0.1);
+
+	const coverFolder = gui.addFolder('Snow Cover');
+	coverFolder.add(snowEffect, 'cover', 0, 1, 0.01);
+	coverFolder.addColor(snowEffect, 'color');
+	coverFolder.add(snowEffect, 'fxaa');
+	coverFolder.add({ volumeClip: false }, 'volumeClip').name('Volume Clip').onChange(value => {
+		snowEffect.volumeId = value ? 1 : 0;
+	});
 
 	const stats = new Stats();
 	stats.dom.style.cssText = 'position:fixed;bottom:0;left:0;cursor:pointer;opacity:0.9;z-index:10000';
@@ -160,7 +188,7 @@
 		}
 	});
 
-	const controller = new OrbitControls(camera, canvas);
+	//
 
 	function loop(count) {
 		requestAnimationFrame(loop);
@@ -171,7 +199,7 @@
 
 		scene.updateMatrix();
 		scene.updateRenderStates(camera);
-		scene.updateRenderQueue(camera).getLayer(0);
+		scene.updateRenderQueue(camera);
 
 		shadowMapPass.render(renderer, scene);
 
