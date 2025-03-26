@@ -81,7 +81,7 @@ export default class VolumeEffect extends Effect {
 		gBufferRenderStates.camera.position.toArray(mainPass.material.uniforms.cameraPos);
 
 		mainPass.material.uniforms.volumeid = this.volumeId;
-		mainPass.material.uniforms.idTex = thicknessBuffer.output()[0]._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
+		mainPass.material.uniforms.idTex = thicknessBuffer.output()[1]._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 		mainPass.material.uniforms.frontDepthTex = thicknessBuffer.output()[0]._attachments[ATTACHMENT.DEPTH_ATTACHMENT];
 		mainPass.material.uniforms.backDepthTex = thicknessBuffer.output()[1]._attachments[ATTACHMENT.DEPTH_ATTACHMENT];
 		mainPass.material.uniforms.diffuseTex = inputRenderTarget.texture;
