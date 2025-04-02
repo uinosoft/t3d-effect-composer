@@ -180,45 +180,50 @@ const snowShader = {
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
-		varying vec2 v_Uv;
 		uniform float time;
 		uniform float size;
 		uniform float angle;
 		uniform float density;
 		uniform float strength;
 		uniform vec2 viewportSize;
-		float snow(vec2 uv,float scale) {
-			float time1 = time ;
-			float w = smoothstep(1.,0.,-uv.y * (scale/10.));if(w < .1)return 0.;
-			uv += time1/scale;
-			uv.y += time1 * 2. / scale;uv.x += sin(uv.y + time1*.5) / scale;
+
+		varying vec2 v_Uv;
+
+		float snow(vec2 uv, float scale) {
+			uv += time / scale;
+			uv.y += time * 2. / scale;
+			uv.x += sin(uv.y + time * .5) / scale;
 			uv *= scale;
-			vec2 s = floor(uv),f = fract(uv),p;float k = 3.,d;
-			p = .5+.35 * sin(11. * fract(sin((s + p + scale) * mat2(7,3,6,5)) * 5.)) - f;
+			vec2 s = floor(uv), f = fract(uv), p;
+			float k = 3., d;
+			p = .5 + .35 * sin(11. * fract(sin((s + p + scale) * mat2(7, 3, 6, 5)) * 5.)) - f;
 			d = length(p) / size;
-			k = min(d,k);
-			k = smoothstep(0.,k,sin(f.x+f.y)*density/400.);
-			return k * w;
+			k = min(d, k);
+			k = smoothstep(0., k, sin(f.x + f.y) * density / 400.);
+			return k;
 		}
+
 		void main(void) {
-			float a =  angle / 180. * 3.141592;
+			float a =  angle / 180. * PI;
 			float si = sin(a), co = cos(a);
+
 			vec2 uv = v_Uv;
+			uv = (uv - 0.5);
 			uv.x = uv.x * viewportSize.x / 1024.;
 			uv.y = uv.y * viewportSize.y / 1024.;
 			uv *= mat2(co, -si, si, co);
 			uv *= density;
-			vec3 finalColor = vec3(0);
+
 			float c = 0.;
-			c += snow(uv,30.)*.0;
-			c += snow(uv,20.)*.0;
-			c += snow(uv,15.)*.0;
-			c += snow(uv,10.);
-			c += snow(uv,8.);
-			c += snow(uv,6.);
-			c += snow(uv,5.);
-			finalColor = (vec3(c));
-			gl_FragColor = vec4(finalColor * strength, 1.);
+			c += snow(uv, 30.);
+			c += snow(uv, 20.);
+			c += snow(uv, 15.);
+			c += snow(uv, 10.);
+			c += snow(uv, 8.);
+			c += snow(uv, 6.);
+			c += snow(uv, 5.);
+
+			gl_FragColor = vec4(vec3(c) * strength, 1.);
 		}
 	`
 };
@@ -272,9 +277,9 @@ const snowCoverShader = {
 				float frontDepth = texture2D(frontDepthTex, v_Uv).r;
 				
 				// Combine all conditions into a single multiplier
-				float volumeMask = 
-					float(volumeId == decodeID(texId)) * 
-					float(depth >= frontDepth) * 
+				float volumeMask =
+					float(volumeId == decodeID(texId)) *
+					float((frontDepth > backDepth) || (depth >= frontDepth)) *
 					float(depth <= backDepth);
 				
 				coverDensity *= volumeMask;
