@@ -1,4 +1,4 @@
-import { ShaderPostPass, ATTACHMENT, Color3 } from 't3d';
+import { ShaderPostPass, ATTACHMENT, Color3, Matrix4 } from 't3d';
 import { Effect, defaultVertexShader, octahedronToUnitVectorGLSL, fxaaShader } from 't3d-effect-composer';
 
 export default class SnowEffect extends Effect {
@@ -13,6 +13,8 @@ export default class SnowEffect extends Effect {
 		this.strength = 1;
 		this.color = new Color3(1, 1, 1);
 		this.fxaa = true;
+		this.coverNoise = 0;
+		this.coverNoiseScale = 1;
 
 		this.bufferDependencies = [
 			{ key: 'GBuffer' }
@@ -102,12 +104,28 @@ export default class SnowEffect extends Effect {
 			this._snowCoverPass.uniforms.normalTexture = gBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			this._snowCoverPass.uniforms.cover = this._cover;
 
+			if (this._snowCoverPass.material.defines['USE_NOISE'] !== (this.coverNoise > 0)) {
+				this._snowCoverPass.material.defines['USE_NOISE'] = this.coverNoise > 0;
+				this._snowCoverPass.material.needsUpdate = true;
+			}
+
+			if (this.coverNoise > 0) {
+				this._snowCoverPass.uniforms.noiseScale = this.coverNoiseScale;
+				this._snowCoverPass.uniforms.noiseStrength = this.coverNoise;
+				const gBufferRenderStates = gBuffer.getCurrentRenderStates();
+				projectionViewInverse.copy(gBufferRenderStates.camera.projectionViewMatrix).inverse();
+				projectionViewInverse.toArray(this._snowCoverPass.uniforms.projectionViewInverse);
+			}
+
 			if (this._volumeId > 0) {
 				const thicknessBuffer = composer.getBuffer('ThicknessBuffer');
 				this._snowCoverPass.uniforms.volumeId = this._volumeId;
 				this._snowCoverPass.uniforms.idTex = thicknessBuffer.output()[1]._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 				this._snowCoverPass.uniforms.frontDepthTex = thicknessBuffer.output()[0]._attachments[ATTACHMENT.DEPTH_ATTACHMENT];
 				this._snowCoverPass.uniforms.backDepthTex = thicknessBuffer.output()[1]._attachments[ATTACHMENT.DEPTH_ATTACHMENT];
+			}
+
+			if (this.coverNoise > 0 || this._volumeId > 0) {
 				this._snowCoverPass.uniforms.depthTex = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
 			}
 
@@ -166,6 +184,8 @@ export default class SnowEffect extends Effect {
 	}
 
 }
+
+const projectionViewInverse = new Matrix4();
 
 const snowShader = {
 	name: 'ec_snow',
@@ -231,7 +251,8 @@ const snowShader = {
 const snowCoverShader = {
 	name: 'ec_snow_cover',
 	defines: {
-		USE_VOLUME: false
+		USE_VOLUME: false,
+		USE_NOISE: false
 	},
 	uniforms: {
 		normalTexture: null,
@@ -240,17 +261,28 @@ const snowCoverShader = {
 		depthTex: null,
 		idTex: null,
 		backDepthTex: null,
-		frontDepthTex: null
+		frontDepthTex: null,
+		noiseScale: 1,
+		noiseStrength: 1.0,
+		projectionViewInverse: new Float32Array(16)
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
 		uniform sampler2D normalTexture;
-
 		uniform float cover;
+
+		#if defined(USE_NOISE) || defined(USE_VOLUME)
+			uniform sampler2D depthTex;
+		#endif
+
+		#ifdef USE_NOISE
+			uniform float noiseScale;
+			uniform float noiseStrength;
+			uniform mat4 projectionViewInverse;
+		#endif
 
 		#ifdef USE_VOLUME
 			uniform int volumeId;
-			uniform sampler2D depthTex;
 			uniform sampler2D idTex;
 			uniform sampler2D backDepthTex;
 			uniform sampler2D frontDepthTex;
@@ -264,14 +296,57 @@ const snowCoverShader = {
 
 		varying vec2 v_Uv;
 
+		#ifdef USE_NOISE
+			const float cHashM = 43758.54;
+			vec2 Hashv2v2 (vec2 p) {
+				vec2 cHashVA2 = vec2(37., 39.);
+				return fract(sin(vec2(dot(p, cHashVA2), dot(p + vec2(1., 0.), cHashVA2))) * cHashM);
+			}
+
+			float Noisefv2(vec2 p) {
+				vec2 t, ip, fp;
+				ip = floor(p);  
+				fp = fract(p);
+				fp = fp * fp * (3. - 2. * fp);
+				t = mix(Hashv2v2(ip), Hashv2v2(ip + vec2(0., 1.)), fp.y);
+				return mix(t.x, t.y, fp.x);
+			}
+
+			float Fbmn(vec3 p, vec3 n){
+				vec3 s;
+				float a;
+				s = vec3(0.);
+				a = 1.;
+				for (int j = 0; j < 5; j ++) {
+					s += a * vec3(Noisefv2(p.yz), Noisefv2(p.zx), Noisefv2(p.xy));
+					a *= 0.5;
+					p *= 2.;
+				}
+				return dot(s, abs(n));
+			}
+		#endif
+
 		${octahedronToUnitVectorGLSL}
 
 		void main() {
 			vec3 normal = octahedronToUnitVector(texture2D(normalTexture, v_Uv).rg);
+
+			#if defined(USE_NOISE) || defined(USE_VOLUME)
+				float depth = texture2D(depthTex, v_Uv).r;
+			#endif
+
 			float coverDensity = max(0.0, normal.y) * step(0.1, normal.y);
 
+			#ifdef USE_NOISE
+				vec4 projectedPos = vec4(v_Uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+				vec4 pos = projectionViewInverse * projectedPos;
+				vec3 posWorld = pos.xyz / pos.w / noiseScale;
+				float noise = Fbmn(posWorld, normal);
+				noise = mix(1.0, noise, noiseStrength);
+				coverDensity *= noise;
+			#endif
+
 			#ifdef USE_VOLUME
-				float depth = texture2D(depthTex, v_Uv).r;
 				vec2 texId = texture2D(idTex, v_Uv).rg;
 				float backDepth = texture2D(backDepthTex, v_Uv).r;
 				float frontDepth = texture2D(frontDepthTex, v_Uv).r;
