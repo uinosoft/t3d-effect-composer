@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>t3d-effect Transmission</title>
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <link type="text/css" rel="stylesheet" href="main.css">
+</head>
+
+<body>
+    <div id="info">Transmission Effect</div>
+</body>
+
+<!-- Import maps polyfill -->
+<!-- Remove this when import maps will be widely supported -->
+<script async src="./libs/es-module-shims.js"></script>
+<script src="./libs/nanobar.min.js"></script>
+
+<script type="importmap">
+    {
+        "imports": {
+            "t3d": "./libs/t3d/build/t3d.module.js",
+            "t3d/addons/": "./libs/t3d/examples/jsm/",
+            "t3d-effect-composer": "../build/t3d.effectcomposer.module.js"
+        }
+    }
+</script>
+
+<script type="module">
+    import * as t3d from 't3d';
+    import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
+    import { SkyBox } from 't3d/addons/objects/SkyBox.js';
+    import { Texture2DLoader } from 't3d/addons/loaders/Texture2DLoader.js';
+    import { EnvTextureCubeLoader } from 't3d/addons/loaders/EnvLoader.js';
+    import { DefaultEffectComposer } from 't3d-effect-composer';
+    import { TransmissionPBRMaterial } from 't3d/addons/materials/TransmissionPBRMaterial.js';
+    import { BitmapTextGeometry } from 't3d/addons/geometries/BitmapTextGeometry.js';
+    import { DynamicFont } from 't3d/addons/DynamicFont.js';
+    import { SDFTextShader } from 't3d/addons/shaders/SDFTextShader.js';
+    import { GUI } from './libs/lil-gui.esm.min.js';
+    import Stats from './libs/stats.module.js';
+
+    let width = window.innerWidth || 2;
+    let height = window.innerHeight || 2;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    document.body.appendChild(canvas);
+
+    const contextParams = { antialias: true, alpha: false, stencil: true };
+    const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
+    const renderer = new t3d.WebGLRenderer(gl);
+    renderer.setClearColor(0, 0, 0, 1);
+    const backRenderTarget = new t3d.RenderTargetBack(canvas);
+    const shadowMapPass = new t3d.ShadowMapPass();
+
+    const effectComposer = new DefaultEffectComposer(width, height, {
+    	samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
+    	webgl2: renderer.capabilities.version > 1,
+    	bufferMipmaps: true,
+    	highDynamicRange: false
+    });
+    effectComposer.sceneMSAA = true;
+
+    const sceneBuffer = effectComposer.getBuffer('SceneBuffer');
+    sceneBuffer.setOutputEncoding(t3d.TEXEL_ENCODING_TYPE.SRGB);
+    sceneBuffer.postRenderLayers.transmission.id = 20;
+    sceneBuffer.postRenderLayers.postTransmission.id = 21;
+
+    const envTextureLoader = new EnvTextureCubeLoader();
+    envTextureLoader.setRenderer(renderer);
+    const envMap = envTextureLoader.load('./resources/sky_hdr/Footprint_Court.env');
+
+    const scene = new t3d.Scene();
+    scene.environment = envMap;
+
+    const skyBox = new SkyBox(envMap);
+    skyBox.gamma = true;
+    scene.add(skyBox);
+
+    const directionalLight = new t3d.DirectionalLight(0xffffff, 1);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.windowSize = 30;
+    directionalLight.shadow.mapSize.set(512, 512);
+    directionalLight.shadow.bias = -0.001;
+    directionalLight.shadow.normalBias = 0.2;
+    directionalLight.shadow.cameraNear = 10;
+    directionalLight.position.set(20, 20, 30);
+    directionalLight.lookAt(new t3d.Vector3(), new t3d.Vector3(0, 1, 0));
+    scene.add(directionalLight);
+
+    const camera = new t3d.Camera();
+    camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.SRGB;
+    camera.position.set(-3, 2, 15);
+    camera.setPerspective(45 / 180 * Math.PI, width / height, 1, 5000);
+    scene.add(camera);
+
+    const controller = new OrbitControls(camera, canvas);
+
+    // create ground
+
+    const textureLoader = new Texture2DLoader();
+    textureLoader.loadAsync('./resources/SlateFloorTile/BaseColor.jpg').then(diffuseMap => {
+    	diffuseMap.wrapS = diffuseMap.wrapT = t3d.TEXTURE_WRAP.REPEAT;
+    	diffuseMap.encoding = t3d.TEXEL_ENCODING_TYPE.SRGB;
+    	diffuseMap.anisotropy = 8;
+
+    	groundMaterial.diffuseMap = diffuseMap;
+
+    	groundMesh.visible = true;
+    });
+
+    const groundMaterial = new t3d.PBRMaterial();
+    groundMaterial.diffuseMapTransform.setUvTransform(0, 0, 8, 8, 0, 0.5, 0.5);
+    groundMaterial.roughness = 1;
+    groundMaterial.metalness = 0;
+    const groundMesh = new t3d.Mesh(new t3d.PlaneGeometry(100, 100), groundMaterial);
+    groundMesh.receiveShadow = true;
+    groundMesh.visible = false;
+    groundMesh.position.y = -4.5;
+    scene.add(groundMesh);
+
+    // create test box
+
+    const redBoxMaterial = new t3d.PBRMaterial();
+    redBoxMaterial.diffuse.setRGB(1, 0, 0);
+    redBoxMaterial.roughness = 0.5;
+    redBoxMaterial.metalness = 0.5;
+    redBoxMaterial.dithering = true;
+
+    const redBox = new t3d.Mesh(new t3d.BoxGeometry(1, 1, 1), redBoxMaterial);
+    redBox.position.set(0, 0, -1);
+    redBox.castShadow = true;
+    scene.add(redBox);
+
+    // create panel container
+
+    const panelContainer = new t3d.Object3D();
+    scene.add(panelContainer);
+
+    // Create text mesh
+
+    const text = '  Here is some test text on a frosted glass background. The text is marked on a special renderlayer to avoid interfering with transmission sampling.';
+
+    const dynamicFont = new DynamicFont({ sdf: true, width: 2048, height: 2048 });
+    dynamicFont.addChars(text);
+
+    const fontTexture = new t3d.Texture2D();
+    fontTexture.image = { data: dynamicFont.atlasBuffer, width: 2048, height: 2048 };
+    fontTexture.format = t3d.PIXEL_FORMAT.RED;
+    fontTexture.magFilter = t3d.TEXTURE_FILTER.LINEAR;
+    fontTexture.minFilter = t3d.TEXTURE_FILTER.LINEAR;
+    fontTexture.unpackAlignment = 1;
+    fontTexture.generateMipmaps = false;
+
+    const bitmapTextOptions = {
+    	text,
+    	mode: 'word-wrapper',
+    	align: 'left',
+    	letterSpacing: 1,
+    	lineHeight: 90,
+    	baseline: 60
+    };
+    bitmapTextOptions.font = dynamicFont.fontData;
+    bitmapTextOptions.width = 1100;
+
+    const textGeometry = new BitmapTextGeometry(bitmapTextOptions);
+
+    const textMaterial = new t3d.ShaderMaterial(SDFTextShader);
+    textMaterial.transparent = true;
+    textMaterial.diffuseMap = fontTexture;
+    textMaterial.diffuse.setRGB(1, 1, 1);
+    textMaterial.uniforms.gamma = 120;
+    textMaterial.side = t3d.DRAW_SIDE.DOUBLE;
+
+    const textScalar = 0.008;
+    const textMesh = new t3d.Mesh(textGeometry, textMaterial);
+    textMesh.scale.multiplyScalar(textScalar);
+    textMesh.euler.x = Math.PI;
+    textGeometry.boundingBox.getSize(textMesh.position)
+    	.multiplyScalar(-0.5 * textScalar);
+    textMesh.position.z = 0.1;
+    textMesh.renderLayer = 21;
+    panelContainer.add(textMesh);
+
+    // create transmission plane
+
+    const transmissionMaterial = new TransmissionPBRMaterial();
+    transmissionMaterial.uniforms.transmission = 1;
+    transmissionMaterial.uniforms.thickness = 0.5;
+    transmissionMaterial.metalness = 0;
+    transmissionMaterial.roughness = 0.6;
+    transmissionMaterial.uniforms.attenuationColor = [1, 1, 1];
+    transmissionMaterial.uniforms.attenuationDistance = 0.155;
+    transmissionMaterial.uniforms.ior = 1.5;
+    transmissionMaterial.side = t3d.DRAW_SIDE.DOUBLE;
+    transmissionMaterial.dithering = true;
+
+    const plane = new t3d.Mesh(new t3d.PlaneGeometry(10, 6), transmissionMaterial);
+    plane.euler.x = -Math.PI / 2;
+    plane.renderLayer = 20;
+    plane.castShadow = true;
+    panelContainer.add(plane);
+
+    // gui
+
+    const params = { speed: 0.2 };
+
+    const gui = new GUI();
+
+    const basicFolder = gui.addFolder('Basic');
+    basicFolder.addColor(transmissionMaterial, 'diffuse');
+    basicFolder.add(transmissionMaterial, 'metalness', 0, 1, 0.01);
+    basicFolder.add(transmissionMaterial, 'roughness', 0, 1, 0.01);
+
+    const transmissionFolder = gui.addFolder('Transmission');
+    transmissionFolder.add(transmissionMaterial.uniforms, 'transmission', 0, 1, 0.01);
+    transmissionFolder.add(transmissionMaterial.uniforms, 'thickness', 0, 5, 0.01);
+    transmissionFolder.addColor(transmissionMaterial.uniforms, 'attenuationColor');
+    transmissionFolder.add(transmissionMaterial.uniforms, 'attenuationDistance', 0, 1, 0.01);
+    transmissionFolder.add(transmissionMaterial.uniforms, 'ior', 1, 3, 0.01);
+
+    const testFolder = gui.addFolder('Test');
+    testFolder.add(params, 'speed', 0, 1, 0.01).name('Speed');
+
+    //
+    
+    const stats = new Stats();
+    stats.showPanel(0);
+    document.body.appendChild(stats.dom);
+
+    function loop(timestamp) {
+    	requestAnimationFrame(loop);
+
+    	stats.begin();
+
+    	redBox.position.x = Math.sin(timestamp * params.speed / 100) * 8;
+
+    	controller.update();
+
+    	scene.updateMatrix();
+    	scene.updateRenderStates(camera);
+    	scene.updateRenderQueue(camera);
+
+    	shadowMapPass.render(renderer, scene);
+    
+    	effectComposer.render(renderer, scene, camera, backRenderTarget);
+
+    	stats.end();
+    }
+    requestAnimationFrame(loop);
+
+    function onWindowResize() {
+    	width = window.innerWidth || 2;
+    	height = window.innerHeight || 2;
+
+    	camera.setPerspective(45 / 180 * Math.PI, width / height, 1, 5000);
+
+    	backRenderTarget.resize(width, height);
+    	effectComposer.resize(width, height);
+    }
+    window.addEventListener('resize', onWindowResize, false);
+</script>
+</html>

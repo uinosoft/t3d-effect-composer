@@ -343,6 +343,9 @@ export default class EffectComposer {
 
 		this._tempBufferNames.clear();
 
+		const sceneBuffer = this._bufferMap.get('SceneBuffer');
+		const renderQueue = scene.getRenderQueue(camera);
+
 		if (postEffectEnable) {
 			this._tempBufferNames.add('SceneBuffer'); // Insert SceneBuffer first
 
@@ -384,7 +387,7 @@ export default class EffectComposer {
 				item.effect.render(
 					renderer,
 					this,
-					index === firstActiveIndex ? this._bufferMap.get('SceneBuffer').output() : inputRT,
+					index === firstActiveIndex ? sceneBuffer.output() : inputRT,
 					notLast ? outputRT : target,
 					!notLast
 				);
@@ -399,8 +402,10 @@ export default class EffectComposer {
 			this._renderTargetCache.release(outputRT);
 
 			this._cameraJitter.update();
-		} else if (!!this._externalColorAttachment && !!this._externalDepthAttachment) {
-			const sceneBuffer = this._bufferMap.get('SceneBuffer');
+		} else if (
+			(!!this._externalColorAttachment && !!this._externalDepthAttachment) ||
+			!sceneBuffer.$isRenderLayerEmpty(renderQueue, sceneBuffer.postRenderLayers.transmission)
+		) {
 			sceneBuffer.render(renderer, this, scene, camera);
 
 			renderer.setRenderTarget(target);
@@ -418,10 +423,9 @@ export default class EffectComposer {
 			renderer.clear(this.clearColor, this.clearDepth, this.clearStencil);
 			renderStates.camera.rect.fromArray(this._tempViewport);
 
-			const renderQueue = scene.getRenderQueue(camera);
-
-			const sceneBuffer = this._bufferMap.get('SceneBuffer');
 			sceneBuffer.$renderScene(renderer, renderQueue, renderStates);
+			sceneBuffer.$renderPostTransmission(renderer, renderQueue, renderStates);
+			sceneBuffer.$renderOverlay(renderer, renderQueue, renderStates);
 		}
 
 		renderer.setClearColor(...this._tempClearColor); // restore clear color

@@ -1,5 +1,5 @@
 // t3d-effect-composer
-import { PIXEL_FORMAT, PIXEL_TYPE, TEXTURE_FILTER, RenderTarget2D, ATTACHMENT, ShaderPostPass, Matrix4, Texture2D, TEXTURE_WRAP, Vector3, TEXEL_ENCODING_TYPE, Color3, Vector2, Vector4, SHADING_TYPE, ShaderMaterial, RenderBuffer, DRAW_SIDE, BLEND_TYPE } from 't3d';
+import { PIXEL_TYPE, PIXEL_FORMAT, TEXTURE_FILTER, RenderTarget2D, ATTACHMENT, ShaderPostPass, Matrix4, Texture2D, TEXTURE_WRAP, Vector3, TEXEL_ENCODING_TYPE, Color3, Vector2, Vector4, SHADING_TYPE, ShaderMaterial, RenderBuffer, DRAW_SIDE, BLEND_TYPE } from 't3d';
 
 class Buffer {
 
@@ -6247,6 +6247,29 @@ class SceneBuffer extends Buffer {
 		];
 
 		this._sceneRenderOptions = {};
+
+		this._transmissionRT = new RenderTarget2D(width, height);
+		setupColorTexture(this._transmissionRT.texture, options);
+		this._transmissionRT.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+
+		const transmissionRenderOptions = {
+			getMaterial: renderable => {
+				const samplerMap = this._transmissionRT.texture;
+				renderable.material.uniforms.transmissionSamplerMap = samplerMap;
+				renderable.material.uniforms.transmissionSamplerSize[0] = samplerMap.image.width;
+				renderable.material.uniforms.transmissionSamplerSize[1] = samplerMap.image.height;
+				return renderable.material;
+			},
+			ifRender: renderable => {
+				return renderable.material.shaderName === 'TransmissionPBR';
+			}
+		};
+
+		this.postRenderLayers = {
+			transmission: { id: -1, mask: RenderListMask.ALL, options: transmissionRenderOptions },
+			postTransmission: { id: -1, mask: RenderListMask.ALL },
+			overlay: { id: 1, mask: RenderListMask.ALL }
+		};
 	}
 
 	syncAttachments(colorAttachment, depthAttachment, msColorRenderBuffer, msDepthRenderBuffer) {
@@ -6325,6 +6348,9 @@ class SceneBuffer extends Buffer {
 		enableCameraJitter && cameraJitter.jitterProjectionMatrix(renderStates.camera, this._rt.width, this._rt.height);
 
 		this.$renderScene(renderer, renderQueue, renderStates);
+		this.$renderTransmission(renderer, renderQueue, renderStates);
+		this.$renderPostTransmission(renderer, renderQueue, renderStates);
+		this.$renderOverlay(renderer, renderQueue, renderStates);
 
 		enableCameraJitter && cameraJitter.restoreProjectionMatrix(renderStates.camera);
 
@@ -6345,48 +6371,97 @@ class SceneBuffer extends Buffer {
 		super.resize(width, height);
 		this._rt.resize(width, height);
 		this._mrt.resize(width, height);
+		this._transmissionRT.resize(width, height);
 	}
 
 	dispose() {
 		super.dispose();
 		this._rt.dispose();
 		this._mrt.dispose();
+		this._transmissionRT.dispose();
+	}
+
+	_renderOneLayer(renderer, renderQueue, renderStates, renderLayer) {
+		const { id, mask = RenderListMask.ALL, options = this._sceneRenderOptions } = renderLayer;
+		const layer = renderQueue.getLayer(id);
+		if (layer) {
+			if (layer.opaqueCount > 0 && (mask & RenderListMask.OPAQUE)) {
+				renderer.renderRenderableList(layer.opaque, renderStates, options);
+			}
+			if (layer.transparentCount > 0 && (mask & RenderListMask.TRANSPARENT)) {
+				renderer.renderRenderableList(layer.transparent, renderStates, options);
+			}
+		}
 	}
 
 	$renderScene(renderer, renderQueue, renderStates) {
-		const sceneRenderOptions = this._sceneRenderOptions;
-
 		renderer.beginRender();
 
 		const renderLayers = this.renderLayers;
 		for (let i = 0, l = renderLayers.length; i < l; i++) {
-			const { id, mask, options = sceneRenderOptions } = renderLayers[i];
-			const layer = renderQueue.getLayer(id);
-			if (layer) {
-				if (layer.opaqueCount > 0 && (mask & RenderListMask.OPAQUE)) {
-					renderer.renderRenderableList(layer.opaque, renderStates, options);
-				}
-				if (layer.transparentCount > 0 && (mask & RenderListMask.TRANSPARENT)) {
-					renderer.renderRenderableList(layer.transparent, renderStates, options);
-				}
-			}
+			this._renderOneLayer(renderer, renderQueue, renderStates, renderLayers[i]);
 		}
 
 		renderer.endRender();
+	}
 
-		// TODO Overlay layer
+	$renderTransmission(renderer, renderQueue, renderStates) {
+		const renderLayer = this.postRenderLayers.transmission;
 
-		const overlayLayer = renderQueue.getLayer(1);
-		if (overlayLayer && (overlayLayer.opaqueCount + overlayLayer.transparentCount) > 0) {
-			renderer.clear(false, true, false); // TODO Forcing clear depth may cause bugs
+		if (this.$isRenderLayerEmpty(renderQueue, renderLayer)) return;
 
-			renderer.beginRender();
+		const oldRenderTarget = renderer.getRenderTarget();
 
-			renderer.renderRenderableList(overlayLayer.opaque, renderStates, sceneRenderOptions);
-			renderer.renderRenderableList(overlayLayer.transparent, renderStates, sceneRenderOptions);
+		renderer.setRenderTarget(this._transmissionRT);
+		renderer.blitRenderTarget(oldRenderTarget, this._transmissionRT, true, false, false);
+		renderer.updateRenderTargetMipmap(this._transmissionRT);
+		renderer.setRenderTarget(oldRenderTarget);
 
-			renderer.endRender();
+		renderer.beginRender();
+		this._renderOneLayer(renderer, renderQueue, renderStates, renderLayer);
+		renderer.endRender();
+	}
+
+	$renderPostTransmission(renderer, renderQueue, renderStates) {
+		const renderLayer = this.postRenderLayers.postTransmission;
+
+		if (this.$isRenderLayerEmpty(renderQueue, renderLayer)) return;
+
+		renderer.beginRender();
+		this._renderOneLayer(renderer, renderQueue, renderStates, renderLayer);
+		renderer.endRender();
+	}
+
+	$renderOverlay(renderer, renderQueue, renderStates) {
+		const renderLayer = this.postRenderLayers.overlay;
+
+		if (this.$isRenderLayerEmpty(renderQueue, renderLayer)) return;
+
+		// TODO Forcing clear depth may cause bugs
+		renderer.clear(false, true, false);
+
+		renderer.beginRender();
+		this._renderOneLayer(renderer, renderQueue, renderStates, renderLayer);
+		renderer.endRender();
+	}
+
+	$isRenderLayerEmpty(renderQueue, renderLayer) {
+		const { id, mask = RenderListMask.ALL } = renderLayer;
+
+		if (id == -1) return true; // ignore invalid layer id
+
+		const layer = renderQueue.getLayer(id);
+
+		if (layer) {
+			if (layer.opaqueCount > 0 && (mask & RenderListMask.OPAQUE)) {
+				return false;
+			}
+			if (layer.transparentCount > 0 && (mask & RenderListMask.TRANSPARENT)) {
+				return false;
+			}
 		}
+
+		return true;
 	}
 
 }
@@ -6936,6 +7011,9 @@ class EffectComposer {
 
 		this._tempBufferNames.clear();
 
+		const sceneBuffer = this._bufferMap.get('SceneBuffer');
+		const renderQueue = scene.getRenderQueue(camera);
+
 		if (postEffectEnable) {
 			this._tempBufferNames.add('SceneBuffer'); // Insert SceneBuffer first
 
@@ -6977,7 +7055,7 @@ class EffectComposer {
 				item.effect.render(
 					renderer,
 					this,
-					index === firstActiveIndex ? this._bufferMap.get('SceneBuffer').output() : inputRT,
+					index === firstActiveIndex ? sceneBuffer.output() : inputRT,
 					notLast ? outputRT : target,
 					!notLast
 				);
@@ -6992,8 +7070,10 @@ class EffectComposer {
 			this._renderTargetCache.release(outputRT);
 
 			this._cameraJitter.update();
-		} else if (!!this._externalColorAttachment && !!this._externalDepthAttachment) {
-			const sceneBuffer = this._bufferMap.get('SceneBuffer');
+		} else if (
+			(!!this._externalColorAttachment && !!this._externalDepthAttachment) ||
+			!sceneBuffer.$isRenderLayerEmpty(renderQueue, sceneBuffer.postRenderLayers.transmission)
+		) {
 			sceneBuffer.render(renderer, this, scene, camera);
 
 			renderer.setRenderTarget(target);
@@ -7011,10 +7091,9 @@ class EffectComposer {
 			renderer.clear(this.clearColor, this.clearDepth, this.clearStencil);
 			renderStates.camera.rect.fromArray(this._tempViewport);
 
-			const renderQueue = scene.getRenderQueue(camera);
-
-			const sceneBuffer = this._bufferMap.get('SceneBuffer');
 			sceneBuffer.$renderScene(renderer, renderQueue, renderStates);
+			sceneBuffer.$renderPostTransmission(renderer, renderQueue, renderStates);
+			sceneBuffer.$renderOverlay(renderer, renderQueue, renderStates);
 		}
 
 		renderer.setClearColor(...this._tempClearColor); // restore clear color

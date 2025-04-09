@@ -2,6 +2,8 @@
 import { ATTACHMENT, PIXEL_FORMAT, TEXTURE_FILTER, RenderBuffer, RenderTarget2D } from 't3d';
 import { Buffer, isDepthStencilAttachment, RenderListMask, setupColorTexture, getColorBufferFormat } from 't3d-effect-composer';
 
+console.warn('TransmissionBuffer: this buffer is deprecated, use SceneBuffer.postRenderLayers instead.');
+
 export class TransmissionBuffer extends Buffer {
 
 	constructor(width, height, options) {

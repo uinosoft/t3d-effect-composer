@@ -6,6 +6,8 @@
 		"effect_tonemapping",
 		"effect_ssao",
 		"effect_ssr",
+		"effect_transmission",
+		"effect_transmission_gltf",
 		"effect_transition"
 	],
 	"layer": [
@@ -32,8 +34,7 @@
 		"advanced_sharpness",
 		"advanced_volume",
 		"advanced_skyline",
-		"advanced_godrays",
-		"advanced_transmission"
+		"advanced_godrays"
 	],
 	"debugger": [
 		"debugger_uv"

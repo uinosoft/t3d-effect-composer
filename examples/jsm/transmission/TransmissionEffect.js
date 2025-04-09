@@ -1,6 +1,8 @@
 import { ShaderPostPass, ATTACHMENT } from 't3d';
 import { Effect, defaultVertexShader } from 't3d-effect-composer';
 
+console.warn('TransmissionEffect: this effect is deprecated, use SceneBuffer.postRenderLayers instead.');
+
 export class TransmissionEffect extends Effect {
 
 	constructor() {
