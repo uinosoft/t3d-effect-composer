@@ -96,6 +96,16 @@ class MathUtils {
 	}
 
 	/**
+	 * Return the next power of two square size of this number.
+	 * This method is usually used to calculate the minimum 2d texture size based on the pixel length.
+	 * @param {number} value - The input number.
+	 * @returns {number} - The result size.
+	 */
+	static nextPowerOfTwoSquareSize(value) {
+		return this.nextPowerOfTwo(Math.ceil(Math.sqrt(value)));
+	}
+
+	/**
 	 * Denormalizes a value based on the type of the provided array.
 	 * @param {number} value - The value to be denormalized.
 	 * @param {TypedArray} array - The typed array to determine the normalization factor.
@@ -4797,78 +4807,49 @@ function satForAxes(axes, v0, v1, v2, extents) {
 }
 
 /**
- * Color3 Class.
+ * A Color3 instance is represented by RGB components.
  */
 class Color3 {
 
 	/**
-	 * @param {number} r - (optional) If arguments g and b are defined, the red component of the color.
-	 * 						If they are not defined, it can be a hexadecimal triplet (recommended).
-	 * @param {number} g - (optional) If it is defined, the green component of the color.
-	 * @param {number} b - (optional) If it is defined, the blue component of the color.
+	 * Constructs a new three-component color.
+	 * @param {number} [r] - The red component of the color. If `g` and `b` are not provided, it can be a hexadecimal triplet.
+	 * @param {number} [g] - The green component.
+	 * @param {number} [b] - The blue component.
 	 */
 	constructor(r, g, b) {
+		/**
+		 * The red component.
+		 * @type {number}
+		 * @default 0
+		 */
 		this.r = 0;
+
+		/**
+		 * The green component.
+		 * @type {number}
+		 * @default 0
+		 */
 		this.g = 0;
+
+		/**
+		 * The blue component.
+		 * @type {number}
+		 * @default 0
+		 */
 		this.b = 0;
 
 		if (g === undefined && b === undefined) {
-			return this.setHex(r);
+			this.setHex(r);
+		} else {
+			this.setRGB(r, g, b);
 		}
-
-		this.setRGB(r, g, b);
 	}
 
 	/**
-	 * Sets this color to be the color linearly interpolated
-	 * between color1 and color2 where ratio is the percent distance along the line connecting the two colors
-	 * - ratio = 0 will be color1, and ratio = 1 will be color2.
-	 * @param {Color3} c1 - the starting Color.
-	 * @param {Color3} c2 - Color to interpolate towards.
-	 * @param {number} ratio - interpolation factor, typically in the closed interval [0, 1].
-	 */
-	lerpColors(c1, c2, ratio) {
-		this.r = ratio * (c2.r - c1.r) + c1.r;
-		this.g = ratio * (c2.g - c1.g) + c1.g;
-		this.b = ratio * (c2.b - c1.b) + c1.b;
-	}
-
-	/**
-	 * Linearly interpolates this color's RGB values toward the RGB values of the passed argument.
-	 * The ratio argument can be thought of as the ratio between the two colors,
-	 * where 0.0 is this color and 1.0 is the first argument.
-	 * @param {Color3} c - color to converge on.
-	 * @param {number} ratio - interpolation factor in the closed interval [0, 1].
-	 */
-	lerp(c, ratio) {
-		this.lerpColors(this, c, ratio);
-	}
-
-	/**
-	 * Returns a new Color with the same r, g and b values as this one.
-	 * @returns {Color3}
-	 */
-	clone() {
-		return new Color3(this.r, this.g, this.b);
-	}
-
-	/**
-	 * Copies the r, g and b parameters from v in to this color.
-	 * @param {Color3} v
-	 * @returns {Color3}
-	 */
-	copy(v) {
-		this.r = v.r;
-		this.g = v.g;
-		this.b = v.b;
-
-		return this;
-	}
-
-	/**
-	 * Set from hex.
-	 * @param {number} hex - hexadecimal triplet format.
-	 * @returns {Color3}
+	 * Sets this color from a hexadecimal value.
+	 * @param {number} hex - The hexadecimal value.
+	 * @returns {Color3} A reference to this color.
 	 */
 	setHex(hex) {
 		hex = Math.floor(hex);
@@ -4881,19 +4862,11 @@ class Color3 {
 	}
 
 	/**
-	 * Returns the hexadecimal value of this color.
-	 * @returns {number}
-	 */
-	getHex() {
-		return MathUtils.clamp(this.r * 255, 0, 255) << 16 ^ MathUtils.clamp(this.g * 255, 0, 255) << 8 ^ MathUtils.clamp(this.b * 255, 0, 255) << 0;
-	}
-
-	/**
 	 * Sets this color from RGB values.
 	 * @param {number} r - Red channel value between 0.0 and 1.0.
 	 * @param {number} g - Green channel value between 0.0 and 1.0.
 	 * @param {number} b - Blue channel value between 0.0 and 1.0.
-	 * @returns {Color3}
+	 * @returns {Color3} A reference to this color.
 	 */
 	setRGB(r, g, b) {
 		this.r = r;
@@ -4904,11 +4877,11 @@ class Color3 {
 	}
 
 	/**
-	 * Set from HSL.
-	 * @param {number} h - hue value between 0.0 and 1.0
-	 * @param {number} s - saturation value between 0.0 and 1.0
-	 * @param {number} l - lightness value between 0.0 and 1.0
-	 * @returns {Color3}
+	 * Set this color from HSL values.
+	 * @param {number} h - Hue value between 0.0 and 1.0.
+	 * @param {number} s - Saturation value between 0.0 and 1.0.
+	 * @param {number} l - Lightness value between 0.0 and 1.0.
+	 * @returns {Color3} A reference to this color.
 	 */
 	setHSL(h, s, l) {
 		// h,s,l ranges are in 0.0 - 1.0
@@ -4926,12 +4899,34 @@ class Color3 {
 			this.g = hue2rgb(q, p, h);
 			this.b = hue2rgb(q, p, h - 1 / 3);
 		}
+
+		return this;
+	}
+
+	/**
+	 * Returns a new color with copied values from this instance.
+	 * @returns {Color3} A clone of this instance.
+	 */
+	clone() {
+		return new this.constructor(this.r, this.g, this.b);
+	}
+
+	/**
+	 * Copies the values of the given color to this instance.
+	 * @param {Color3} color - The color to copy.
+	 * @returns {Color3} A reference to this color.
+	 */
+	copy(color) {
+		this.r = color.r;
+		this.g = color.g;
+		this.b = color.b;
+
 		return this;
 	}
 
 	/**
 	 * Converts this color from sRGB space to linear space.
-	 * @returns {Color3}
+	 * @returns {Color3} A reference to this color.
 	 */
 	convertSRGBToLinear() {
 		this.r = SRGBToLinear(this.r);
@@ -4942,7 +4937,7 @@ class Color3 {
 
 	/**
 	 * Converts this color from linear space to sRGB space.
-	 * @returns {Color3}
+	 * @returns {Color3} A reference to this color.
 	 */
 	convertLinearToSRGB() {
 		this.r = LinearToSRGB(this.r);
@@ -4952,11 +4947,47 @@ class Color3 {
 	}
 
 	/**
-	 * Sets this color's components based on an array formatted like [ r, g, b ].
-	 * @param {number[]} array - Array of floats in the form [ r, g, b ].
-	 * @param {number} [offset=0] - An offset into the array.
-	 * @param {boolean} [denormalize=false] - if true, denormalize the values, and array should be a typed array.
-	 * @returns {Color3}
+	 * Returns the hexadecimal value of this color.
+	 * @returns {number} The hexadecimal value.
+	 */
+	getHex() {
+		return MathUtils.clamp(this.r * 255, 0, 255) << 16 ^ MathUtils.clamp(this.g * 255, 0, 255) << 8 ^ MathUtils.clamp(this.b * 255, 0, 255) << 0;
+	}
+
+	/**
+	 * Linearly interpolates this color's RGB values toward the RGB values of the
+	 * given color. The alpha argument can be thought of as the ratio between
+	 * the two colors, where 0.0 is this color and 1.0 is the first argument.
+	 * @param {Color3} color - The color to converge on.
+	 * @param {number} alpha - The interpolation factor in the closed interval [0,1].
+	 * @returns {Color3} A reference to this color.
+	 */
+	lerp(color, alpha) {
+		return this.lerpColors(this, color, alpha);
+	}
+
+	/**
+	 * Linearly interpolates between the given colors and stores the result in this instance.
+	 * The alpha argument can be thought of as the ratio between the two colors, where 0.0
+	 * is the first and 1.0 is the second color.
+	 * @param {Color3} color1 - The first color.
+	 * @param {Color3} color2 - The second color.
+	 * @param {number} alpha - The interpolation factor in the closed interval [0,1].
+	 * @returns {Color3} A reference to this color.
+	 */
+	lerpColors(color1, color2, alpha) {
+		this.r = MathUtils.lerp(color1.r, color2.r, alpha);
+		this.g = MathUtils.lerp(color1.g, color2.g, alpha);
+		this.b = MathUtils.lerp(color1.b, color2.b, alpha);
+		return this;
+	}
+
+	/**
+	 * Sets this color's RGB components from the given array.
+	 * @param {number[]} array - An array holding the RGB values.
+	 * @param {number} [offset=0] - The offset into the array.
+	 * @param {boolean} [denormalize=false] - If true, denormalize the values, and array should be a typed array.
+	 * @returns {Color3} A reference to this color.
 	 */
 	fromArray(array, offset = 0, denormalize = false) {
 		let r = array[offset], g = array[offset + 1], b = array[offset + 2];
@@ -4975,11 +5006,12 @@ class Color3 {
 	}
 
 	/**
-	 * Returns an array of the form [ r, g, b ].
-	 * @param {number[]} [array] - An array to store the color to.
-	 * @param {number} [offset=0] - An offset into the array.
-	 * @param {boolean} [normalize=false] - if true, normalize the values, and array should be a typed array.
-	 * @returns {number[]}
+	 * Writes the RGB components of this color to the given array. If no array is provided,
+	 * the method returns a new instance.
+	 * @param {number[]} [array=[]] - The target array holding the color components.
+	 * @param {number} [offset=0] - Index of the first element in the array.
+	 * @param {boolean} [normalize=false] - If true, normalize the values, and array should be a typed array.
+	 * @returns {number[]} The color components.
 	 */
 	toArray(array = [], offset = 0, normalize = false) {
 		let r = this.r, g = this.g, b = this.b;
@@ -5014,6 +5046,140 @@ function SRGBToLinear(c) {
 
 function LinearToSRGB(c) {
 	return (c < 0.0031308) ? c * 12.92 : 1.055 * (Math.pow(c, 0.41666)) - 0.055;
+}
+
+/**
+ * A Color4 instance is represented by RGBA components.
+ */
+class Color4 {
+
+	/**
+	 * Constructs a new four-component color.
+	 * @param {number} [r=0] - The red value.
+	 * @param {number} [g=0] - The green value.
+	 * @param {number} [b=0] - The blue value.
+	 * @param {number} [a=1] - The alpha value.
+	 */
+	constructor(r = 0, g = 0, b = 0, a = 1) {
+		/**
+		 * The red component.
+		 * @type {number}
+		 * @default 0
+		 */
+		this.r = r;
+
+		/**
+		 * The green component.
+		 * @type {number}
+		 * @default 0
+		 */
+		this.g = g;
+
+		/**
+		 * The blue component.
+		 * @type {number}
+		 * @default 0
+		 */
+		this.b = b;
+
+		/**
+		 * The alpha component.
+		 * @type {number}
+		 * @default 1
+		 */
+		this.a = a;
+	}
+
+	/**
+	 * Sets this color from RGBA values.
+	 * @param {number} r - Red channel value between 0.0 and 1.0.
+	 * @param {number} g - Green channel value between 0.0 and 1.0.
+	 * @param {number} b - Blue channel value between 0.0 and 1.0.
+	 * @param {number} a - Alpha channel value between 0.0 and 1.0.
+	 * @returns {Color4} A reference to this color.
+	 */
+	setRGBA(r, g, b, a) {
+		this.r = r;
+		this.g = g;
+		this.b = b;
+		this.a = a;
+
+		return this;
+	}
+
+	/**
+	 * Returns a new color with copied values from this instance.
+	 * @returns {Color4} A clone of this instance.
+	 */
+	clone() {
+		return new Color4(this.r, this.g, this.b, this.a);
+	}
+
+	/**
+	 * Copies the values of the given color to this instance.
+	 * @param {Color4} color - The color to copy.
+	 * @returns {Color4} A clone of this instance.
+	 */
+	copy(color) {
+		this.r = color.r;
+		this.g = color.g;
+		this.b = color.b;
+		this.a = color.a;
+
+		return this;
+	}
+
+	/**
+	 * Sets this color's RGBA components from the given array.
+	 * @param {number[]} array - An array holding the RGBA values.
+	 * @param {number} [offset=0] - The offset into the array.
+	 * @param {boolean} [denormalize=false] - If true, denormalize the values, and array should be a typed array.
+	 * @returns {Color4} A reference to this color.
+	 */
+	fromArray(array, offset = 0, denormalize = false) {
+		let r = array[offset], g = array[offset + 1], b = array[offset + 2], a = array[offset + 3];
+
+		if (denormalize) {
+			r = MathUtils.denormalize(r, array);
+			g = MathUtils.denormalize(g, array);
+			b = MathUtils.denormalize(b, array);
+			a = MathUtils.denormalize(a, array);
+		}
+
+		this.r = r;
+		this.g = g;
+		this.b = b;
+		this.a = a;
+
+		return this;
+	}
+
+	/**
+	 * Writes the RGBA components of this color to the given array. If no array is provided,
+	 * the method returns a new instance.
+	 * @param {number[]} [array=[]] - The target array holding the color components.
+	 * @param {number} [offset=0] - Index of the first element in the array.
+	 * @param {boolean} [normalize=false] - If true, normalize the values, and array should be a typed array.
+	 * @returns {number[]} The color components.
+	 */
+	toArray(array = [], offset = 0, normalize = false) {
+		let r = this.r, g = this.g, b = this.b, a = this.a;
+
+		if (normalize) {
+			r = MathUtils.normalize(r, array);
+			g = MathUtils.normalize(g, array);
+			b = MathUtils.normalize(b, array);
+			a = MathUtils.normalize(a, array);
+		}
+
+		array[offset] = r;
+		array[offset + 1] = g;
+		array[offset + 2] = b;
+		array[offset + 3] = a;
+
+		return array;
+	}
+
 }
 
 const _matrix$1 = new Matrix4();
@@ -5622,7 +5788,7 @@ class Matrix3 {
 }
 
 const _vec3_1$4 = new Vector3();
-const _vec3_2 = new Vector3();
+const _vec3_2$1 = new Vector3();
 const _mat3_1$1 = new Matrix3();
 
 /**
@@ -5716,7 +5882,7 @@ class Plane {
 	 * @returns {Plane}
 	 */
 	setFromCoplanarPoints(a, b, c) {
-		const normal = _vec3_1$4.subVectors(c, b).cross(_vec3_2.subVectors(a, b)).normalize();
+		const normal = _vec3_1$4.subVectors(c, b).cross(_vec3_2$1.subVectors(a, b)).normalize();
 		// Q: should an error be thrown if normal is zero (e.g. degenerate plane)?
 		this.setFromNormalAndCoplanarPoint(normal, a);
 		return this;
@@ -6323,6 +6489,7 @@ class Ray {
 
 const _box3_1 = new Box3();
 const _vec3_1$1 = new Vector3();
+const _vec3_2 = new Vector3();
 
 /**
  * A sphere defined by a center and radius.
@@ -6492,6 +6659,35 @@ class Sphere {
 			const delta = (length - this.radius) * 0.5;
 			this.center.addScaledVector(_vec3_1$1, delta / length);
 			this.radius += delta;
+		}
+
+		return this;
+	}
+
+	/**
+	 * Expands this sphere to enclose both the original sphere and the given sphere.
+	 * @param {Sphere} sphere - The sphere to include.
+	 * @returns {Sphere} A reference to this sphere.
+	 */
+	union(sphere) {
+		if (sphere.isEmpty()) {
+			return this;
+		}
+
+		if (this.isEmpty()) {
+			this.copy(sphere);
+
+			return this;
+		}
+
+		if (this.center.equals(sphere.center)) {
+			this.radius = Math.max(this.radius, sphere.radius);
+		} else {
+			_vec3_2.subVectors(sphere.center, this.center).normalize().multiplyScalar(sphere.radius);
+
+			this.expandByPoint(_vec3_1$1.addVectors(sphere.center, _vec3_2));
+
+			this.expandByPoint(_vec3_1$1.addVectors(sphere.center, _vec3_2));
 		}
 
 		return this;
@@ -9467,6 +9663,7 @@ class Mesh extends Object3D {
 
 	raycast(ray, intersects) {
 		const geometry = this.geometry;
+		const material = this.material;
 		const worldMatrix = this.worldMatrix;
 
 		_sphere.copy(geometry.boundingSphere);
@@ -9489,35 +9686,84 @@ class Mesh extends Object3D {
 		}
 
 		const uv = geometry.getAttribute('a_Uv');
+		const groups = geometry.groups;
 
 		let intersection;
 
 		if (geometry.index) {
 			const index = geometry.index.buffer.array;
 
-			for (let i = 0; i < index.length; i += 3) {
-				const a = index[i];
-				const b = index[i + 1];
-				const c = index[i + 2];
+			if (Array.isArray(material)) {
+				for (let i = 0, il = groups.length; i < il; i++) {
+					const group = groups[i];
+					const groupMaterial = material[group.materialIndex];
 
-				intersection = checkGeometryIntersection(this, ray, _ray, uv, a, b, c);
+					const start = group.start;
+					const end = Math.min(index.length, group.start + group.count);
 
-				if (intersection) {
-					intersection.faceIndex = Math.floor(i / 3);
-					intersects.push(intersection);
+					for (let j = start, jl = end; j < jl; j += 3) {
+						const a = index[j];
+						const b = index[j + 1];
+						const c = index[j + 2];
+
+						intersection = checkGeometryIntersection(this, groupMaterial, ray, _ray, uv, a, b, c);
+
+						if (intersection) {
+							intersection.faceIndex = Math.floor(i / 3);
+							intersection.face.materialIndex = group.materialIndex;
+							intersects.push(intersection);
+						}
+					}
+				}
+			} else {
+				for (let i = 0, il = index.length; i < il; i += 3) {
+					const a = index[i];
+					const b = index[i + 1];
+					const c = index[i + 2];
+
+					intersection = checkGeometryIntersection(this, material, ray, _ray, uv, a, b, c);
+
+					if (intersection) {
+						intersection.faceIndex = Math.floor(i / 3);
+						intersects.push(intersection);
+					}
 				}
 			}
 		} else {
-			for (let i = 0; i < position.buffer.count; i += 3) {
-				const a = i;
-				const b = i + 1;
-				const c = i + 2;
+			if (Array.isArray(material)) {
+				for (let i = 0, il = groups.length; i < il; i++) {
+					const group = groups[i];
+					const groupMaterial = material[group.materialIndex];
 
-				intersection = checkGeometryIntersection(this, ray, _ray, uv, a, b, c);
+					const start = group.start;
+					const end = Math.min(position.buffer.count, group.start + group.count);
 
-				if (intersection) {
-					intersection.faceIndex = Math.floor(i / 3);
-					intersects.push(intersection);
+					for (let j = start, jl = end; j < jl; j += 3) {
+						const a = j;
+						const b = j + 1;
+						const c = j + 2;
+
+						intersection = checkGeometryIntersection(this, groupMaterial, ray, _ray, uv, a, b, c);
+
+						if (intersection) {
+							intersection.faceIndex = Math.floor(i / 3);
+							intersection.face.materialIndex = group.materialIndex;
+							intersects.push(intersection);
+						}
+					}
+				}
+			} else {
+				for (let i = 0, il = position.buffer.count; i < il; i += 3) {
+					const a = i;
+					const b = i + 1;
+					const c = i + 2;
+
+					intersection = checkGeometryIntersection(this, material, ray, _ray, uv, a, b, c);
+
+					if (intersection) {
+						intersection.faceIndex = Math.floor(i / 3);
+						intersects.push(intersection);
+					}
 				}
 			}
 		}
@@ -9544,12 +9790,12 @@ class Mesh extends Object3D {
  */
 Mesh.prototype.isMesh = true;
 
-function checkGeometryIntersection(object, ray, _ray, uv, a, b, c) {
+function checkGeometryIntersection(object, material, ray, _ray, uv, a, b, c) {
 	object.getVertexPosition(a, _vA);
 	object.getVertexPosition(b, _vB);
 	object.getVertexPosition(c, _vC);
 
-	const intersection = checkIntersection(object, ray, _ray, _vA, _vB, _vC, _intersectionPoint);
+	const intersection = checkIntersection(object, material, ray, _ray, _vA, _vB, _vC, _intersectionPoint);
 
 	if (intersection) {
 		let array;
@@ -9594,9 +9840,8 @@ function uvIntersection(point, p1, p2, p3, uv1, uv2, uv3) {
 	return uv1.clone();
 }
 
-function checkIntersection(object, ray, localRay, pA, pB, pC, point) {
+function checkIntersection(object, material, ray, localRay, pA, pB, pC, point) {
 	let intersect;
-	const material = object.material;
 
 	if (material.side === DRAW_SIDE.BACK) {
 		intersect = localRay.intersectTriangle(pC, pB, pA, true, point);
@@ -14260,9 +14505,8 @@ class Skeleton {
 	}
 
 	generateBoneTexture() {
-		let size = Math.sqrt(this.bones.length * 4);
-		size = MathUtils.nextPowerOfTwo(Math.ceil(size));
-		size = Math.max(4, size);
+		let size = MathUtils.nextPowerOfTwoSquareSize(this.bones.length * 4);
+		size = Math.max(size, 4);
 
 		const boneMatrices = new Float32Array(size * size * 4);
 		boneMatrices.set(this.boneMatrices);
@@ -19224,6 +19468,8 @@ class WebGLBuffers extends PropertyMap {
 		bufferProperties.version = buffer.version;
 
 		bufferProperties.__external = false;
+
+		buffer.updateRange.count = -1; // reset range
 	}
 
 	_updateGLBuffer(glBuffer, buffer, bufferType) {
@@ -20992,4 +21238,4 @@ const isPowerOfTwo = MathUtils.isPowerOfTwo;
 const nearestPowerOfTwo = MathUtils.nearestPowerOfTwo;
 const nextPowerOfTwo = MathUtils.nextPowerOfTwo;
 
-export { ATTACHMENT, AmbientLight, AnimationAction, AnimationMixer, Attribute, BLEND_EQUATION, BLEND_FACTOR, BLEND_TYPE, BUFFER_USAGE, BasicMaterial, Bone, BooleanKeyframeTrack, Box2, Box3, BoxGeometry, Buffer, COMPARE_FUNC, CULL_FACE_TYPE, Camera, Color3, ColorKeyframeTrack, CubeGeometry, CubicSplineInterpolant, CylinderGeometry, DRAW_MODE, DRAW_SIDE, DefaultLoadingManager, DepthMaterial, DirectionalLight, DirectionalLightShadow, DistanceMaterial, ENVMAP_COMBINE_TYPE, Euler, EventDispatcher, FileLoader, Fog, FogExp2, Frustum, Geometry, Group, HemisphereLight, ImageLoader, KeyframeClip, KeyframeInterpolant, KeyframeTrack, LambertMaterial, Light, LightShadow, LineMaterial, LinearInterpolant, Loader, LoadingManager, MATERIAL_TYPE, Material, MathUtils, Matrix3, Matrix4, Mesh, NumberKeyframeTrack, OPERATION, Object3D, PBR2Material, PBRMaterial, PIXEL_FORMAT, PIXEL_TYPE, PhongMaterial, Plane, PlaneGeometry, PointLight, PointLightShadow, PointsMaterial, PropertyBindingMixer, PropertyMap, QUERY_TYPE, Quaternion, QuaternionCubicSplineInterpolant, QuaternionKeyframeTrack, QuaternionLinearInterpolant, Query, Ray, RectAreaLight, RenderBuffer, RenderInfo, RenderQueue, RenderQueueLayer, RenderStates, RenderTarget2D, RenderTarget2DArray, RenderTarget3D, RenderTargetBack, RenderTargetBase, RenderTargetCube, Renderer, SHADING_TYPE, SHADOW_TYPE, Scene, SceneData, ShaderChunk, ShaderLib, ShaderMaterial, ShaderPostPass, ShadowMapPass, Skeleton, SkinnedMesh, Sphere, SphereGeometry, Spherical, SphericalHarmonics3, SphericalHarmonicsLight, SpotLight, SpotLightShadow, StepInterpolant, StringKeyframeTrack, TEXEL_ENCODING_TYPE, TEXTURE_FILTER, TEXTURE_WRAP, Texture2D, Texture2DArray, Texture3D, TextureBase, TextureCube, ThinRenderer, TorusKnotGeometry, TransformUV, Triangle, VERTEX_COLOR, Vector2, Vector3, Vector4, VectorKeyframeTrack, WebGLAttribute, WebGLCapabilities, WebGLGeometries, WebGLProgram, WebGLPrograms, WebGLQueries, WebGLRenderBuffers, WebGLRenderer, WebGLState, WebGLTextures, WebGLUniforms, cloneJson, cloneUniforms, generateUUID, isPowerOfTwo, nearestPowerOfTwo, nextPowerOfTwo };
+export { ATTACHMENT, AmbientLight, AnimationAction, AnimationMixer, Attribute, BLEND_EQUATION, BLEND_FACTOR, BLEND_TYPE, BUFFER_USAGE, BasicMaterial, Bone, BooleanKeyframeTrack, Box2, Box3, BoxGeometry, Buffer, COMPARE_FUNC, CULL_FACE_TYPE, Camera, Color3, Color4, ColorKeyframeTrack, CubeGeometry, CubicSplineInterpolant, CylinderGeometry, DRAW_MODE, DRAW_SIDE, DefaultLoadingManager, DepthMaterial, DirectionalLight, DirectionalLightShadow, DistanceMaterial, ENVMAP_COMBINE_TYPE, Euler, EventDispatcher, FileLoader, Fog, FogExp2, Frustum, Geometry, Group, HemisphereLight, ImageLoader, KeyframeClip, KeyframeInterpolant, KeyframeTrack, LambertMaterial, Light, LightShadow, LineMaterial, LinearInterpolant, Loader, LoadingManager, MATERIAL_TYPE, Material, MathUtils, Matrix3, Matrix4, Mesh, NumberKeyframeTrack, OPERATION, Object3D, PBR2Material, PBRMaterial, PIXEL_FORMAT, PIXEL_TYPE, PhongMaterial, Plane, PlaneGeometry, PointLight, PointLightShadow, PointsMaterial, PropertyBindingMixer, PropertyMap, QUERY_TYPE, Quaternion, QuaternionCubicSplineInterpolant, QuaternionKeyframeTrack, QuaternionLinearInterpolant, Query, Ray, RectAreaLight, RenderBuffer, RenderInfo, RenderQueue, RenderQueueLayer, RenderStates, RenderTarget2D, RenderTarget2DArray, RenderTarget3D, RenderTargetBack, RenderTargetBase, RenderTargetCube, Renderer, SHADING_TYPE, SHADOW_TYPE, Scene, SceneData, ShaderChunk, ShaderLib, ShaderMaterial, ShaderPostPass, ShadowMapPass, Skeleton, SkinnedMesh, Sphere, SphereGeometry, Spherical, SphericalHarmonics3, SphericalHarmonicsLight, SpotLight, SpotLightShadow, StepInterpolant, StringKeyframeTrack, TEXEL_ENCODING_TYPE, TEXTURE_FILTER, TEXTURE_WRAP, Texture2D, Texture2DArray, Texture3D, TextureBase, TextureCube, ThinRenderer, TorusKnotGeometry, TransformUV, Triangle, VERTEX_COLOR, Vector2, Vector3, Vector4, VectorKeyframeTrack, WebGLAttribute, WebGLCapabilities, WebGLGeometries, WebGLProgram, WebGLPrograms, WebGLQueries, WebGLRenderBuffers, WebGLRenderer, WebGLState, WebGLTextures, WebGLUniforms, cloneJson, cloneUniforms, generateUUID, isPowerOfTwo, nearestPowerOfTwo, nextPowerOfTwo };
