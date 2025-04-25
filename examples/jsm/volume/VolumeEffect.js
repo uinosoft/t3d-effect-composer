@@ -21,6 +21,9 @@ export default class VolumeEffect extends Effect {
 		// the color ramp texture
 		this.colorRampTexture = null;
 
+		// the volume light texture, baked by VolumeLightingGenerator
+		this.lightTexture = null;
+
 		// unitDistanceOpacity is accumulated value of transparency per unit distance
 		this.unitDistanceOpacity = 1.0;
 
@@ -87,6 +90,7 @@ export default class VolumeEffect extends Effect {
 		mainPass.material.uniforms.diffuseTex = inputRenderTarget.texture;
 		mainPass.material.uniforms.depthTex = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
 		mainPass.material.uniforms.volumeTexture = this.volumeTexture;
+		mainPass.material.uniforms.preLightTexture = this.lightTexture;
 		mainPass.material.uniforms.colorRampTexture = this.colorRampTexture;
 		mainPass.material.uniforms.near = gBufferRenderStates.camera.near;
 		mainPass.material.uniforms.far = gBufferRenderStates.camera.far;
@@ -123,6 +127,12 @@ export default class VolumeEffect extends Effect {
 			mainPass.material.needsUpdate = true;
 		}
 
+		const useLightTexture = !!this.lightTexture && isTexture3D;
+		if (useLightTexture !== mainPass.material.defines.USE_LIGHT_TEXTURE) {
+			mainPass.material.defines.USE_LIGHT_TEXTURE = useLightTexture;
+			mainPass.material.needsUpdate = true;
+		}
+
 		if (finish) {
 			mainPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
 			mainPass.renderStates.camera.rect.fromArray(composer._tempViewport);
@@ -155,7 +165,9 @@ const volumeShader = {
 		ZSLICENUM: 256,
 		ZSLICEX: 16,
 		ZSLICEY: 16,
-		TEXTURE2D_WRAP_REPEAT: false
+		TEXTURE2D_WRAP_REPEAT: false,
+
+		USE_LIGHT_TEXTURE: true
 	},
 	uniforms: {
 		volumeid: 1,
@@ -168,6 +180,7 @@ const volumeShader = {
 		volumeTexture: null,
 		diffuseTex: null,
 		colorRampTexture: null,
+		preLightTexture: null,
 
 		projection: new Float32Array(16),
 		ProjViewInverse: new Float32Array(16),
@@ -234,9 +247,24 @@ const volumeShader = {
 
         uniform sampler3D volumeTexture;
 
+		#ifdef USE_LIGHT_TEXTURE
+			uniform sampler3D preLightTexture;
+		#endif
+
         vec4 sampleAs3DTexture(vec3 texCoord) {
             texCoord += vec3(0.5);
-            return getColor(texture(volumeTexture, texCoord).r);
+
+			float intensity = texture(volumeTexture, texCoord).r;
+
+			vec4 color = getColor(intensity);
+
+			#ifdef USE_LIGHT_TEXTURE
+				float luminance = texture(preLightTexture, texCoord).r;
+				luminance = 1.0 - min(1.0, luminance);
+				color.rgb *= luminance;
+			#endif
+
+            return color;
         }
     #else 
         uniform sampler2D volumeTexture;
@@ -344,6 +372,7 @@ const volumeShader = {
         }
 
 		float unitOpacity = unitDistanceOpacity * length(step);
+		unitOpacity = clamp(unitOpacity, 0.0, 1.0);
 		
         // ray marching
 		#ifdef USE_BLUE_NOISE

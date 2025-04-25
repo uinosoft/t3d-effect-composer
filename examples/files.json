@@ -33,6 +33,7 @@
 		"advanced_heightfog",
 		"advanced_sharpness",
 		"advanced_volume",
+		"advanced_volume_lighted",
 		"advanced_skyline",
 		"advanced_godrays"
 	],

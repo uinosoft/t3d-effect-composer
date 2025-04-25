@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>t3d-effect-composer</title>
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <link type="text/css" rel="stylesheet" href="main.css">
+    <style>
+        .top-left-corner {
+            left: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="container"></div>
+    <div id="info">
+        Example of Lighted Volume Rendering
+    </div>
+</body>
+
+<!-- Import maps polyfill -->
+<!-- Remove this when import maps will be widely supported -->
+<script async src="./libs/es-module-shims.js"></script>
+
+<script type="importmap">
+    {
+        "imports": {
+            "t3d": "./libs/t3d/build/t3d.module.js",
+            "t3d/addons/": "./libs/t3d/examples/jsm/",
+            "t3d-effect-composer": "../build/t3d.effectcomposer.module.js"
+        }
+    }
+</script>
+
+<script type="module">
+	import * as t3d from 't3d';
+	import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
+	import { Box3Helper } from 't3d/addons/objects/Box3Helper.js';
+	import { DirectionalLightHelper } from 't3d/addons/objects/DirectionalLightHelper.js';
+
+	import { DefaultEffectComposer } from 't3d-effect-composer';
+	import ThicknessBuffer from './jsm/volume/ThicknessBuffer.js';
+	import VolumeEffect from './jsm/volume/VolumeEffect.js';
+	import { VolumeLightingGenerator } from './jsm/volume/VolumeLightingGenerator.js';
+	
+	import { GUI } from './libs/lil-gui.esm.min.js';
+
+	let width = window.innerWidth || 2;
+	let height = window.innerHeight || 2;
+
+	const canvas = document.createElement('canvas');
+	canvas.width = width;
+	canvas.height = height;
+	document.body.appendChild(canvas);
+
+	const contextParams = { antialias: true, alpha: false };
+	const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
+	const renderer = new t3d.WebGLRenderer(gl);
+	const backRenderTarget = new t3d.RenderTargetBack(canvas);
+
+	const options = {
+		samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
+		webgl2: renderer.capabilities.version > 1
+	};
+
+	const effectComposer = new DefaultEffectComposer(width, height, options);
+	effectComposer.sceneMSAA = true;
+	effectComposer.getBuffer('GBuffer').setIfRenderReplaceFunction(function normalIfRenderFunction(renderable) {
+		if (renderable.object.effects && renderable.object.effects['volume']) {
+			return false;
+		}
+		if (renderable.object.isHelper) {
+			return false;
+		}
+		return true;
+	});
+
+	const scene = new t3d.Scene();
+
+	const camera = new t3d.Camera();
+	camera.position.set(0, 30, 25);
+	camera.setPerspective(45 / 180 * Math.PI, width / height, 0.1, 1000);
+	scene.add(camera);
+
+	const controller = new OrbitControls(camera, canvas);
+
+	// Volume effect
+
+	const thicknessBuffer = new ThicknessBuffer(width, height, options);
+	effectComposer.addBuffer('ThicknessBuffer', thicknessBuffer);
+
+	const volumeEffect = new VolumeEffect();
+	volumeEffect.volumeId = 1;
+	effectComposer.addEffect('volumeEffect', volumeEffect, 99);
+
+	const canvasTexture = document.createElement('canvas');
+	canvasTexture.width = 4;
+	canvasTexture.height = 4;
+	const ctx = canvasTexture.getContext('2d');
+	ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+	ctx.fillRect(0, 0, canvasTexture.width, canvasTexture.height);
+	const whiteTexture = new t3d.Texture2D();
+	whiteTexture.image = canvasTexture;
+	whiteTexture.version++;
+	volumeEffect.colorRampTexture = whiteTexture;
+
+	const texture3d = new t3d.Texture3D();
+	texture3d.magFilter = t3d.TEXTURE_FILTER.LINEAR;
+	texture3d.minFilter = t3d.TEXTURE_FILTER.LINEAR;
+	texture3d.format = t3d.PIXEL_FORMAT.RED;
+	volumeEffect.volumeTexture = texture3d;
+	volumeEffect.unitAlphaCorrection = 2.0;
+
+	const volumeMaterial = new t3d.BasicMaterial();
+	volumeMaterial.transparent = true;
+	volumeMaterial.colorWrite = false;
+	const volumeMesh = new t3d.Mesh(new t3d.BoxGeometry(1, 1, 1), volumeMaterial);
+	volumeMesh.effects = { volume: 1 };
+	volumeMesh.visible = false;
+	scene.add(volumeMesh);
+
+	const offsetQuaternion = new t3d.Quaternion();
+	const offsetScale = new t3d.Vector3(20, 20 * 50 / 196, 20);
+	const offsetTranslation = new t3d.Vector3(0, 0, 0);
+	const boxMatrix = new t3d.Matrix4().transform(offsetTranslation, offsetScale, offsetQuaternion);
+	const matrix90 = new t3d.Matrix4().set(
+		1, 0, 0, 0,
+		0, 0, 1, 0,
+		0, 1, 0, 0,
+		0, 0, 0, 1
+	);
+	boxMatrix.multiply(matrix90);
+	const boxMatrixInverse = new t3d.Matrix4().copy(boxMatrix).inverse();
+
+	volumeEffect.boxMatrix.copy(boxMatrix);
+	volumeMesh.matrix.copy(boxMatrix);
+	boxMatrix.decompose(volumeMesh.position, volumeMesh.quaternion, volumeMesh.scale);
+
+	const box3 = new t3d.Box3();
+	box3.min.set(-0.51, -0.51, -0.51);
+	box3.max.set(0.51, 0.51, 0.51);
+	box3.applyMatrix4(boxMatrix);
+	
+	const helper = new Box3Helper(box3);
+	helper.isHelper = true;
+	scene.add(helper);
+
+	// light
+
+	const directionalLight = new t3d.DirectionalLight(0xffff00, 0);
+	scene.add(directionalLight);
+	const directionalLightHelper = new DirectionalLightHelper(directionalLight, 1);
+	directionalLightHelper.visible = true;
+	directionalLight.add(directionalLightHelper);
+
+	const lightSpherical = new t3d.Spherical(20, Math.PI * 0.35, Math.PI * 1.8);
+	
+	function setLightPosition() {
+		directionalLight.position.setFromSpherical(lightSpherical);
+		directionalLight.lookAt(new t3d.Vector3(0, 0, 0), new t3d.Vector3(0, 1, 0));
+
+		lightingGenerator.lightDirection.copy(directionalLight.position).negate().normalize();
+		lightingGenerator.lightDirection.transformDirection(boxMatrixInverse);
+	}
+
+	// data request
+	
+	const sCurveCoefficient = 3.0;
+
+	function sCurve(value) {
+		return Math.pow(value, sCurveCoefficient) /
+			(Math.pow(value, sCurveCoefficient) +
+			Math.pow(1 - value, sCurveCoefficient));
+	}
+
+	function sCurveArray(array) {
+		for (let i = 0, l = array.length; i < l; i++) {
+			array[i] = sCurve(array[i] / 255) * 255;
+		}
+		return array;
+	}
+
+	const filesArray = [
+		'Volume_0',
+		'Volume_1',
+		'Volume_2',
+		'Volume_3'
+	];
+
+	const requestCache = new Map();
+	async function requestData(fileName) {
+		if (requestCache.has(fileName)) {
+			return requestCache.get(fileName);
+		}
+	
+		const arrayBuffer = await (await fetch('./resources/3d/' + fileName + '.bin')).arrayBuffer();
+
+		const data = new Uint8Array(arrayBuffer);
+
+		sCurveArray(data);
+
+		requestCache.set(fileName, data);
+
+		return data;
+	}
+
+	async function getTexture3d(index) {
+		const data = await requestData(index);
+		texture3d.image = {
+			data: data,
+			width: 196,
+			height: 196,
+			depth: 50
+		};
+		texture3d.version++;
+
+		bakeLighting();
+
+		volumeMesh.visible = true;
+	}
+
+	// lighting bake
+
+	const lightingGenerator = new VolumeLightingGenerator();
+	lightingGenerator.detectSupport(renderer);
+
+	function bakeLighting() {
+		lightingGenerator.prelight(renderer, texture3d);
+	}
+
+	// run
+
+	const params = { prelight: true, prelightDebug: false };
+
+	function setPrelight() {
+		volumeEffect.volumeTexture = params.prelightDebug ? lightingGenerator.lightTexture : texture3d;
+		volumeEffect.lightTexture = (!params.prelightDebug && params.prelight) ? lightingGenerator.lightTexture : null;
+	}
+
+	setPrelight();
+	setLightPosition();
+	getTexture3d(filesArray[0]);
+
+	// gui
+
+	const gui = new GUI();
+
+	gui.add({ data: filesArray[0] }, 'data', filesArray).onChange(fileName => {
+		console.time('Change Data');
+		getTexture3d(fileName).then(() => {
+			console.timeEnd('Change Data');
+		});
+	});
+
+	const prelightFolder = gui.addFolder('Prelight').onChange(() => {
+		setLightPosition();
+		bakeLighting();
+	}).close();
+	prelightFolder.add(lightSpherical, 'phi', 0, Math.PI, 0.001).name('Longitudinal Angle');
+	prelightFolder.add(lightSpherical, 'theta', 0, Math.PI * 2, 0.001).name('Horizontal Angle');
+	prelightFolder.add(lightingGenerator, 'sampleDistance', 0.1, 1, 0.1);
+	prelightFolder.add(lightingGenerator, 'sampleSteps', 5, 20, 1);
+	prelightFolder.add(lightingGenerator, 'maskIntensity', 0, 2, 0.01);
+
+	const volumeFolder = gui.addFolder('Volume').close();
+	volumeFolder.add(volumeEffect, 'unitDistanceOpacity', 0, 10, 0.01);
+	volumeFolder.add(params, 'prelight').name('lighting').onChange(setPrelight);
+
+	const debugFolder = gui.addFolder('Debug').close();
+	debugFolder.add(params, 'prelightDebug').name('lighting debug').onChange(setPrelight);
+	debugFolder.add(helper, 'visible').name('Box Helper');
+	debugFolder.add(directionalLightHelper, 'visible').name('Light Helper');
+
+	//
+
+	function loop(count) {
+		requestAnimationFrame(loop);
+
+		controller.update();
+
+		scene.updateMatrix();
+		scene.updateRenderStates(camera);
+		scene.updateRenderQueue(camera);
+
+		renderer.setClearColor(0.3, 0.6, 1.0, 1);
+		effectComposer.render(renderer, scene, camera, backRenderTarget);
+	}
+	requestAnimationFrame(loop);
+
+	function onWindowResize() {
+		width = window.innerWidth || 2;
+		height = window.innerHeight || 2;
+
+		camera.setPerspective(45 / 180 * Math.PI, width / height, 0.1, 1000);
+
+		backRenderTarget.resize(width, height);
+		effectComposer.resize(width, height);
+	}
+	window.addEventListener('resize', onWindowResize, false);
+</script>
+</html>
