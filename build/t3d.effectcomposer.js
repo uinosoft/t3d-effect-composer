@@ -2818,6 +2818,17 @@ vec3 octahedronToUnitVector(vec2 p) {
 			// PENDING viewportSize ?
 			vec2 P0 = (H0.xy * k0 * 0.5 + 0.5) * viewportSize;
 			vec2 P1 = (H1.xy * k1 * 0.5 + 0.5) * viewportSize;
+			
+			// Clip to frustum
+			float xMax = viewportSize.x - 0.5, xMin = 0.5, yMax = viewportSize.y - 0.5, yMin = 0.5;
+			float alpha = 0.0;
+			if ((P1.y > yMax) || (P1.y < yMin)) {
+				alpha = (P1.y - ((P1.y > yMax) ? yMax : yMin)) / (P1.y - P0.y);
+			}
+			if ((P1.x > xMax) || (P1.x < xMin)) {
+				alpha = max(alpha, (P1.x - ((P1.x > xMax) ? xMax : xMin)) / (P1.x - P0.x));
+			}
+			P1 = mix(P1, P0, alpha); k1 = mix(k1, k0, alpha); Q1 = mix(Q1, Q0, alpha);
 
 			// If the line is degenerate, make it cover at least one pixel to avoid handling
 			// zero-pixel extent as a special case later

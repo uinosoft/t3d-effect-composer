@@ -33,7 +33,7 @@ class Inspector {
 			ssrFolder.add(ssrEffect, 'active');
 			ssrFolder.add(ssrEffect, 'pixelStride', 1, 100, 1);
 			ssrFolder.add(ssrEffect, 'maxIteration', 1, 10, 1);
-			ssrFolder.add(ssrEffect, 'maxSteps', 20, 200, 1);
+			ssrFolder.add(ssrEffect, 'maxSteps', 20, 1000, 1);
 			ssrFolder.add(ssrEffect, 'maxRayDistance', 1, 1000, 0.01);
 			ssrFolder.add(ssrEffect, 'enablePixelStrideZCutoff');
 			ssrFolder.add(ssrEffect, 'pixelStrideZCutoff', 1, 300, 1);
@@ -45,6 +45,7 @@ class Inspector {
 			ssrFolder.add(ssrEffect, 'falloff', 0, 1, 0.01);
 			ssrFolder.add(ssrEffect, 'zThicknessThreshold', 0, 10, 0.01);
 			ssrFolder.add(ssrEffect, 'importanceSampling');
+			ssrFolder.add(ssrEffect, 'blurSize', 0, 5, 0.01).name('denoise');
 
 			const colorCorrectionEffect = effectComposer.getEffect('ColorCorrection');
 			const colorCorrectionFolder = postEffectFolder.addFolder('ColorCorrection');
