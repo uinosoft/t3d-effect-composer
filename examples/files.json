@@ -32,6 +32,7 @@
 		"advanced_rain",
 		"advanced_heightfog",
 		"advanced_sharpness",
+		"advanced_kuwahara",
 		"advanced_volume",
 		"advanced_volume_lighted",
 		"advanced_skyline",
