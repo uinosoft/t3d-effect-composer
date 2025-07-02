@@ -55,6 +55,7 @@
     "lint": "eslint src",
     "lint-fix": "eslint src --fix",
     "lint-addons": "eslint examples/jsm",
-    "lint-examples": "eslint examples --ext .html"
+    "lint-examples": "eslint examples --ext .html",
+    "install-examples": "cd examples && npm install && cd .."
   }
 }

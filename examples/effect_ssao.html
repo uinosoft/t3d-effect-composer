@@ -13,22 +13,22 @@
 </head>
 
 <body>
-    <div id="container"></div>
     <div id="info" class="dark">
     	GTAO vs SSAO
     </div>
 </body>
 
+<script src="./node_modules/nanobar/nanobar.min.js"></script>
+
 <!-- Import maps polyfill -->
 <!-- Remove this when import maps will be widely supported -->
-<script async src="./libs/es-module-shims.js"></script>
-<script src="./libs/nanobar.min.js"></script>
+<script async src="./node_modules/es-module-shims/dist/es-module-shims.js"></script>
 
 <script type="importmap">
     {
       	"imports": {
-			"t3d": "./libs/t3d/build/t3d.module.js",
-			"t3d/addons/": "./libs/t3d/examples/jsm/",
+			"t3d": "./node_modules/t3d/build/t3d.module.js",
+			"t3d/addons/": "./node_modules/t3d/examples/jsm/",
 			"t3d-effect-composer": "../build/t3d.effectcomposer.module.js"
       	}
     }
@@ -46,8 +46,8 @@
     import GTAOEffect from './jsm/gtao/GTAOEffect.js';
     import GTAODebugger from './jsm/gtao/GTAODebugger.js';
     
-    import { GUI } from './libs/lil-gui.esm.min.js';
-    import Stats from './libs/stats.module.js';
+    import { GUI } from './node_modules/lil-gui/dist/lil-gui.esm.js';
+    import Stats from './node_modules/stats.js/src/Stats.js';
 
     let width = window.innerWidth || 2;
     let height = window.innerHeight || 2;

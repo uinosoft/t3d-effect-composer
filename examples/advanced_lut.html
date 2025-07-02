@@ -13,19 +13,18 @@
 </head>
 
 <body>
-	<div id="container"></div>
 	<div id="info">Lut Effect, press 'i' to show Inspector</div>
 </body>
 
 <!-- Import maps polyfill -->
 <!-- Remove this when import maps will be widely supported -->
-<script async src="./libs/es-module-shims.js"></script>
+<script async src="./node_modules/es-module-shims/dist/es-module-shims.js"></script>
 
 <script type="importmap">
     {
         "imports": {
-            "t3d": "./libs/t3d/build/t3d.module.js",
-            "t3d/addons/": "./libs/t3d/examples/jsm/",
+            "t3d": "./node_modules/t3d/build/t3d.module.js",
+            "t3d/addons/": "./node_modules/t3d/examples/jsm/",
             "t3d-effect-composer": "../build/t3d.effectcomposer.module.js"
         }
     }
@@ -45,8 +44,8 @@
 	import { LUT3dlLoader } from './jsm/lut/LUT3dlLoader.js';
 	import { Inspector } from './jsm/Inspector.js';
 
-	import { GUI } from './libs/lil-gui.esm.min.js';
-	import Stats from './libs/stats.module.js';
+	import { GUI } from './node_modules/lil-gui/dist/lil-gui.esm.js';
+	import Stats from './node_modules/stats.js/src/Stats.js';
 
 	let width = window.innerWidth || 2;
 	let height = window.innerHeight || 2;

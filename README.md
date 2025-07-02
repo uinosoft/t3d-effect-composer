@@ -14,6 +14,19 @@ Documents<[English](./docs/doc-en.md)/[中文](./docs/doc-zh.md)>
 * Mesh effects: InnerGlow, Glow, SoftGlow, Tailing, RadialTailing, Ghosting, Outline.
 * Extended rendering features: Decal, lensflare, lut, overlay, sketch, uv debug ...
 
+### Running Examples
+
+To run the examples locally:
+
+1. Clone the repository
+2. Install dependencies for examples:
+   ```bash
+   npm run install-examples
+   ```
+3. Start a local server in the examples directory and open any HTML file
+
+The examples demonstrate various effects and features of the t3d-effect-composer library.
+
 ### Usage
 
 Getting started：

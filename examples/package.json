@@ -1,0 +1,13 @@
+{
+    "name": "t3d-effect-composer-examples",
+    "version": "0.0.1",
+    "private": true,
+    "description": "Examples for t3d-effect-composer library",
+    "dependencies": {
+        "es-module-shims": "2.5.1",
+        "lil-gui": "0.20.0",
+        "nanobar": "0.4.2",
+        "stats.js": "0.17.0",
+        "t3d": "0.4.3"
+    }
+}

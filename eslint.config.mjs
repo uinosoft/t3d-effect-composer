@@ -8,7 +8,7 @@ export default [
 	{
 		ignores: [
 			'build/**',
-			'node_modules/**',
+			'**/node_modules/**',
 			'examples/libs/**'
 		]
 	},
