@@ -225,7 +225,6 @@ const instancedLineShader = {
 		SCREEN_UV: false // TODO
 	},
 	uniforms: {
-		resolution: [512, 512],
 		lineWidth: 5,
 		cornerThreshold: 0.4
 	},
@@ -260,20 +259,20 @@ const instancedLineShader = {
         #endif
 
         uniform float lineWidth;
-        uniform vec2 resolution;
+        uniform vec2 u_RenderTargetSize;
 
         uniform float cornerThreshold;
 
         void trimSegment(const in vec4 start, inout vec4 end) {
             // trim end segment so it terminates between the camera plane and the near plane
-        
+
             // conservative estimate of the near plane
             float a = u_Projection[2][2]; // 3nd entry in 3th column
             float b = u_Projection[3][2]; // 3nd entry in 4th column
             float nearEstimate = -0.5 * b / a;
-        
+
             float alpha = (nearEstimate - start.z) / (end.z - start.z);
-        
+
             end.xyz = mix(start.xyz, end.xyz, alpha);
         }
 
@@ -281,7 +280,7 @@ const instancedLineShader = {
             vec3 position = a_Position;
             mat4 modelViewMatrix = u_View * u_Model;
 
-            float aspect = resolution.x / resolution.y;
+            float aspect = u_RenderTargetSize.x / u_RenderTargetSize.y;
             float flagY = position.y * 0.5 + 0.5;
 
             // camera space
@@ -326,7 +325,7 @@ const instancedLineShader = {
                     } else if (next.z < 0.0 && curr.z >= 0.0) {
                         trimSegment(next, curr);
                     }
-                } 
+                }
             }
 
             // clip space
@@ -343,18 +342,18 @@ const instancedLineShader = {
             vec2 dir, dir1, dir2;
             float w = 1.0;
 
-            if (prev == curr) {
+            if (prev == curr || ndcPrev == ndcCurr) {
                 dir = ndcNext - ndcCurr;
                 dir.x *= aspect;
                 dir = normalize(dir);
-            } else if(curr == next) {
+            } else if(curr == next || ndcCurr == ndcNext) {
                 dir = ndcCurr - ndcPrev;
                 dir.x *= aspect;
                 dir = normalize(dir);
             } else {
                 dir1 = ndcCurr - ndcPrev;
                 dir1.x *= aspect;
-                
+
                 dir2 = ndcNext - ndcCurr;
                 dir2.x *= aspect;
 
@@ -365,7 +364,7 @@ const instancedLineShader = {
 
                 w = dot(dir1, dir);
 
-                #ifdef DISABLE_CORNER_BROKEN  
+                #ifdef DISABLE_CORNER_BROKEN
                     w = 1.0 / max(w, cornerThreshold);
                 #else
                     float flagT = step(w, cornerThreshold);
@@ -385,10 +384,10 @@ const instancedLineShader = {
 
             // adjust for lineWidth
             offset *= lineWidth * w;
-            
-            // adjust for clip-space to screen-space conversion // maybe resolution should be based on viewport ...
-            offset /= resolution.y;
-            
+
+            // adjust for clip-space to screen-space conversion // maybe this should be based on viewport ...
+            offset /= u_RenderTargetSize.y;
+
             // select end
             vec4 clip = clipCurr;
 
@@ -402,7 +401,7 @@ const instancedLineShader = {
             #ifdef USE_FOG
                 vDepth = -curr.z;
             #endif
-            
+
             #ifdef USE_LOGDEPTHBUF
                 #ifdef USE_LOGDEPTHBUF_EXT
                     vFragDepth = 1.0 + gl_Position.w - logDepthCameraNear;
@@ -475,19 +474,19 @@ const instancedLineShader = {
                     discard;
                 }
             #endif
-        
+
             vec4 outColor = vec4(u_Color, u_Opacity);
 
             #ifdef USE_DIFFUSE_MAP
                 outColor *= texture2D(diffuseMap, v_Uv);
             #endif
-        
+
             #ifdef USE_ALPHA_MAP
                 outColor.a *= texture2D(alphaMap, vAlphaMapUV).g;
             #endif
-        
+
             gl_FragColor = outColor;
-        
+
             #ifdef USE_FOG
                 float depth = vDepth;
                 #ifdef USE_EXP2_FOG

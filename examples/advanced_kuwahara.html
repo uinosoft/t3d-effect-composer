@@ -69,7 +69,7 @@
     effectComposer.sceneMSAA = true;
 
     const scene = new t3d.Scene();
-    scene.environmentLightIntensity = 1;
+    scene.envDiffuseIntensity = 1;
 
     const ambientLight = new t3d.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);

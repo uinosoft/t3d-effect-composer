@@ -160,7 +160,9 @@
     	align: 'left',
     	letterSpacing: 1,
     	lineHeight: 90,
-    	baseline: 60
+    	baseline: 60,
+    	centerX: 0.5,
+    	centerY: 0.5
     };
     bitmapTextOptions.font = dynamicFont.fontData;
     bitmapTextOptions.width = 1100;
@@ -177,9 +179,6 @@
     const textScalar = 0.008;
     const textMesh = new t3d.Mesh(textGeometry, textMaterial);
     textMesh.scale.multiplyScalar(textScalar);
-    textMesh.euler.x = Math.PI;
-    textGeometry.boundingBox.getSize(textMesh.position)
-    	.multiplyScalar(-0.5 * textScalar);
     textMesh.position.z = 0.1;
     textMesh.renderLayer = 21;
     panelContainer.add(textMesh);
