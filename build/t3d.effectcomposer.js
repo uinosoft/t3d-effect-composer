@@ -5718,9 +5718,14 @@ vec3 octahedronToUnitVector(vec2 p) {
 				mask: RenderListMask.ALL
 			}];
 			this._sceneRenderOptions = {};
-			this._transmissionRT = new t3d.RenderTarget2D(width, height);
+
+			// transmission render target is power-of-two size
+			// to avoid artifacts in mipmap generation
+			this._transmissionRT = new t3d.RenderTarget2D(t3d.MathUtils.nearestPowerOfTwo(width), t3d.MathUtils.nearestPowerOfTwo(height));
 			setupColorTexture(this._transmissionRT.texture, options);
+			this._transmissionRT.texture.magFilter = t3d.TEXTURE_FILTER.NEAREST;
 			this._transmissionRT.detach(t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+			this._transmissionCopyPass = new t3d.ShaderPostPass(copyShader);
 			const transmissionRenderOptions = {
 				getMaterial: renderable => {
 					const samplerMap = this._transmissionRT.texture;
@@ -5808,7 +5813,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 			const renderQueue = scene.getRenderQueue(camera);
 			enableCameraJitter && cameraJitter.jitterProjectionMatrix(renderStates.camera, this._rt.width, this._rt.height);
 			this.$renderScene(renderer, renderQueue, renderStates);
-			this.$renderTransmission(renderer, renderQueue, renderStates);
+			this.$renderTransmission(renderer, renderQueue, renderStates, composer);
 			this.$renderPostTransmission(renderer, renderQueue, renderStates);
 			this.$renderOverlay(renderer, renderQueue, renderStates);
 			enableCameraJitter && cameraJitter.restoreProjectionMatrix(renderStates.camera);
@@ -5827,13 +5832,14 @@ vec3 octahedronToUnitVector(vec2 p) {
 			super.resize(width, height);
 			this._rt.resize(width, height);
 			this._mrt.resize(width, height);
-			this._transmissionRT.resize(width, height);
+			this._transmissionRT.resize(t3d.MathUtils.nearestPowerOfTwo(width), t3d.MathUtils.nearestPowerOfTwo(height));
 		}
 		dispose() {
 			super.dispose();
 			this._rt.dispose();
 			this._mrt.dispose();
 			this._transmissionRT.dispose();
+			this._transmissionCopyPass.dispose();
 		}
 		_renderOneLayer(renderer, renderQueue, renderStates, renderLayer) {
 			const {
@@ -5859,13 +5865,29 @@ vec3 octahedronToUnitVector(vec2 p) {
 			}
 			renderer.endRender();
 		}
-		$renderTransmission(renderer, renderQueue, renderStates) {
+		$renderTransmission(renderer, renderQueue, renderStates, composer) {
 			const renderLayer = this.postRenderLayers.transmission;
 			if (this.$isRenderLayerEmpty(renderQueue, renderLayer)) return;
 			const oldRenderTarget = renderer.getRenderTarget();
+			const oldColorBuffer = oldRenderTarget._attachments[t3d.ATTACHMENT.COLOR_ATTACHMENT0];
+			const useMSAA = oldColorBuffer.isRenderBuffer && oldColorBuffer.multipleSampling > 0;
+			let sceneRenderTarget = oldRenderTarget;
+			if (useMSAA) {
+				sceneRenderTarget = composer._renderTargetCache.allocate(0);
+
+				// blit to single-sampled render target
+				renderer.setRenderTarget(sceneRenderTarget);
+				renderer.blitRenderTarget(this._mrt, sceneRenderTarget, true, false, false);
+			}
+
+			// copy to power-of-two transmissionRT and generate mipmaps
 			renderer.setRenderTarget(this._transmissionRT);
-			renderer.blitRenderTarget(oldRenderTarget, this._transmissionRT, true, false, false);
+			this._transmissionCopyPass.uniforms.tDiffuse = sceneRenderTarget.texture;
+			this._transmissionCopyPass.render(renderer);
 			renderer.updateRenderTargetMipmap(this._transmissionRT);
+			if (useMSAA) {
+				composer._renderTargetCache.release(sceneRenderTarget, 0);
+			}
 			renderer.setRenderTarget(oldRenderTarget);
 			renderer.beginRender();
 			this._renderOneLayer(renderer, renderQueue, renderStates, renderLayer);

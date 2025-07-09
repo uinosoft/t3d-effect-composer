@@ -1,5 +1,5 @@
-import { RenderTarget2D, ATTACHMENT } from 't3d';
-import { isDepthStencilAttachment, RenderListMask, setupColorTexture } from '../Utils.js';
+import { RenderTarget2D, ATTACHMENT, TEXTURE_FILTER, MathUtils, ShaderPostPass } from 't3d';
+import { copyShader, isDepthStencilAttachment, RenderListMask, setupColorTexture } from '../Utils.js';
 import Buffer from './Buffer.js';
 
 export default class SceneBuffer extends Buffer {
@@ -27,9 +27,17 @@ export default class SceneBuffer extends Buffer {
 
 		this._sceneRenderOptions = {};
 
-		this._transmissionRT = new RenderTarget2D(width, height);
+		// transmission render target is power-of-two size
+		// to avoid artifacts in mipmap generation
+		this._transmissionRT = new RenderTarget2D(
+			MathUtils.nearestPowerOfTwo(width),
+			MathUtils.nearestPowerOfTwo(height)
+		);
 		setupColorTexture(this._transmissionRT.texture, options);
+		this._transmissionRT.texture.magFilter = TEXTURE_FILTER.NEAREST;
 		this._transmissionRT.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+
+		this._transmissionCopyPass = new ShaderPostPass(copyShader);
 
 		const transmissionRenderOptions = {
 			getMaterial: renderable => {
@@ -127,7 +135,7 @@ export default class SceneBuffer extends Buffer {
 		enableCameraJitter && cameraJitter.jitterProjectionMatrix(renderStates.camera, this._rt.width, this._rt.height);
 
 		this.$renderScene(renderer, renderQueue, renderStates);
-		this.$renderTransmission(renderer, renderQueue, renderStates);
+		this.$renderTransmission(renderer, renderQueue, renderStates, composer);
 		this.$renderPostTransmission(renderer, renderQueue, renderStates);
 		this.$renderOverlay(renderer, renderQueue, renderStates);
 
@@ -150,7 +158,10 @@ export default class SceneBuffer extends Buffer {
 		super.resize(width, height);
 		this._rt.resize(width, height);
 		this._mrt.resize(width, height);
-		this._transmissionRT.resize(width, height);
+		this._transmissionRT.resize(
+			MathUtils.nearestPowerOfTwo(width),
+			MathUtils.nearestPowerOfTwo(height)
+		);
 	}
 
 	dispose() {
@@ -158,6 +169,7 @@ export default class SceneBuffer extends Buffer {
 		this._rt.dispose();
 		this._mrt.dispose();
 		this._transmissionRT.dispose();
+		this._transmissionCopyPass.dispose();
 	}
 
 	_renderOneLayer(renderer, renderQueue, renderStates, renderLayer) {
@@ -184,16 +196,35 @@ export default class SceneBuffer extends Buffer {
 		renderer.endRender();
 	}
 
-	$renderTransmission(renderer, renderQueue, renderStates) {
+	$renderTransmission(renderer, renderQueue, renderStates, composer) {
 		const renderLayer = this.postRenderLayers.transmission;
 
 		if (this.$isRenderLayerEmpty(renderQueue, renderLayer)) return;
 
 		const oldRenderTarget = renderer.getRenderTarget();
+		const oldColorBuffer = oldRenderTarget._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
+		const useMSAA = oldColorBuffer.isRenderBuffer && oldColorBuffer.multipleSampling > 0;
 
+		let sceneRenderTarget = oldRenderTarget;
+
+		if (useMSAA) {
+			sceneRenderTarget = composer._renderTargetCache.allocate(0);
+
+			// blit to single-sampled render target
+			renderer.setRenderTarget(sceneRenderTarget);
+			renderer.blitRenderTarget(this._mrt, sceneRenderTarget, true, false, false);
+		}
+
+		// copy to power-of-two transmissionRT and generate mipmaps
 		renderer.setRenderTarget(this._transmissionRT);
-		renderer.blitRenderTarget(oldRenderTarget, this._transmissionRT, true, false, false);
+		this._transmissionCopyPass.uniforms.tDiffuse = sceneRenderTarget.texture;
+		this._transmissionCopyPass.render(renderer);
 		renderer.updateRenderTargetMipmap(this._transmissionRT);
+
+		if (useMSAA) {
+			composer._renderTargetCache.release(sceneRenderTarget, 0);
+		}
+
 		renderer.setRenderTarget(oldRenderTarget);
 
 		renderer.beginRender();
