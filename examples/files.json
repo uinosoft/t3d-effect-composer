@@ -22,6 +22,7 @@
 	],
 	"advanced": [
 		"advanced_stencil",
+		"advanced_prez",
 		"advanced_wireframe",
 		"advanced_decal",
 		"advanced_sketch",
