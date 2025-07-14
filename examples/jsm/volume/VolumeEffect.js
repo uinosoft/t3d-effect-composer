@@ -167,6 +167,8 @@ const volumeShader = {
 		ZSLICEY: 16,
 		TEXTURE2D_WRAP_REPEAT: false,
 
+		TEXTURE_CLIP_OVERFLOW: true,
+
 		USE_LIGHT_TEXTURE: true
 	},
 	uniforms: {
@@ -392,6 +394,12 @@ const volumeShader = {
             }
 			
 			vec3 rayPosObject = (boxMatrixInverse * vec4(point, 1.0)).xyz;
+
+			#ifdef TEXTURE_CLIP_OVERFLOW
+				if (any(greaterThan(abs(rayPosObject), vec3(0.5)))) {
+					continue;
+				}
+			#endif
 
             colorSum = sampleAs3DTexture(rayPosObject);
 
