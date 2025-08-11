@@ -4952,46 +4952,51 @@ vec3 octahedronToUnitVector(vec2 p) {
 	function defaultMaterialReplaceFunction$2(renderable) {
 		let materialRef = materialWeakMap.get(renderable.material);
 		if (!materialRef) {
-			const useFlatShading = !renderable.geometry.attributes['a_Normal'] || renderable.material.shading === t3d.SHADING_TYPE.FLAT_SHADING;
-			const useDiffuseMap = !!renderable.material.diffuseMap;
-			const useMetalnessMap = !!renderable.material.metalnessMap;
-			const useRoughnessMap = !!renderable.material.roughnessMap;
-			const useSkinning = renderable.object.isSkinnedMesh && renderable.object.skeleton;
-			const morphTargets = !!renderable.object.morphTargetInfluences;
-			const morphNormals = !!renderable.object.morphTargetInfluences && renderable.object.geometry.morphAttributes.normal;
-			const side = renderable.material.side;
+			const {
+				geometry,
+				material,
+				object
+			} = renderable;
+			const useFlatShading = !geometry.attributes['a_Normal'] || material.shading === t3d.SHADING_TYPE.FLAT_SHADING;
+			const useDiffuseMap = !!material.diffuseMap;
+			const useMetalnessMap = !!material.metalnessMap;
+			const useRoughnessMap = !!material.roughnessMap;
+			const useSkinning = object.isSkinnedMesh && object.skeleton;
+			const morphTargets = !!object.morphTargetInfluences;
+			const morphNormals = !!object.morphTargetInfluences && geometry.morphAttributes.normal;
+			const side = material.side;
 			let maxBones = 0;
 			if (useSkinning) {
-				if (renderable.object.skeleton.boneTexture) {
+				if (object.skeleton.boneTexture) {
 					maxBones = 1024;
 				} else {
-					maxBones = renderable.object.skeleton.bones.length;
+					maxBones = object.skeleton.bones.length;
 				}
 			}
 			const code = useFlatShading + '_' + useDiffuseMap + '_' + useMetalnessMap + '_' + useRoughnessMap + '_' + useSkinning + '_' + maxBones + '_' + morphTargets + '_' + morphNormals + '_' + side;
 			materialRef = materialMap$2.get(code);
 			if (!materialRef) {
-				const material = new t3d.ShaderMaterial(gBufferShader);
-				material.shading = useFlatShading ? t3d.SHADING_TYPE.FLAT_SHADING : t3d.SHADING_TYPE.SMOOTH_SHADING;
-				material.alphaTest = useDiffuseMap ? 0.999 : 0; // ignore if alpha < 0.99
-				material.side = side;
+				const _material = new t3d.ShaderMaterial(gBufferShader);
+				_material.shading = useFlatShading ? t3d.SHADING_TYPE.FLAT_SHADING : t3d.SHADING_TYPE.SMOOTH_SHADING;
+				_material.alphaTest = useDiffuseMap ? 0.999 : 0; // ignore if alpha < 0.99
+				_material.side = side;
 				materialRef = {
 					refCount: 0,
-					material
+					material: _material
 				};
 				materialMap$2.set(code, materialRef);
 			}
-			materialWeakMap.set(renderable.material, materialRef);
+			materialWeakMap.set(material, materialRef);
 			materialRef.refCount++;
 			function onDispose() {
-				renderable.material.removeEventListener('dispose', onDispose);
-				materialWeakMap.delete(renderable.material);
+				material.removeEventListener('dispose', onDispose);
+				materialWeakMap.delete(material);
 				materialRef.refCount--;
 				if (materialRef.refCount <= 0) {
 					materialMap$2.delete(code);
 				}
 			}
-			renderable.material.addEventListener('dispose', onDispose);
+			material.addEventListener('dispose', onDispose);
 		}
 		return materialRef.material;
 	}

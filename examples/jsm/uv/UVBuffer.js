@@ -80,15 +80,17 @@ class UVMaterialCache {
 		let materialRef = this._weakMap.get(renderable.material);
 
 		if (!materialRef) {
-			const useSkinning = renderable.object.isSkinnedMesh && renderable.object.skeleton;
-			const morphTargets = !!renderable.object.morphTargetInfluences;
+			const { material, object } = renderable;
+
+			const useSkinning = object.isSkinnedMesh && object.skeleton;
+			const morphTargets = !!object.morphTargetInfluences;
 
 			let maxBones = 0;
 			if (useSkinning) {
-				if (renderable.object.skeleton.boneTexture) {
+				if (object.skeleton.boneTexture) {
 					maxBones = 1024;
 				} else {
-					maxBones = renderable.object.skeleton.bones.length;
+					maxBones = object.skeleton.bones.length;
 				}
 			}
 
@@ -98,26 +100,26 @@ class UVMaterialCache {
 
 			materialRef = this._map.get(code);
 			if (!materialRef) {
-				const material = new ShaderMaterial(uvShader);
+				const _material = new ShaderMaterial(uvShader);
 
-				materialRef = { refCount: 0, material };
+				materialRef = { refCount: 0, material: _material };
 				this._map.set(code, materialRef);
 			}
 
-			this._weakMap.set(renderable.material, materialRef);
+			this._weakMap.set(material, materialRef);
 			materialRef.refCount++;
 
 			function onDispose() {
-				renderable.material.removeEventListener('dispose', onDispose);
+				material.removeEventListener('dispose', onDispose);
 
-				this._weakMap.delete(renderable.material);
+				this._weakMap.delete(material);
 				materialRef.refCount--;
 
 				if (materialRef.refCount <= 0) {
 					this._map.delete(code);
 				}
 			}
-			renderable.material.addEventListener('dispose', onDispose);
+			material.addEventListener('dispose', onDispose);
 		}
 
 		return materialRef.material;
