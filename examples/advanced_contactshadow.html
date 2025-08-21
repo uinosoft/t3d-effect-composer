@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>t3d-effect-composer</title>
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <link type="text/css" rel="stylesheet" href="main.css">
+    <style>
+        .top-left-corner {
+            left: 15px;
+        }
+    </style>
+</head>
+
+<script src="./node_modules/nanobar/nanobar.min.js"></script>
+
+<!-- Import maps polyfill -->
+<!-- Remove this when import maps will be widely supported -->
+<script async src="./node_modules/es-module-shims/dist/es-module-shims.js"></script>
+
+<script type="importmap">
+    {
+        "imports": {
+            "t3d": "./node_modules/t3d/build/t3d.module.js",
+            "t3d/addons/": "./node_modules/t3d/examples/jsm/",
+            "t3d-effect-composer": "../build/t3d.effectcomposer.module.js"
+        }
+    }
+</script>
+
+<body>
+    <div id="info">contact shadow</div>
+</body>
+
+<script type="module">
+	import * as t3d from 't3d';
+	import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
+	import { GLTFLoader } from 't3d/addons/loaders/glTF/GLTFLoader.js';
+	import { TextureCubeLoader } from 't3d/addons/loaders/TextureCubeLoader.js';
+	import { SkyBox } from 't3d/addons/objects/SkyBox.js';
+	import { DefaultEffectComposer, TAAEffect, AccumulationBuffer } from 't3d-effect-composer';
+	import { ContactShadowEffect } from './jsm/ContactShadowEffect.js';
+	import { GUI } from './node_modules/lil-gui/dist/lil-gui.esm.js';
+	import Stats from './node_modules/stats.js/src/Stats.js';
+	import { FastGBuffer } from './jsm/FastGBuffer.js';
+
+	let width = window.innerWidth || 2;
+	let height = window.innerHeight || 2;
+
+	const canvas = document.createElement('canvas');
+	canvas.width = width * window.devicePixelRatio;
+	canvas.height = height * window.devicePixelRatio;
+	canvas.style.width = width + 'px';
+	canvas.style.height = height + 'px';
+	document.body.appendChild(canvas);
+
+	const contextParams = { antialias: true, alpha: false, stencil: false };
+	const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
+	const renderer = new t3d.WebGLRenderer(gl);
+	renderer.setClearColor(0, 0, 0, 1);
+	const backRenderTarget = new t3d.RenderTargetBack(canvas);
+
+	const shadowMapPass = new t3d.ShadowMapPass();
+
+	const composerOptions = {
+		samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
+		webgl2: renderer.capabilities.version > 1,
+		depthTextureAttachment: true
+	};
+	const effectComposer = new DefaultEffectComposer(width * window.devicePixelRatio, height * window.devicePixelRatio, composerOptions);
+
+	const sceneBuffer = effectComposer.getBuffer('SceneBuffer');
+	const gBuffer = effectComposer.getBuffer('GBuffer');
+	const fastGBuffer = new FastGBuffer(width * window.devicePixelRatio, height * window.devicePixelRatio, composerOptions);
+
+	gBuffer.setIfRenderReplaceFunction(function(renderable) {
+		return renderable.material.shaderName !== 'skybox';
+	});
+
+	const contactShadowEffect = new ContactShadowEffect();
+	effectComposer.addEffect('contactShadow', contactShadowEffect, 5);
+	contactShadowEffect.lightDirection.set(1, -1, 1).normalize();
+
+	const accumBuffer = new AccumulationBuffer(width * window.devicePixelRatio, height * window.devicePixelRatio, composerOptions);
+	const taaEffect = new TAAEffect();
+	taaEffect.onFinish = () => {
+		sceneBuffer.autoUpdate = false;
+		console.log('accumulation finished.');
+	};
+	effectComposer.addBuffer('AccumulationBuffer', accumBuffer);
+	effectComposer.addEffect('TAA', taaEffect, 6); // After contactShadow
+
+	function taaReset() {
+		sceneBuffer.autoUpdate = true;
+		taaEffect.reset();
+	}
+
+	const scene = new t3d.Scene();
+
+	const camera = new t3d.Camera();
+	camera.position.set(30, 20, 40);
+	camera.lookAt(new t3d.Vector3(0, 0, 0), new t3d.Vector3(0, 1, 0));
+	camera.setPerspective(30 / 180 * Math.PI, width / height, 1, 800);
+	scene.add(camera);
+
+	camera.gammaFactor = 2.0;
+	camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.GAMMA;
+	effectComposer.getBuffer('SceneBuffer').setOutputEncoding(t3d.TEXEL_ENCODING_TYPE.GAMMA);
+
+	const controller = new OrbitControls(camera, canvas);
+	controller.enableDamping = true;
+	controller.dampingFactor = 1;
+
+	// Environment
+
+	const ambientLight = new t3d.AmbientLight(0xffffff, 0.1);
+	scene.add(ambientLight);
+
+	const directionalLight = new t3d.DirectionalLight(0xffffff, 0.5);
+	directionalLight.position.set(-80, 80, -80);
+	directionalLight.lookAt(new t3d.Vector3(), new t3d.Vector3(0, 1, 0));
+	scene.add(directionalLight);
+
+	const cubeTexture = new TextureCubeLoader().load([
+		'./resources/cube/BlueSky/posx.jpg',
+		'./resources/cube/BlueSky/negx.jpg',
+		'./resources/cube/BlueSky/posy.jpg',
+		'./resources/cube/BlueSky/negy.jpg',
+		'./resources/cube/BlueSky/posz.jpg',
+		'./resources/cube/BlueSky/negz.jpg'
+	]);
+	scene.environment = cubeTexture;
+
+	const skyBox = new SkyBox(cubeTexture);
+	scene.add(skyBox);
+
+	// Load model
+
+	const nanobar = new Nanobar();
+	nanobar.el.style.background = 'gray';
+
+	const loadingManager = new t3d.LoadingManager(function() {
+		nanobar.go(100);
+		nanobar.el.style.background = 'transparent';
+	}, function(url, itemsLoaded, itemsTotal) {
+		if (itemsLoaded < itemsTotal) {
+			nanobar.go(itemsLoaded / itemsTotal * 100);
+		}
+	});
+
+	const loader = new GLTFLoader(loadingManager);
+	const modelUrl = './resources/gltf/lowpoly.glb';
+	loader.load(modelUrl).then(function(result) {
+		console.timeEnd('GLTFLoader');
+
+		const object = result.root;
+
+		object.traverse(node => {
+			if (node.material) {
+				node.castShadow = true;
+				node.receiveShadow = true;
+			}
+		});
+
+		scene.add(object);
+	});
+
+	const planeGeometry = new t3d.PlaneGeometry(150, 150);
+	const planeMaterial = new t3d.PBRMaterial();
+	planeMaterial.diffuseMapTransform.setUvTransform(0, 0, 3, 3, 0, 0.5, 0.5);
+	planeMaterial.roughness = 0.5;
+	planeMaterial.metalness = 0.01;
+	planeMaterial.dithering = true;
+	const plane = new t3d.Mesh(planeGeometry, planeMaterial);
+	plane.position.y -= 25;
+	plane.receiveShadow = true;
+	plane.visible = false;
+	scene.add(plane);
+
+	// GUI
+
+	const gui = new GUI();
+	gui.add(taaEffect, 'active').name('taa').onChange(taaReset);
+
+	const shadowFolder = gui.addFolder('Contact Shadow').onChange(taaReset);
+	shadowFolder.add(contactShadowEffect, 'active').name('Enable');
+	shadowFolder.addColor(contactShadowEffect, 'shadowColor');
+	shadowFolder.add(contactShadowEffect, 'shadowIntensity').name('Intensity').min(0).max(1);
+	shadowFolder.add(contactShadowEffect, 'rayLength').name('Ray Length').min(0).max(100);
+	shadowFolder.add(contactShadowEffect, 'zThicknessThreshold').name('Thickness Threshold').min(0).max(10).step(0.01);
+	shadowFolder.add(contactShadowEffect, 'numSteps').name('Steps').min(0).max(1000);
+	shadowFolder.add({ fastGBuffer: false }, 'fastGBuffer').name('Fast GBuffer').onChange(value => {
+		const currentBuffer = value ? fastGBuffer : gBuffer;
+		effectComposer.addBuffer('GBuffer', currentBuffer);
+		effectComposer._syncAttachments();
+	});
+
+	//
+
+	const stats = new Stats();
+	stats.showPanel(0);
+	document.body.appendChild(stats.dom);
+
+	let staticCount = -1;
+	function loop(count) {
+		requestAnimationFrame(loop);
+
+		stats.begin();
+
+		if (controller.update()) {
+			staticCount = 10;
+			taaReset();
+		} else {
+			staticCount--;
+			if (staticCount > 0) {
+				taaReset();
+			}
+		}
+
+		scene.updateMatrix();
+		scene.updateRenderStates(camera);
+		scene.updateRenderQueue(camera);
+
+		shadowMapPass.render(renderer, scene);
+
+	
+		effectComposer.render(renderer, scene, camera, backRenderTarget);
+
+		stats.end();
+	}
+	requestAnimationFrame(loop);
+
+	function onWindowResize() {
+		width = window.innerWidth || 2;
+		height = window.innerHeight || 2;
+
+		canvas.style.width = width + 'px';
+		canvas.style.height = height + 'px';
+
+		camera.setPerspective(30 / 180 * Math.PI, width / height, 0.1, 1000);
+
+		backRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+		effectComposer.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+
+		taaReset();
+	}
+	window.addEventListener('resize', onWindowResize, false);
+</script>
+</html>

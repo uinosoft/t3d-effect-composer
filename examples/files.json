@@ -37,7 +37,8 @@
 		"advanced_volume",
 		"advanced_volume_lighted",
 		"advanced_skyline",
-		"advanced_godrays"
+		"advanced_godrays",
+		"advanced_contactshadow"
 	],
 	"debugger": [
 		"debugger_uv"
