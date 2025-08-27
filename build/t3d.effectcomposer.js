@@ -4802,7 +4802,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 				setupDepthTexture(depthTexture, true);
 				this._logDepthRenderTarget.attach(depthTexture, t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 
-				// only use this pass to render depth texture
+				// only render to depth texture in this pass
 				this._logDepthPass = new t3d.ShaderPostPass(logDepthShader);
 				this._logDepthPass.material.colorWrite = false;
 				// If depth test is disabled, gl_FragDepthEXT will not work
@@ -4863,12 +4863,16 @@ vec3 octahedronToUnitVector(vec2 p) {
 				renderer.clear(false, true, true);
 				const {
 					near,
-					far
+					far,
+					logDepthCameraNear,
+					logDepthBufFC
 				} = fixedRenderStates.camera;
 				this._logDepthPass.uniforms.depthTexture = this._rt._attachments[t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
-				this._logDepthPass.uniforms.depthFactors[0] = far / (far - near); // a
-				this._logDepthPass.uniforms.depthFactors[1] = far * near / (near - far); // b
-				this._logDepthPass.uniforms.depthFactors[2] = far; // far
+				this._logDepthPass.uniforms.depthFactors[0] = logDepthCameraNear; // logDepthCameraNear
+				this._logDepthPass.uniforms.depthFactors[1] = logDepthBufFC; // logDepthBufFC
+				this._logDepthPass.uniforms.depthFactors[2] = far / (far - near); // a
+				this._logDepthPass.uniforms.depthFactors[3] = far * near / (near - far); // b
+
 				this._logDepthPass.render(renderer);
 			}
 			this._renderLogDepth = renderLogDepth;
@@ -5104,22 +5108,25 @@ vec3 octahedronToUnitVector(vec2 p) {
 		name: 'ec_logdepth',
 		uniforms: {
 			depthTexture: null,
-			depthFactors: [] // a, b, far
+			depthFactors: [0, 0, 0, 0] // logDepthCameraNear, logDepthBufFC, a, b
 		},
 		vertexShader: defaultVertexShader,
 		fragmentShader: `
 		uniform sampler2D depthTexture;
-		uniform vec3 depthFactors;
+		uniform vec4 depthFactors;
 		
 		varying vec2 v_Uv;
+
+		float reverseLogDepth(const float logDepth) {
+			float depth = pow(2.0, logDepth * 2.0 / depthFactors.y) + depthFactors.x - 1.0;
+			depth = depthFactors.z + depthFactors.w / depth;
+			return depth;
+		}
 
 		void main() {
 			float logDepth = texture2D(depthTexture, v_Uv).r;
 
-			float depth = pow(2.0, logDepth * log2(depthFactors.z + 1.0));
-			depth = depthFactors.x + depthFactors.y / depth;
-
-			gl_FragDepthEXT = depth;
+			gl_FragDepthEXT = reverseLogDepth(logDepth);
 
 			gl_FragColor = vec4(0.0);
 		}
@@ -6567,6 +6574,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 			this.bufferDependencies = ['GBuffer'];
 			this._mainPass = new t3d.ShaderPostPass(shader);
 			this.debugType = DebugTypes.Normal;
+			this.useAnchorMatrix = true;
 		}
 		render(renderer, composer, outputRenderTarget) {
 			renderer.setRenderTarget(outputRenderTarget);
@@ -6578,9 +6586,16 @@ vec3 octahedronToUnitVector(vec2 p) {
 			this._mainPass.uniforms['depthTexture'] = gBuffer.output()._attachments[t3d.ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
 			this._mainPass.uniforms['debug'] = this.debugType || 0;
 			gBufferRenderStates.camera.projectionViewMatrix.toArray(this._mainPass.uniforms['projectionView']);
+			if (this.useAnchorMatrix) {
+				_matrix.identity().toArray(this._mainPass.uniforms['anchorMatrix']);
+			} else {
+				// pass the anchor matrix to convert the debug normals and positions from anchor space to world space
+				gBufferRenderStates.scene.anchorMatrix.toArray(this._mainPass.uniforms['anchorMatrix']);
+			}
 			this._mainPass.render(renderer);
 		}
 	}
+	const _matrix = new t3d.Matrix4();
 	const DebugTypes = {
 		Normal: 0,
 		Depth: 1,
@@ -6596,6 +6611,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 			colorTexture0: null,
 			depthTexture: null,
 			projectionView: new Float32Array(16),
+			anchorMatrix: new Float32Array(16),
 			debug: 0
 		},
 		vertexShader: defaultVertexShader,
@@ -6605,6 +6621,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 		uniform int debug;
 
 		uniform mat4 projectionView;
+		uniform mat4 anchorMatrix;
 
 		varying vec2 v_Uv;
 
@@ -6628,6 +6645,9 @@ vec3 octahedronToUnitVector(vec2 p) {
 			vec4 p4 = inverse(projectionView) * projectedPos;
 
 			vec3 position = p4.xyz / p4.w;
+
+			position = (anchorMatrix * vec4(position, 1.0)).xyz;
+			normal = (anchorMatrix * vec4(normal, 0.0)).xyz;
 
 			if (debug == 0) {
 				gl_FragColor = vec4(normal * 0.5 + 0.5, 1.0);

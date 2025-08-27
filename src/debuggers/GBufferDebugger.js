@@ -1,4 +1,4 @@
-import { ShaderPostPass, ATTACHMENT } from 't3d';
+import { ShaderPostPass, ATTACHMENT, Matrix4 } from 't3d';
 import { defaultVertexShader, octahedronToUnitVectorGLSL } from '../Utils.js';
 import Debugger from './Debugger.js';
 
@@ -11,6 +11,8 @@ export default class GBufferDebugger extends Debugger {
 		this._mainPass = new ShaderPostPass(shader);
 
 		this.debugType = DebugTypes.Normal;
+
+		this.useAnchorMatrix = true;
 	}
 
 	render(renderer, composer, outputRenderTarget) {
@@ -25,10 +27,20 @@ export default class GBufferDebugger extends Debugger {
 		this._mainPass.uniforms['depthTexture'] = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
 		this._mainPass.uniforms['debug'] = this.debugType || 0;
 		gBufferRenderStates.camera.projectionViewMatrix.toArray(this._mainPass.uniforms['projectionView']);
+
+		if (this.useAnchorMatrix) {
+			_matrix.identity().toArray(this._mainPass.uniforms['anchorMatrix']);
+		} else {
+			// pass the anchor matrix to convert the debug normals and positions from anchor space to world space
+			gBufferRenderStates.scene.anchorMatrix.toArray(this._mainPass.uniforms['anchorMatrix']);
+		}
+
 		this._mainPass.render(renderer);
 	}
 
 }
+
+const _matrix = new Matrix4();
 
 const DebugTypes = {
 	Normal: 0,
@@ -47,6 +59,7 @@ const shader = {
 		colorTexture0: null,
 		depthTexture: null,
 		projectionView: new Float32Array(16),
+		anchorMatrix: new Float32Array(16),
 		debug: 0
 	},
 	vertexShader: defaultVertexShader,
@@ -56,6 +69,7 @@ const shader = {
 		uniform int debug;
 
 		uniform mat4 projectionView;
+		uniform mat4 anchorMatrix;
 
 		varying vec2 v_Uv;
 
@@ -79,6 +93,9 @@ const shader = {
 			vec4 p4 = inverse(projectionView) * projectedPos;
 
 			vec3 position = p4.xyz / p4.w;
+
+			position = (anchorMatrix * vec4(position, 1.0)).xyz;
+			normal = (anchorMatrix * vec4(normal, 0.0)).xyz;
 
 			if (debug == 0) {
 				gl_FragColor = vec4(normal * 0.5 + 0.5, 1.0);

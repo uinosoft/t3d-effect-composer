@@ -5181,7 +5181,7 @@ class GBuffer extends Buffer {
 
 			this._logDepthRenderTarget.attach(depthTexture, ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 
-			// only use this pass to render depth texture
+			// only render to depth texture in this pass
 			this._logDepthPass = new ShaderPostPass(logDepthShader);
 			this._logDepthPass.material.colorWrite = false;
 			// If depth test is disabled, gl_FragDepthEXT will not work
@@ -5256,12 +5256,15 @@ class GBuffer extends Buffer {
 			renderer.setRenderTarget(this._logDepthRenderTarget);
 			renderer.clear(false, true, true);
 
-			const { near, far } = fixedRenderStates.camera;
+			const { near, far, logDepthCameraNear, logDepthBufFC } = fixedRenderStates.camera;
 
 			this._logDepthPass.uniforms.depthTexture = this._rt._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
-			this._logDepthPass.uniforms.depthFactors[0] = far / (far - near); // a
-			this._logDepthPass.uniforms.depthFactors[1] = far * near / (near - far); // b
-			this._logDepthPass.uniforms.depthFactors[2] = far; // far
+
+			this._logDepthPass.uniforms.depthFactors[0] = logDepthCameraNear; // logDepthCameraNear
+			this._logDepthPass.uniforms.depthFactors[1] = logDepthBufFC; // logDepthBufFC
+			this._logDepthPass.uniforms.depthFactors[2] = far / (far - near); // a
+			this._logDepthPass.uniforms.depthFactors[3] = far * near / (near - far); // b
+
 			this._logDepthPass.render(renderer);
 		}
 
@@ -5531,22 +5534,25 @@ const logDepthShader = {
 	name: 'ec_logdepth',
 	uniforms: {
 		depthTexture: null,
-		depthFactors: [] // a, b, far
+		depthFactors: [0, 0, 0, 0] // logDepthCameraNear, logDepthBufFC, a, b
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
 		uniform sampler2D depthTexture;
-		uniform vec3 depthFactors;
+		uniform vec4 depthFactors;
 		
 		varying vec2 v_Uv;
+
+		float reverseLogDepth(const float logDepth) {
+			float depth = pow(2.0, logDepth * 2.0 / depthFactors.y) + depthFactors.x - 1.0;
+			depth = depthFactors.z + depthFactors.w / depth;
+			return depth;
+		}
 
 		void main() {
 			float logDepth = texture2D(depthTexture, v_Uv).r;
 
-			float depth = pow(2.0, logDepth * log2(depthFactors.z + 1.0));
-			depth = depthFactors.x + depthFactors.y / depth;
-
-			gl_FragDepthEXT = depth;
+			gl_FragDepthEXT = reverseLogDepth(logDepth);
 
 			gl_FragColor = vec4(0.0);
 		}
@@ -7290,6 +7296,8 @@ class GBufferDebugger extends Debugger {
 		this._mainPass = new ShaderPostPass(shader);
 
 		this.debugType = DebugTypes.Normal;
+
+		this.useAnchorMatrix = true;
 	}
 
 	render(renderer, composer, outputRenderTarget) {
@@ -7304,10 +7312,20 @@ class GBufferDebugger extends Debugger {
 		this._mainPass.uniforms['depthTexture'] = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
 		this._mainPass.uniforms['debug'] = this.debugType || 0;
 		gBufferRenderStates.camera.projectionViewMatrix.toArray(this._mainPass.uniforms['projectionView']);
+
+		if (this.useAnchorMatrix) {
+			_matrix.identity().toArray(this._mainPass.uniforms['anchorMatrix']);
+		} else {
+			// pass the anchor matrix to convert the debug normals and positions from anchor space to world space
+			gBufferRenderStates.scene.anchorMatrix.toArray(this._mainPass.uniforms['anchorMatrix']);
+		}
+
 		this._mainPass.render(renderer);
 	}
 
 }
+
+const _matrix = new Matrix4();
 
 const DebugTypes = {
 	Normal: 0,
@@ -7326,6 +7344,7 @@ const shader = {
 		colorTexture0: null,
 		depthTexture: null,
 		projectionView: new Float32Array(16),
+		anchorMatrix: new Float32Array(16),
 		debug: 0
 	},
 	vertexShader: defaultVertexShader,
@@ -7335,6 +7354,7 @@ const shader = {
 		uniform int debug;
 
 		uniform mat4 projectionView;
+		uniform mat4 anchorMatrix;
 
 		varying vec2 v_Uv;
 
@@ -7358,6 +7378,9 @@ const shader = {
 			vec4 p4 = inverse(projectionView) * projectedPos;
 
 			vec3 position = p4.xyz / p4.w;
+
+			position = (anchorMatrix * vec4(position, 1.0)).xyz;
+			normal = (anchorMatrix * vec4(normal, 0.0)).xyz;
 
 			if (debug == 0) {
 				gl_FragColor = vec4(normal * 0.5 + 0.5, 1.0);

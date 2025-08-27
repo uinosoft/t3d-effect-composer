@@ -38,7 +38,8 @@
 		"advanced_volume_lighted",
 		"advanced_skyline",
 		"advanced_godrays",
-		"advanced_contactshadow"
+		"advanced_contactshadow",
+		"advanced_gbuffer_logdepth"
 	],
 	"debugger": [
 		"debugger_uv"
