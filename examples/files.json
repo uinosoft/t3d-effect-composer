@@ -2,6 +2,7 @@
 	"effect": [
 		"effect_features",
 		"effect_transparent",
+		"effect_smaa",
 		"effect_taa",
 		"effect_tonemapping",
 		"effect_ssao",
