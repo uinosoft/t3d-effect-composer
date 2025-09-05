@@ -130,6 +130,14 @@ export default class EffectComposer {
 		// Public properties
 
 		/**
+		 * Whether to allow automatically fallback to scene direct rendering when there is no need to use EffectComposer.
+		 * This requires that the scene does not use any postRenderLayers except for 'transmission' and 'overlay'.
+		 * @type {Boolean}
+		 * @default true
+		 */
+		this.allowSceneDirectRender = true;
+
+		/**
 		 * Whether to use msaa.
 		 * @type {Boolean}
 		 * @default false
@@ -404,7 +412,8 @@ export default class EffectComposer {
 			this._cameraJitter.update();
 		} else if (
 			(!!this._externalColorAttachment && !!this._externalDepthAttachment) ||
-			!sceneBuffer.$isRenderLayerEmpty(renderQueue, sceneBuffer.postRenderLayers.transmission)
+			!sceneBuffer.$isRenderLayerEmpty(renderQueue, sceneBuffer.postRenderLayers.transmission) ||
+			!this.allowSceneDirectRender
 		) {
 			sceneBuffer.render(renderer, this, scene, camera);
 

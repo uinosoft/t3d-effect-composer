@@ -6212,6 +6212,14 @@ vec3 octahedronToUnitVector(vec2 p) {
 			// Public properties
 
 			/**
+			 * Whether to allow automatically fallback to scene direct rendering when there is no need to use EffectComposer.
+			 * This requires that the scene does not use any postRenderLayers except for 'transmission' and 'overlay'.
+			 * @type {Boolean}
+			 * @default true
+			 */
+			this.allowSceneDirectRender = true;
+
+			/**
 			 * Whether to use msaa.
 			 * @type {Boolean}
 			 * @default false
@@ -6442,7 +6450,7 @@ vec3 octahedronToUnitVector(vec2 p) {
 				this._renderTargetCache.release(inputRT);
 				this._renderTargetCache.release(outputRT);
 				this._cameraJitter.update();
-			} else if (!!this._externalColorAttachment && !!this._externalDepthAttachment || !sceneBuffer.$isRenderLayerEmpty(renderQueue, sceneBuffer.postRenderLayers.transmission)) {
+			} else if (!!this._externalColorAttachment && !!this._externalDepthAttachment || !sceneBuffer.$isRenderLayerEmpty(renderQueue, sceneBuffer.postRenderLayers.transmission) || !this.allowSceneDirectRender) {
 				sceneBuffer.render(renderer, this, scene, camera);
 				renderer.setRenderTarget(target);
 				renderer.setClearColor(0, 0, 0, 0);
