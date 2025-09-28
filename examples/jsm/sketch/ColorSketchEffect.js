@@ -15,11 +15,6 @@ export class ColorSketchEffect extends Effect {
 		this._blendPass = new ShaderPostPass(blendShader);
 	}
 
-	resize(width, height) {
-		this._edgeDetectorPass.uniforms.resolution[0] = 1 / width;
-		this._edgeDetectorPass.uniforms.resolution[1] = 1 / height;
-	}
-
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
 		const tempRT1 = composer._renderTargetCache.allocate(0);
 
@@ -30,38 +25,16 @@ export class ColorSketchEffect extends Effect {
 		edgeDetectorPass.material.uniforms.lineWidth = this.lineWidth;
 		edgeDetectorPass.uniforms.threshold = this.threshold;
 		edgeDetectorPass.uniforms.gamma = this.gamma;
-
-		renderer.setRenderTarget(tempRT1);
-		renderer.setClearColor(0, 0, 0, 0);
-		edgeDetectorPass.render(renderer);
+		tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		edgeDetectorPass.render(renderer, tempRT1);
 
 		// Step 2: blend pass
-
-		renderer.setRenderTarget(outputRenderTarget);
-
-		renderer.setClearColor(0, 0, 0, 0);
-
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, true);
-		}
 
 		this._blendPass.uniforms.diffuse = inputRenderTarget.texture;
 		this._blendPass.uniforms.sketch = tempRT1.texture;
 		this.color.toArray(this._blendPass.uniforms.color);
-
-		if (finish) {
-			this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-
-		this._blendPass.render(renderer);
-
-		if (finish) {
-			this._blendPass.material.transparent = false;
-			this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, this._blendPass, finish);
+		this._blendPass.render(renderer, outputRenderTarget);
 
 		composer._renderTargetCache.release(tempRT1, 0);
 	}
@@ -79,7 +52,6 @@ const colorEdgeDetectorShader = {
 	defines: {},
 	uniforms: {
 		colorTex: null,
-		resolution: [1.0, 1.0],
 
 		lineWidth: 1.0,
 		threshold: 0.05,
@@ -87,18 +59,21 @@ const colorEdgeDetectorShader = {
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
+		uniform vec2 u_RenderTargetSize;
+
     	varying vec2 v_Uv;
 
 		uniform sampler2D colorTex;
-		uniform vec2 resolution;
 
         uniform float lineWidth;
         uniform float threshold;
 		uniform float gamma;
 
         void make_kernel(inout vec4 n[9], sampler2D tex, vec2 coord) {
-            float w = resolution.x * lineWidth;
-            float h = resolution.y * lineWidth;
+			vec2 texelSize = 1.0 / u_RenderTargetSize;
+
+            float w = texelSize.x * lineWidth;
+            float h = texelSize.y * lineWidth;
 
             n[0] = texture2D(tex, coord + vec2( -w, -h));
             n[1] = texture2D(tex, coord + vec2(0.0, -h));

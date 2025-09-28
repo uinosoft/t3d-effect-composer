@@ -57,8 +57,7 @@
 	const contextParams = { antialias: true, alpha: false, stencil: false };
 	const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
 	const renderer = new t3d.WebGLRenderer(gl);
-	renderer.setClearColor(0, 0, 0, 1);
-	const backRenderTarget = new t3d.RenderTargetBack(canvas);
+	const screenRenderTarget = new t3d.ScreenRenderTarget(canvas);
 
 	const shadowMapPass = new t3d.ShadowMapPass();
 
@@ -151,8 +150,6 @@
 	const loader = new GLTFLoader(loadingManager);
 	const modelUrl = './resources/gltf/lowpoly.glb';
 	loader.load(modelUrl).then(function(result) {
-		console.timeEnd('GLTFLoader');
-
 		const object = result.root;
 
 		object.traverse(node => {
@@ -222,9 +219,8 @@
 		scene.updateRenderQueue(camera);
 
 		shadowMapPass.render(renderer, scene);
-
 	
-		effectComposer.render(renderer, scene, camera, backRenderTarget);
+		effectComposer.render(renderer, scene, camera, screenRenderTarget);
 
 		stats.end();
 	}
@@ -239,7 +235,7 @@
 
 		camera.setPerspective(30 / 180 * Math.PI, width / height, 0.1, 1000);
 
-		backRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+		screenRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 		effectComposer.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
 		taaReset();

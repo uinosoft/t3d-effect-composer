@@ -37,58 +37,28 @@ export class SketchEffect extends Effect {
 		_matProjViewInverse.toArray(this._sketchPass.uniforms.matProjViewInverse);
 		this._sketchPass.uniforms.normalTexture = gBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 		this._sketchPass.uniforms.depthTexture = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
-		this._sketchPass.uniforms.invResolution[0] = 1 / gBuffer.output().width;
-		this._sketchPass.uniforms.invResolution[1] = 1 / gBuffer.output().height;
 
 		this._sketchPass.uniforms.uThreshold = this.threshold;
 		this._sketchPass.uniforms.uContrast = this.contrast;
 
-		renderer.setRenderTarget(tempRT1);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, true);
-
-		this._sketchPass.render(renderer);
+		tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._sketchPass.render(renderer, tempRT1);
 
 		// (Optional) Render fxaa pass
 
 		if (this.fxaa) {
-			renderer.setRenderTarget(tempRT2);
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, true, true);
-
-			this._fxaaPass.uniforms.resolution[0] = 1 / gBuffer.output().width;
-			this._fxaaPass.uniforms.resolution[1] = 1 / gBuffer.output().height;
 			this._fxaaPass.uniforms.tDiffuse = tempRT1.texture;
-			this._fxaaPass.render(renderer);
+			tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+			this._fxaaPass.render(renderer, tempRT2);
 		}
 
 		// Render mix pass
 
-		renderer.setRenderTarget(outputRenderTarget);
-
-		renderer.setClearColor(0, 0, 0, 0);
-
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, true);
-		}
-
 		this._mixPass.uniforms['diffuse'] = inputRenderTarget.texture;
 		this._mixPass.uniforms['sketch'] = this.fxaa ? tempRT2.texture : tempRT1.texture;
 		this.color.toArray(this._mixPass.uniforms['color']);
-
-		if (finish) {
-			this._mixPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._mixPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-
-		this._mixPass.render(renderer);
-
-		if (finish) {
-			this._mixPass.material.transparent = false;
-			this._mixPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, this._mixPass, finish);
+		this._mixPass.render(renderer, outputRenderTarget);
 
 		composer._renderTargetCache.release(tempRT1, 0);
 		composer._renderTargetCache.release(tempRT2, 0);

@@ -37,20 +37,15 @@ export default class RainEffect extends Effect {
 
 		// Step 1: rain pass
 
-		renderer.setRenderTarget(tempRT1);
-		renderer.setClearColor(1, 1, 1, 1);
-		renderer.clear(true, true, false);
-
 		const deltaTime = 0.0166666;
 		this._rainPass.uniforms.time += deltaTime * this.speed * 0.4;
 		this._rainPass.uniforms.angle = this.angle;
 		this._rainPass.uniforms.size = this.size;
 		this._rainPass.uniforms.density = this.density;
 		this._rainPass.uniforms.strength = this.strength;
-		this._rainPass.uniforms.viewportSize[0] = inputRenderTarget.width;
-		this._rainPass.uniforms.viewportSize[1] = inputRenderTarget.height;
 
-		this._rainPass.render(renderer);
+		tempRT1.setColorClearValue(1, 1, 1, 1).setClear(true, true, false);
+		this._rainPass.render(renderer, tempRT1);
 
 		// Step 2: rain cover pass
 
@@ -58,9 +53,7 @@ export default class RainEffect extends Effect {
 			this._renderCover = false;
 		}
 
-		renderer.setRenderTarget(tempRT2);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
+		tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
 
 		if (this._renderCover) {
 			const gBufferRenderStates = gBuffer.getCurrentRenderStates();
@@ -71,7 +64,10 @@ export default class RainEffect extends Effect {
 			this._rainCoverPass.uniforms.time += deltaTime * this.coverSpeed * 1.2;
 			this._rainCoverPass.uniforms.coverDensity = this.coverDensity;
 			this._rainCoverPass.uniforms.coverSize = this.coverSize;
-			this._rainCoverPass.render(renderer);
+			this._rainCoverPass.render(renderer, tempRT2);
+		} else {
+			renderer.beginRender(tempRT2);
+			renderer.endRender();
 		}
 
 		if (this.coverStrength > 0 && !!this.rainCoverTexture) {
@@ -86,28 +82,13 @@ export default class RainEffect extends Effect {
 
 		// Step 3: blend pass
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
-
 		this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 		this._blendPass.uniforms.texture2 = tempRT1.texture;
 		this._blendPass.uniforms.texture3 = tempRT2.texture;
 		this._blendPass.uniforms.texture4 = gBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 		this._blendPass.uniforms.coverStrength = this.coverStrength;
-		if (finish) {
-			this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		this._blendPass.render(renderer);
-		if (finish) {
-			this._blendPass.material.transparent = false;
-			this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, this._blendPass, finish);
+		this._blendPass.render(renderer, outputRenderTarget);
 
 		composer._renderTargetCache.release(tempRT1, 0);
 		composer._renderTargetCache.release(tempRT2, 0);
@@ -132,7 +113,6 @@ const rainShader = {
 		angle: -10,
 		density: 1,
 		time: 1,
-		viewportSize: [512, 512],
 		strength: 1
 	},
 	vertexShader: defaultVertexShader,
@@ -142,7 +122,7 @@ const rainShader = {
 		uniform float angle;
 		uniform float density;
 		uniform float strength;
-		uniform vec2 viewportSize;
+		uniform vec2 u_RenderTargetSize;
 		varying vec2 v_Uv;
 		float hash(float x) {
 			return fract(sin(x*133.3)*13.13);
@@ -152,8 +132,8 @@ const rainShader = {
 			float a = angle / 180. * 3.141592;
 			float si = sin(a), co = cos(a);
 			vec2 uv = v_Uv;
-			uv.x = uv.x * viewportSize.x / 1024.;
-			uv.y = uv.y * viewportSize.y / 1024.;
+			uv.x = uv.x * u_RenderTargetSize.x / 1024.;
+			uv.y = uv.y * u_RenderTargetSize.y / 1024.;
 			uv *= mat2(co, -si, si, co);
 			uv *= length(uv + vec2(0, 4.9)) * .3 + 4. / density;
 			float v = 1. - sin(hash(floor(uv.x * 100.)));

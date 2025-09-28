@@ -1,4 +1,4 @@
-import { RenderTarget2D, RenderBuffer, ATTACHMENT, DRAW_SIDE, BLEND_TYPE, ShaderMaterial, TEXTURE_FILTER } from 't3d';
+import { OffscreenRenderTarget, RenderBuffer, ATTACHMENT, DRAW_SIDE, BLEND_TYPE, ShaderMaterial, TEXTURE_FILTER } from 't3d';
 import BufferAttachManager from './BufferAttachManager.js';
 import { getColorBufferFormat, RenderListMask, setupColorTexture } from '../Utils.js';
 import Buffer from './Buffer.js';
@@ -11,7 +11,7 @@ export default class NonDepthMarkBuffer extends Buffer {
 		const bufferMipmaps = options.bufferMipmaps;
 		this._rts = [];
 		for (let i = 0; i < options.maxMarkAttachment; i++) {
-			const rt = new RenderTarget2D(width, height);
+			const rt = OffscreenRenderTarget.create2D(width, height);
 			rt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 			setupColorTexture(rt.texture, options);
 			if (!bufferMipmaps) {
@@ -24,7 +24,7 @@ export default class NonDepthMarkBuffer extends Buffer {
 		const colorBufferFormat = getColorBufferFormat(options);
 		this._mrts = [];
 		for (let i = 0; i < options.maxMarkAttachment; i++) {
-			const mrt = new RenderTarget2D(width, height);
+			const mrt = OffscreenRenderTarget.create2D(width, height);
 			mrt.attach(
 				new RenderBuffer(width, height, colorBufferFormat, options.samplerNumber),
 				ATTACHMENT.COLOR_ATTACHMENT0
@@ -95,15 +95,8 @@ export default class NonDepthMarkBuffer extends Buffer {
 			const rt = this._rts[attachIndex];
 			const mrt = this._mrts[attachIndex];
 
-			if (composer.$useMSAA) {
-				renderer.setRenderTarget(mrt);
-				renderer.setClearColor(0, 0, 0, 0);
-				renderer.clear(true, false, false);
-			} else {
-				renderer.setRenderTarget(rt);
-				renderer.setClearColor(0, 0, 0, 0);
-				renderer.clear(true, false, false);
-			}
+			const renderTarget = (composer.$useMSAA ? mrt : rt)
+				.setColorClearValue(0, 0, 0, 0).setClear(true, false, false);
 
 			const renderStates = scene.getRenderStates(camera);
 			const renderQueue = scene.getRenderQueue(camera);
@@ -117,7 +110,7 @@ export default class NonDepthMarkBuffer extends Buffer {
 				attachMask |= attachMasks[i];
 			}
 
-			renderer.beginRender();
+			renderer.beginRender(renderTarget);
 
 			const layers = this.layers;
 			for (let i = 0, l = layers.length; i < l; i++) {
@@ -135,12 +128,11 @@ export default class NonDepthMarkBuffer extends Buffer {
 			renderer.endRender();
 
 			if (composer.$useMSAA) {
-				renderer.setRenderTarget(rt);
 				renderer.blitRenderTarget(mrt, rt, true, false, false);
 			}
 
 			// generate mipmaps for down sampler
-			renderer.updateRenderTargetMipmap(rt);
+			renderer.generateMipmaps(rt.texture);
 		}
 	}
 

@@ -1,5 +1,5 @@
 
-import { RenderTarget2D, TEXTURE_FILTER, ATTACHMENT } from 't3d';
+import { OffscreenRenderTarget, TEXTURE_FILTER, ATTACHMENT } from 't3d';
 import Buffer from './Buffer.js';
 import { setupColorTexture } from '../Utils.js';
 
@@ -11,7 +11,7 @@ export default class AccumulationBuffer extends Buffer {
 		super(width, height, options);
 
 		function createSwapRenderTarget() {
-			const renderTarget = new RenderTarget2D(width, height);
+			const renderTarget = OffscreenRenderTarget.create2D(width, height);
 			setupColorTexture(renderTarget.texture, options);
 			renderTarget.texture.minFilter = TEXTURE_FILTER.NEAREST;
 			renderTarget.texture.magFilter = TEXTURE_FILTER.NEAREST;

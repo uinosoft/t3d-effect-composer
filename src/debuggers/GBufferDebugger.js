@@ -16,10 +16,6 @@ export default class GBufferDebugger extends Debugger {
 	}
 
 	render(renderer, composer, outputRenderTarget) {
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 1);
-		renderer.clear(true, true, false);
-
 		const gBuffer = composer.getBuffer('GBuffer');
 		const gBufferRenderStates = gBuffer.getCurrentRenderStates();
 
@@ -35,7 +31,8 @@ export default class GBufferDebugger extends Debugger {
 			gBufferRenderStates.scene.anchorMatrix.toArray(this._mainPass.uniforms['anchorMatrix']);
 		}
 
-		this._mainPass.render(renderer);
+		outputRenderTarget.setColorClearValue(0, 0, 0, 1).setClear(true, true, false);
+		this._mainPass.render(renderer, outputRenderTarget);
 	}
 
 }

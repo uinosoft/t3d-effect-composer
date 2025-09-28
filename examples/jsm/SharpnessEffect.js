@@ -12,35 +12,12 @@ export default class SharpnessEffect extends Effect {
 		this._mainPass.material.premultipliedAlpha = true;
 	}
 
-	resize(width, height) {
-		this._mainPass.uniforms.resolution[0] = width;
-		this._mainPass.uniforms.resolution[1] = height;
-	}
-
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
-
 		const mainPass = this._mainPass;
-
 		mainPass.uniforms.strength = this.strength;
 		mainPass.uniforms.tDiffuse = inputRenderTarget.texture;
-
-		if (finish) {
-			mainPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			mainPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		mainPass.render(renderer);
-		if (finish) {
-			mainPass.material.transparent = false;
-			mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, mainPass, finish);
+		mainPass.render(renderer, outputRenderTarget);
 	}
 
 	dispose() {
@@ -54,14 +31,13 @@ const sharpnessShader = {
 	name: 'ec_sharpness',
 	uniforms: {
 		tDiffuse: null,
-		resolution: [1024, 512],
 		strength: 0.2 // adjusts the amount of sharpness, range [0,1]
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
         varying vec2 v_Uv;
         uniform sampler2D tDiffuse;
-        uniform vec2 resolution;
+        uniform vec2 u_RenderTargetSize;
         uniform float strength;
 
         vec3 srgb2lin(vec3 color)
@@ -79,13 +55,13 @@ const sharpnessShader = {
         // https://gpuopen.com/wp-content/uploads/2019/07/FidelityFX-CAS.pptx
         vec3 cas(sampler2D tex, float sharpness_knob, out float transparency)
         {
-            vec3 a = srgb2lin(texture2D(tex, v_Uv + vec2(0.0, -1.0 / resolution.y)).rgb);
-            vec3 b = srgb2lin(texture2D(tex, v_Uv + vec2(-1.0 / resolution.x, 0.0)).rgb);
+            vec3 a = srgb2lin(texture2D(tex, v_Uv + vec2(0.0, -1.0 / u_RenderTargetSize.y)).rgb);
+            vec3 b = srgb2lin(texture2D(tex, v_Uv + vec2(-1.0 / u_RenderTargetSize.x, 0.0)).rgb);
             vec4 diffuseColor = texture2D(tex, v_Uv + vec2(0.0, 0.0));
             transparency = diffuseColor.a;
             vec3 c = srgb2lin(diffuseColor.rgb);
-            vec3 d = srgb2lin(texture2D(tex, v_Uv + vec2(1.0 / resolution.x, 0.0)).rgb);
-            vec3 e = srgb2lin(texture2D(tex, v_Uv + vec2(0.0, 1.0 / resolution.y)).rgb);
+            vec3 d = srgb2lin(texture2D(tex, v_Uv + vec2(1.0 / u_RenderTargetSize.x, 0.0)).rgb);
+            vec3 e = srgb2lin(texture2D(tex, v_Uv + vec2(0.0, 1.0 / u_RenderTargetSize.y)).rgb);
         
             float min_g = min(a.g, min(b.g, min(c.g, min(d.g, e.g))));
             float max_g = max(a.g, max(b.g, max(c.g, max(d.g, e.g))));

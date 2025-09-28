@@ -27,38 +27,19 @@ export default class BlurEdgeEffect extends Effect {
 		const blendPass = this._blendPass;
 
 		// Step 1: blur x
-		renderer.setRenderTarget(tempRT1);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._hBlurPass.uniforms.tDiffuse = inputRenderTarget.texture;
-		this._hBlurPass.render(renderer);
+		tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._hBlurPass.render(renderer, tempRT1);
 		// Step 2: blur y
-		renderer.setRenderTarget(tempRT2);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._vBlurPass.uniforms.tDiffuse = tempRT1.texture;
-		this._vBlurPass.render(renderer);
+		tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._vBlurPass.render(renderer, tempRT2);
 		// Step 3: blend
 		blendPass.uniforms.tDiffuse = inputRenderTarget.texture;
 		blendPass.uniforms.blurOffset = this.offset;
 		blendPass.uniforms.blurTexture = tempRT2.texture;
-
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
-		if (finish) {
-			blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		blendPass.render(renderer);
-		if (finish) {
-			blendPass.material.transparent = false;
-			blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, blendPass, finish);
+		blendPass.render(renderer, outputRenderTarget);
 
 		composer._renderTargetCache.release(tempRT1, 1);
 		composer._renderTargetCache.release(tempRT2, 1);

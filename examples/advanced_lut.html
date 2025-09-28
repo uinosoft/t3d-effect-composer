@@ -76,7 +76,7 @@
 	const contextParams = { antialias: true, alpha: false, stencil: true };
 	const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
 	const renderer = new t3d.WebGLRenderer(gl);
-	const backRenderTarget = new t3d.RenderTargetBack(canvas);
+	const screenRenderTarget = new t3d.ScreenRenderTarget(canvas);
 
 	const effectComposer = new DefaultEffectComposer(width, height, {
 		samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
@@ -205,8 +205,7 @@
 
 		lutEffect.active = mapCount === 6 && params.active;
 
-		renderer.setClearColor(0, 0, 0, 1);
-		effectComposer.render(renderer, scene, camera, backRenderTarget);
+		effectComposer.render(renderer, scene, camera, screenRenderTarget);
 
 		stats.end();
 	}
@@ -218,7 +217,7 @@
 
 		camera.setPerspective((60 / 180) * Math.PI, width / height, 0.1, 1000);
 
-		backRenderTarget.resize(width, height);
+		screenRenderTarget.resize(width, height);
 		effectComposer.resize(width, height);
 	}
 	window.addEventListener('resize', onWindowResize, false);

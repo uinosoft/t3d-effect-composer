@@ -23,14 +23,6 @@ export default class InnerGlowEffect extends Effect {
 		this._blendPass.material.premultipliedAlpha = true;
 	}
 
-	resize(width, height) {
-		this._blurXPass.uniforms.texSize[0] = width;
-		this._blurXPass.uniforms.texSize[1] = height;
-
-		this._blurYPass.uniforms.texSize[0] = width;
-		this._blurYPass.uniforms.texSize[1] = height;
-	}
-
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
 		const tempRT1 = composer._renderTargetCache.allocate(0);
 		const tempRT2 = composer._renderTargetCache.allocate(0);
@@ -41,54 +33,34 @@ export default class InnerGlowEffect extends Effect {
 		const attachIndex = markBuffer.attachManager.getAttachIndex(this.name);
 		const channelIndex = markBuffer.attachManager.getChannelIndex(this.name);
 
-		renderer.setRenderTarget(tempRT1);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._channelPass.uniforms['tDiffuse'] = markBuffer.output(attachIndex)._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 		for (let i = 0; i < 4; i++) {
 			this._channelPass.uniforms.channelMask[i] = (i === channelIndex) ? 1 : 0;
 		}
-		this._channelPass.render(renderer);
+		tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._channelPass.render(renderer, tempRT1);
 
-		renderer.setRenderTarget(tempRT2);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._blurXPass.uniforms.tDiffuse = tempRT1.texture;
 		this._blurXPass.uniforms.stride = this.stride;
-		this._blurXPass.render(renderer);
+		tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._blurXPass.render(renderer, tempRT2);
 
-		renderer.setRenderTarget(tempRT3);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._blurYPass.uniforms.tDiffuse = tempRT1.texture;
 		this._blurYPass.uniforms.blurX = tempRT2.texture;
 		this._blurYPass.uniforms.stride = this.stride;
 		this._blurYPass.uniforms.glowness = this.strength;
 		this.color.toArray(this._blurYPass.uniforms.glowColor);
-		this._blurYPass.render(renderer);
+		tempRT3.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._blurYPass.render(renderer, tempRT3);
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
 		this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 		this._blendPass.uniforms.texture2 = tempRT3.texture;
 		// this._blendPass.uniforms.colorWeight1 = 1;
 		// this._blendPass.uniforms.alphaWeight1 = 1;
 		// this._blendPass.uniforms.colorWeight2 = 1;
 		// this._blendPass.uniforms.alphaWeight2 = 0;
-		if (finish) {
-			this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		this._blendPass.render(renderer);
-		if (finish) {
-			this._blendPass.material.transparent = false;
-			this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, this._blendPass, finish);
+		this._blendPass.render(renderer, outputRenderTarget);
 
 		composer._renderTargetCache.release(tempRT1, 0);
 		composer._renderTargetCache.release(tempRT2, 0);
@@ -109,7 +81,6 @@ const innerGlowXShader = {
 	defines: {},
 	uniforms: {
 		tDiffuse: null,
-		texSize: [1, 1],
 		stride: 10
 	},
 	vertexShader: defaultVertexShader,
@@ -121,13 +92,13 @@ const innerGlowXShader = {
 		#define WT9_4 0.2
 		#define WT9_NORMALIZE 5.2
 
+		uniform vec2 u_RenderTargetSize;
 		varying vec2 v_Uv;
 		uniform sampler2D tDiffuse;
-		uniform vec2 texSize;
 		uniform float stride;
 
 		void main() {
-			float texelIncrement = 0.25 * stride / texSize.x;
+			float texelIncrement = 0.25 * stride / u_RenderTargetSize.x;
 
 			float colour = texture2D(tDiffuse,vec2(v_Uv.x + texelIncrement, v_Uv.y)).x * (0.8 / WT9_NORMALIZE);
 			colour += texture2D(tDiffuse, vec2(v_Uv.x + 2.0 * texelIncrement, v_Uv.y)).x * (WT9_2 / WT9_NORMALIZE);
@@ -139,7 +110,7 @@ const innerGlowXShader = {
 			colour += texture2D(tDiffuse, vec2(v_Uv.x - 3.0 * texelIncrement, v_Uv.y)).x * (WT9_3 / WT9_NORMALIZE);
 			colour += texture2D(tDiffuse, vec2(v_Uv.x - 4.0 * texelIncrement, v_Uv.y)).x * (WT9_3 / WT9_NORMALIZE);
 
-			texelIncrement = 0.5 * stride / texSize.x;
+			texelIncrement = 0.5 * stride / u_RenderTargetSize.x;
 			colour += texture2D(tDiffuse,vec2(v_Uv.x + texelIncrement, v_Uv.y)).x * (0.8 / WT9_NORMALIZE);
 			colour += texture2D(tDiffuse, vec2(v_Uv.x + 2.0 * texelIncrement, v_Uv.y)).x * (WT9_2 / WT9_NORMALIZE);
 			colour += texture2D(tDiffuse, vec2(v_Uv.x + 3.0 * texelIncrement, v_Uv.y)).x * (WT9_3 / WT9_NORMALIZE);
@@ -150,7 +121,7 @@ const innerGlowXShader = {
 			colour += texture2D(tDiffuse, vec2(v_Uv.x - 3.0 * texelIncrement, v_Uv.y)).x * (WT9_3 / WT9_NORMALIZE);
 			colour += texture2D(tDiffuse, vec2(v_Uv.x - 4.0 * texelIncrement, v_Uv.y)).x * (WT9_3 / WT9_NORMALIZE);
 
-			texelIncrement = 0.75 * stride / texSize.x;
+			texelIncrement = 0.75 * stride / u_RenderTargetSize.x;
 			colour += texture2D(tDiffuse,vec2(v_Uv.x + texelIncrement, v_Uv.y)).x * (0.8 / WT9_NORMALIZE);
 			colour += texture2D(tDiffuse, vec2(v_Uv.x + 2.0 * texelIncrement, v_Uv.y)).x * (WT9_2 / WT9_NORMALIZE);
 			colour += texture2D(tDiffuse, vec2(v_Uv.x + 3.0 * texelIncrement, v_Uv.y)).x * (WT9_3 / WT9_NORMALIZE);
@@ -161,7 +132,7 @@ const innerGlowXShader = {
 			colour += texture2D(tDiffuse, vec2(v_Uv.x - 3.0 * texelIncrement, v_Uv.y)).x * (WT9_3 / WT9_NORMALIZE);
 			colour += texture2D(tDiffuse, vec2(v_Uv.x - 4.0 * texelIncrement, v_Uv.y)).x * (WT9_3 / WT9_NORMALIZE);
 
-			texelIncrement = stride / texSize.x;
+			texelIncrement = stride / u_RenderTargetSize.x;
 			colour += texture2D(tDiffuse,vec2(v_Uv.x + texelIncrement, v_Uv.y)).x * (0.8 / WT9_NORMALIZE);
 			colour += texture2D(tDiffuse, vec2(v_Uv.x + 2.0 * texelIncrement, v_Uv.y)).x * (WT9_2 / WT9_NORMALIZE);
 			colour += texture2D(tDiffuse, vec2(v_Uv.x + 3.0 * texelIncrement, v_Uv.y)).x * (WT9_3 / WT9_NORMALIZE);
@@ -185,7 +156,6 @@ const innerGlowYShader = {
 	uniforms: {
 		tDiffuse: null,
 		blurX: null,
-		texSize: [1, 1],
 		stride: 10,
 		glowness: 2,
 		glowColor: [1, 0, 0]
@@ -199,8 +169,8 @@ const innerGlowYShader = {
 		#define WT9_4 0.2
 		#define WT9_NORMALIZE 5.2
 
+		uniform vec2 u_RenderTargetSize;
 		varying vec2 v_Uv;
-		uniform vec2 texSize;
 		uniform float stride;
 		uniform float glowness;
 		uniform vec3 glowColor;
@@ -208,7 +178,7 @@ const innerGlowYShader = {
 		uniform sampler2D tDiffuse;
 
 		void main() {
-			float texelIncrement = 0.25 * stride / texSize.y;
+			float texelIncrement = 0.25 * stride / u_RenderTargetSize.y;
 
 			float colour = texture2D(blurX, vec2(v_Uv.x , v_Uv.y + texelIncrement)).x * (0.8 / WT9_NORMALIZE);
 			colour += texture2D(blurX, vec2(v_Uv.x, v_Uv.y + 2.0 * texelIncrement)).x* (WT9_2 / WT9_NORMALIZE);
@@ -220,7 +190,7 @@ const innerGlowYShader = {
 			colour += texture2D(blurX, vec2(v_Uv.x, v_Uv.y - 3.0 * texelIncrement)).x* (WT9_3 / WT9_NORMALIZE);
 			colour += texture2D(blurX, vec2(v_Uv.x , v_Uv.y- 4.0 * texelIncrement)).x * (WT9_3 / WT9_NORMALIZE);
 
-			texelIncrement = 0.5 * stride / texSize.y;
+			texelIncrement = 0.5 * stride / u_RenderTargetSize.y;
 			colour += texture2D(blurX, vec2(v_Uv.x , v_Uv.y + texelIncrement)).x * (0.8 / WT9_NORMALIZE);
 			colour += texture2D(blurX, vec2(v_Uv.x, v_Uv.y + 2.0 * texelIncrement)).x* (WT9_2 / WT9_NORMALIZE);
 			colour += texture2D(blurX, vec2(v_Uv.x , v_Uv.y + 3.0 * texelIncrement)).x * (WT9_3 / WT9_NORMALIZE);
@@ -231,7 +201,7 @@ const innerGlowYShader = {
 			colour += texture2D(blurX, vec2(v_Uv.x, v_Uv.y - 3.0 * texelIncrement)).x* (WT9_3 / WT9_NORMALIZE);
 			colour += texture2D(blurX, vec2(v_Uv.x , v_Uv.y- 4.0 * texelIncrement)).x * (WT9_3 / WT9_NORMALIZE);
 
-			texelIncrement = 0.75 * stride / texSize.y;
+			texelIncrement = 0.75 * stride / u_RenderTargetSize.y;
 			colour += texture2D(blurX, vec2(v_Uv.x , v_Uv.y + texelIncrement)).x * (0.8 / WT9_NORMALIZE);
 			colour += texture2D(blurX, vec2(v_Uv.x, v_Uv.y + 2.0 * texelIncrement)).x* (WT9_2 / WT9_NORMALIZE);
 			colour += texture2D(blurX, vec2(v_Uv.x , v_Uv.y + 3.0 * texelIncrement)).x * (WT9_3 / WT9_NORMALIZE);
@@ -242,7 +212,7 @@ const innerGlowYShader = {
 			colour += texture2D(blurX, vec2(v_Uv.x, v_Uv.y - 3.0 * texelIncrement)).x* (WT9_3 / WT9_NORMALIZE);
 			colour += texture2D(blurX, vec2(v_Uv.x , v_Uv.y- 4.0 * texelIncrement)).x * (WT9_3 / WT9_NORMALIZE);
 
-			texelIncrement = stride / texSize.y;
+			texelIncrement = stride / u_RenderTargetSize.y;
 			colour += texture2D(blurX, vec2(v_Uv.x , v_Uv.y + texelIncrement)).x * (0.8 / WT9_NORMALIZE);
 			colour += texture2D(blurX, vec2(v_Uv.x, v_Uv.y + 2.0 * texelIncrement)).x* (WT9_2 / WT9_NORMALIZE);
 			colour += texture2D(blurX, vec2(v_Uv.x , v_Uv.y + 3.0 * texelIncrement)).x * (WT9_3 / WT9_NORMALIZE);

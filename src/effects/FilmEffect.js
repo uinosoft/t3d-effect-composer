@@ -19,14 +19,6 @@ export default class FilmEffect extends Effect {
 	}
 
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
-
 		const mainPass = this._mainPass;
 
 		mainPass.uniforms.tDiffuse = inputRenderTarget.texture;
@@ -38,15 +30,8 @@ export default class FilmEffect extends Effect {
 		this._time += 0.01667;
 		mainPass.uniforms.time = this._time;
 
-		if (finish) {
-			mainPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			mainPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		mainPass.render(renderer);
-		if (finish) {
-			mainPass.material.transparent = false;
-			mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, mainPass, finish);
+		mainPass.render(renderer, outputRenderTarget);
 	}
 
 	dispose() {

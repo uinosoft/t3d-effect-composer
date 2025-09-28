@@ -88,13 +88,12 @@ export default class SSREffect extends Effect {
 
 		// Step 1: ssr pass
 
-		renderer.setRenderTarget(tempRT1);
 		if (inputRenderTarget) {
 			this._copyRGBPass.uniforms.tDiffuse = sceneBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
-			this._copyRGBPass.render(renderer); // clear rgb channel to scene color and alpha channel to 0
+			tempRT1.setClear(false, false, false);
+			this._copyRGBPass.render(renderer, tempRT1); // clear rgb channel to scene color and alpha channel to 0
 		} else {
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, true, false);
+			tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
 		}
 
 		this._ssrPass.uniforms.colorTex = sceneBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
@@ -133,13 +132,9 @@ export default class SSREffect extends Effect {
 			this._ssrPass.material.defines.IMPORTANCE_SAMPLING = importanceSampling;
 		}
 
-		this._ssrPass.render(renderer);
+		this._ssrPass.render(renderer, tempRT1);
 
 		// Step 2: blurX pass
-
-		renderer.setRenderTarget(tempRT2);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 
 		this._blurPass.uniforms.normalTex = gBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 		this._blurPass.uniforms.depthTex = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
@@ -155,43 +150,27 @@ export default class SSREffect extends Effect {
 		this._blurPass.uniforms.direction = 0;
 		this._blurPass.uniforms.tDiffuse = tempRT1.texture;
 
-		this._blurPass.render(renderer);
+		tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._blurPass.render(renderer, tempRT2);
 
 		// Step 3: blurY pass
 
-		renderer.setRenderTarget(inputRenderTarget ? tempRT1 : outputRenderTarget);
-		renderer.clear(true, true, false);
-
 		this._blurPass.uniforms.direction = 1;
 		this._blurPass.uniforms.tDiffuse = tempRT2.texture;
-
-		this._blurPass.render(renderer);
+		const renderTarget = (inputRenderTarget ? tempRT1 : outputRenderTarget)
+			.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._blurPass.render(renderer, renderTarget);
 
 		// Step 4: blend pass
 
 		if (inputRenderTarget) {
-			renderer.setRenderTarget(outputRenderTarget);
-			renderer.setClearColor(0, 0, 0, 0);
-			if (finish) {
-				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-			} else {
-				renderer.clear(true, true, false);
-			}
-
 			this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 			this._blendPass.uniforms.texture2 = tempRT1.texture;
 			this._blendPass.uniforms.strength = this.strength;
 			this._blendPass.uniforms.falloff = this.falloff;
 
-			if (finish) {
-				this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-				this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-			}
-			this._blendPass.render(renderer);
-			if (finish) {
-				this._blendPass.material.transparent = false;
-				this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-			}
+			composer.$setEffectContextStates(outputRenderTarget, this._blendPass, finish);
+			this._blendPass.render(renderer, outputRenderTarget);
 		}
 
 		composer._renderTargetCache.release(tempRT1, this.downScaleLevel);

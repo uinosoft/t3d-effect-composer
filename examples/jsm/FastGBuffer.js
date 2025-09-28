@@ -1,4 +1,4 @@
-import { RenderTarget2D, ATTACHMENT, TEXTURE_FILTER, PIXEL_TYPE, ShaderPostPass, Matrix4 } from 't3d';
+import { OffscreenRenderTarget, ATTACHMENT, TEXTURE_FILTER, PIXEL_TYPE, ShaderPostPass, Matrix4 } from 't3d';
 import { unitVectorToOctahedronGLSL, defaultVertexShader, Buffer } from 't3d-effect-composer';
 
 /**
@@ -17,7 +17,7 @@ export class FastGBuffer extends Buffer {
 		this.globalRoughness = 0.5;
 		this.globalMetalness = 0.5;
 
-		this._rt = new RenderTarget2D(width, height);
+		this._rt = OffscreenRenderTarget.create2D(width, height);
 		this._rt.texture.minFilter = TEXTURE_FILTER.NEAREST;
 		this._rt.texture.magFilter = TEXTURE_FILTER.NEAREST;
 		this._rt.texture.generateMipmaps = false;
@@ -34,7 +34,7 @@ export class FastGBuffer extends Buffer {
 
 		// don't use this render target for rendering,
 		// it's just used to store the result of the fast gbuffer textures
-		this._fakeRenderTarget = new RenderTarget2D(width, height);
+		this._fakeRenderTarget = OffscreenRenderTarget.create2D(width, height);
 		this._fakeRenderTarget.attach(this._rt.texture, ATTACHMENT.COLOR_ATTACHMENT0);
 		this._fakeRenderTarget.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 	}
@@ -55,10 +55,6 @@ export class FastGBuffer extends Buffer {
 	render(renderer, composer, scene, camera) {
 		if (!this.needRender()) return;
 
-		renderer.setRenderTarget(this._rt);
-		renderer.setClearColor(-2.1, -2.1, 0.5, 0.5);
-		renderer.clear(true, true, false);
-
 		const renderStates = scene.getRenderStates(camera);
 		projectionViewInv.copy(renderStates.camera.projectionViewMatrix).inverse();
 
@@ -66,9 +62,9 @@ export class FastGBuffer extends Buffer {
 		projectionViewInv.toArray(this._fastGBufferPass.uniforms.projectionViewInv);
 		this._fastGBufferPass.uniforms.roughness = this.globalRoughness;
 		this._fastGBufferPass.uniforms.metalness = this.globalMetalness;
-		this._fastGBufferPass.uniforms.resolution[0] = this._rt.width;
-		this._fastGBufferPass.uniforms.resolution[1] = this._rt.height;
-		this._fastGBufferPass.render(renderer);
+
+		this._rt.setColorClearValue(-2.1, -2.1, 0.5, 0.5).setClear(true, true, false);
+		this._fastGBufferPass.render(renderer, this._rt);
 
 		// save render states for effects to get camera and scene info from this buffer
 		this._renderStates = renderStates;
@@ -102,7 +98,6 @@ const fastGBufferShader = {
 	uniforms: {
 		depthTexture: null,
 		projectionViewInv: new Float32Array(16),
-		resolution: [0, 0],
 		roughness: 0.5,
 		metalness: 0.5
 	},
@@ -110,9 +105,10 @@ const fastGBufferShader = {
 	vertexShader: defaultVertexShader,
 
 	fragmentShader: `
+		uniform vec2 u_RenderTargetSize;
+
         uniform sampler2D depthTexture;
         uniform mat4 projectionViewInv;
-        uniform vec2 resolution;
        
         uniform float roughness;
         uniform float metalness;
@@ -167,7 +163,7 @@ const fastGBufferShader = {
 
 			if (depth0 > 0.999) discard;
 
-			vec2 texelSize = 1.0 / resolution;
+			vec2 texelSize = 1.0 / u_RenderTargetSize;
 
 			vec2 uvL = v_Uv + vec2(-texelSize.x, 0.0); // left
             vec2 uvR = v_Uv + vec2(texelSize.x, 0.0);  // right

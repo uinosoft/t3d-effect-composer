@@ -32,11 +32,6 @@ export class ContactShadowEffect extends Effect {
 		this._contactShadowPass.material.depthWrite = false;
 	}
 
-	resize(width, height) {
-		this._contactShadowPass.uniforms.viewportSize[0] = width;
-		this._contactShadowPass.uniforms.viewportSize[1] = height;
-	}
-
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
 		const gBuffer = composer.getBuffer('GBuffer');
 		const renderStates = gBuffer.getCurrentRenderStates();
@@ -79,23 +74,8 @@ export class ContactShadowEffect extends Effect {
 			contactShadowPass.material.needsUpdate = true;
 		}
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
-
-		if (finish) {
-			contactShadowPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			contactShadowPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		contactShadowPass.render(renderer);
-		if (finish) {
-			contactShadowPass.material.transparent = false;
-			contactShadowPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, contactShadowPass, finish);
+		contactShadowPass.render(renderer, outputRenderTarget);
 	}
 
 	dispose() {
@@ -118,7 +98,6 @@ const ContactShadowShader = {
 		cameraFar: 100.0,
 		projection: new Float32Array(16),
 		view: new Float32Array(16),
-		viewportSize: [512, 512],
 		jitterOffset: 0,
 		shadowColor: [0.0, 0.0, 0.0],
 		shadowIntensity: 0.5,
@@ -138,7 +117,7 @@ const ContactShadowShader = {
 		uniform mat4 view;
 		uniform float cameraNear;
 		uniform float cameraFar;
-		uniform vec2 viewportSize;
+		uniform vec2 u_RenderTargetSize;
 		uniform float jitterOffset;
 
 		uniform vec3 shadowColor;
@@ -192,11 +171,11 @@ const ContactShadowShader = {
 			vec3 Q0 = rayOrigin * k0, Q1 = rayEnd * k1;
 
 			// Screen space endpoints
-			vec2 P0 = (H0.xy * k0 * 0.5 + 0.5) * viewportSize;
-			vec2 P1 = (H1.xy * k1 * 0.5 + 0.5) * viewportSize;
+			vec2 P0 = (H0.xy * k0 * 0.5 + 0.5) * u_RenderTargetSize;
+			vec2 P1 = (H1.xy * k1 * 0.5 + 0.5) * u_RenderTargetSize;
 			
 			// Clip to frustum
-			float xMax = viewportSize.x - 0.5, xMin = 0.5, yMax = viewportSize.y - 0.5, yMin = 0.5;
+			float xMax = u_RenderTargetSize.x - 0.5, xMin = 0.5, yMax = u_RenderTargetSize.y - 0.5, yMin = 0.5;
 			float alpha = 0.0;
 			if ((P1.y > yMax) || (P1.y < yMin)) {
 				alpha = (P1.y - ((P1.y > yMax) ? yMax : yMin)) / (P1.y - P0.y);
@@ -240,7 +219,7 @@ const ContactShadowShader = {
 			float rayZNear;
 
 			bool intersect = false;
-			vec2 texelSize = 1.0 / viewportSize;
+			vec2 texelSize = 1.0 / u_RenderTargetSize;
 
 			float iteractionCount = 0.0;
 			float end = P1.x * stepDir;
@@ -300,7 +279,7 @@ const ContactShadowShader = {
 			vec3 rayDir = -(view * vec4(normalize(lightDirection), 0.0)).xyz;
 
 			// Get jitter
-			vec2 uv2 = v_Uv * viewportSize;
+			vec2 uv2 = v_Uv * u_RenderTargetSize;
 			// float jitter = fract((uv2.x + uv2.y) * 0.25) + jitterOffset;
 			float jitter = jitterOffset;
 

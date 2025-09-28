@@ -27,34 +27,18 @@ export class TransitionEffect extends Effect {
 		if (this.progress <= 0) {
 			if (!this._frameShotRenderTarget) {
 				this._frameShotRenderTarget = composer._renderTargetCache.allocate(0);
+				this._frameShotRenderTarget.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
 			}
-
-			renderer.setRenderTarget(this._frameShotRenderTarget);
-			renderer.setClearColor(0, 0, 0, 0);
 			this._copyPass.material.uniforms.tDiffuse = inputRenderTarget.texture;
-			this._copyPass.render(renderer);
+			this._copyPass.render(renderer, this._frameShotRenderTarget);
 		} else if (this.progress < 1 && this._frameShotRenderTarget) {
-			renderer.setRenderTarget(outputRenderTarget);
-			renderer.setClearColor(0, 0, 0, 0);
-			if (finish) {
-				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-			} else {
-				renderer.clear(true, true, false);
-			}
 			this._transitionPass.material.uniforms.texture1 = this._frameShotRenderTarget.texture;
 			this._transitionPass.material.uniforms.texture2 = inputRenderTarget.texture;
 			this._transitionPass.material.uniforms.type = this.type;
 			this._transitionPass.material.uniforms.progress = this.progress;
 			this._transitionPass.material.uniforms.strength = this.zoomFactor;
-			if (finish) {
-				this._transitionPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-				this._transitionPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-			}
-			this._transitionPass.render(renderer);
-			if (finish) {
-				this._transitionPass.material.transparent = false;
-				this._transitionPass.renderStates.camera.rect.set(0, 0, 1, 1);
-			}
+			composer.$setEffectContextStates(outputRenderTarget, this._transitionPass, finish);
+			this._transitionPass.render(renderer, outputRenderTarget);
 
 			return;
 		} else {
@@ -64,23 +48,9 @@ export class TransitionEffect extends Effect {
 			}
 		}
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
 		this._copyPass.material.uniforms.tDiffuse = inputRenderTarget.texture;
-		if (finish) {
-			this._copyPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._copyPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		this._copyPass.render(renderer);
-		if (finish) {
-			this._copyPass.material.transparent = false;
-			this._copyPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, this._copyPass, finish);
+		this._copyPass.render(renderer, outputRenderTarget);
 	}
 
 	dispose() {

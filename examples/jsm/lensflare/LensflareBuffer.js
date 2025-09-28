@@ -1,4 +1,4 @@
-import { RenderTarget2D, TEXTURE_FILTER, ATTACHMENT, Vector3 } from 't3d';
+import { OffscreenRenderTarget, TEXTURE_FILTER, ATTACHMENT, Vector3 } from 't3d';
 import { isDepthStencilAttachment, Buffer } from 't3d-effect-composer';
 
 export class LensflareBuffer extends Buffer {
@@ -6,7 +6,7 @@ export class LensflareBuffer extends Buffer {
 	constructor(width, height) {
 		super(width, height);
 
-		this._occlusionRenderTarget = new RenderTarget2D(width, height);
+		this._occlusionRenderTarget = OffscreenRenderTarget.create2D(width, height);
 		this._occlusionRenderTarget.texture.minFilter = TEXTURE_FILTER.NEAREST;
 		this._occlusionRenderTarget.texture.magFilter = TEXTURE_FILTER.NEAREST;
 		this._occlusionRenderTarget.texture.generateMipmaps = false;
@@ -40,15 +40,13 @@ export class LensflareBuffer extends Buffer {
 
 		if (!renderQueueLayer) return;
 
-		renderer.setRenderTarget(this._occlusionRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, false, false);
-
 		const aspect = this._occlusionRenderTarget.height / this._occlusionRenderTarget.width;
+
+		this._occlusionRenderTarget.setColorClearValue(0, 0, 0, 0).setClear(true, false, false);
 
 		this.lensflareInfos.length = 0;
 
-		renderer.beginRender();
+		renderer.beginRender(this._occlusionRenderTarget);
 		renderer.renderRenderableList(renderQueueLayer.opaque, renderStates, {
 			beforeRender: renderable => {
 				const { object, material } = renderable;

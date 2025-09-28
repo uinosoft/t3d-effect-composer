@@ -15,10 +15,6 @@ export default class NonDepthMarkBufferDebugger extends Debugger {
 	}
 
 	render(renderer, composer, outputRenderTarget) {
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 1);
-		renderer.clear(true, true, false);
-
 		const buffer = composer.getBuffer('NonDepthMarkBuffer');
 
 		const attachIndex = buffer.attachManager.getAttachIndex(this.channel);
@@ -28,7 +24,9 @@ export default class NonDepthMarkBufferDebugger extends Debugger {
 		for (let i = 0; i < 4; i++) {
 			this._mainPass.uniforms.channelMask[i] = (i === channelIndex) ? 1 : 0;
 		}
-		this._mainPass.render(renderer);
+
+		outputRenderTarget.setColorClearValue(0, 0, 0, 1).setClear(true, true, false);
+		this._mainPass.render(renderer, outputRenderTarget);
 	}
 
 }

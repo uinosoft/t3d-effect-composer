@@ -19,11 +19,6 @@ export default class SkylineEffect extends Effect {
 		this._skylinePass.material.depthWrite = false;
 	}
 
-	resize(width, height) {
-		this._skylinePass.uniforms.resolution[0] = 1 / width;
-		this._skylinePass.uniforms.resolution[1] = 1 / height;
-	}
-
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
 		const gBuffer = composer.getBuffer('GBuffer');
 		const renderStates = gBuffer.getCurrentRenderStates();
@@ -45,23 +40,8 @@ export default class SkylineEffect extends Effect {
 		skylinePass.material.uniforms.lineWidth = this.lineWidth;
 		this.lineColor.toArray(skylinePass.material.uniforms.lineColor);
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
-
-		if (finish) {
-			skylinePass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			skylinePass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		skylinePass.render(renderer);
-		if (finish) {
-			skylinePass.material.transparent = false;
-			skylinePass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, skylinePass, finish);
+		skylinePass.render(renderer, outputRenderTarget);
 	}
 
 	dispose() {
@@ -79,20 +59,20 @@ const SkylineShader = {
 		cameraNear: 0.1,
 		cameraFar: 0.1,
 		projection: new Float32Array(16),
-		resolution: [1.0, 1.0],
 		lineColor: [1.0, 0.0, 0.0],
 		lineWidth: 1.0,
 		threshold: 0.1
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
+		uniform vec2 u_RenderTargetSize;
+
 		uniform sampler2D depthTex;
 		uniform sampler2D colorTex;
 		
 		uniform mat4 projection;
 		uniform float cameraNear;
 		uniform float cameraFar;
-		uniform vec2 resolution;
 
 		uniform vec3 lineColor;
 		uniform float lineWidth;
@@ -132,9 +112,11 @@ const SkylineShader = {
 			offsets[6] = vec2(0, 1);
 			offsets[7] = vec2(1, 1);
 
+			vec2 texelSize = 1.0 / u_RenderTargetSize;
+
 			float total = 0.0;
 			for (int i = 0; i < 8; i++) {
-				float sampleDepth = getLinearDepth(v_Uv + (offsets[i] * resolution * lineWidth));
+				float sampleDepth = getLinearDepth(v_Uv + (offsets[i] * texelSize * lineWidth));
 				total += abs(sampleDepth - depth);
 			}
 			total /= 8.0;

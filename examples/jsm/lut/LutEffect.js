@@ -14,14 +14,6 @@ export class LutEffect extends Effect {
 	}
 
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, true);
-		}
-
 		const lutPass = this._lutPass;
 		const is3dTextureDefine = this.lut.isTexture3D ? 1 : 0;
 
@@ -35,15 +27,9 @@ export class LutEffect extends Effect {
 		lutPass.uniforms.lut = this.lut;
 		lutPass.uniforms.intensity = this.intensity;
 		lutPass.uniforms['tDiffuse'] = inputRenderTarget.texture;
-		if (finish) {
-			lutPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			lutPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		lutPass.render(renderer);
-		if (finish) {
-			lutPass.material.transparent = false;
-			lutPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+
+		composer.$setEffectContextStates(outputRenderTarget, lutPass, finish);
+		lutPass.render(renderer, outputRenderTarget);
 	}
 
 }

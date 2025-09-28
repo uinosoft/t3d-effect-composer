@@ -1,5 +1,5 @@
 
-import { ATTACHMENT, PIXEL_FORMAT, TEXTURE_FILTER, RenderBuffer, RenderTarget2D } from 't3d';
+import { ATTACHMENT, PIXEL_FORMAT, TEXTURE_FILTER, RenderBuffer, OffscreenRenderTarget } from 't3d';
 import { Buffer, isDepthStencilAttachment, RenderListMask, setupColorTexture, getColorBufferFormat } from 't3d-effect-composer';
 
 console.warn('TransmissionBuffer: this buffer is deprecated, use SceneBuffer.postRenderLayers instead.');
@@ -9,13 +9,13 @@ export class TransmissionBuffer extends Buffer {
 	constructor(width, height, options) {
 		super(width, height, options);
 
-		this._rt = new RenderTarget2D(width, height);
+		this._rt = OffscreenRenderTarget.create2D(width, height);
 		setupColorTexture(this._rt.texture, options);
 		this._rt.texture.generateMipmaps = false;
 		this._rt.texture.minFilter = TEXTURE_FILTER.LINEAR;
 
 		const colorBufferFormat = getColorBufferFormat(options);
-		this._mrt = new RenderTarget2D(width, height);
+		this._mrt = OffscreenRenderTarget.create2D(width, height);
 		this._mrt.attach(
 			new RenderBuffer(width, height, colorBufferFormat, options.samplerNumber),
 			ATTACHMENT.COLOR_ATTACHMENT0
@@ -78,16 +78,14 @@ export class TransmissionBuffer extends Buffer {
 		const useMSAA = composer.$useMSAA;
 		const renderTarget = useMSAA ? this._mrt : this._rt;
 
-		renderer.setRenderTarget(renderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, false, false);
-
 		const renderStates = scene.getRenderStates(camera);
 		const renderQueue = scene.getRenderQueue(camera);
 
 		const renderOptions = this._renderOptions;
 
-		renderer.beginRender();
+		renderTarget.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+
+		renderer.beginRender(renderTarget);
 
 		const renderLayers = this.renderLayers;
 		for (let i = 0, l = renderLayers.length; i < l; i++) {
@@ -106,7 +104,6 @@ export class TransmissionBuffer extends Buffer {
 		renderer.endRender();
 
 		if (useMSAA) {
-			renderer.setRenderTarget(this._rt);
 			renderer.blitRenderTarget(this._mrt, this._rt, true, true, true);
 		}
 	}

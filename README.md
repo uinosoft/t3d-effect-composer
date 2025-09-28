@@ -46,8 +46,8 @@ const gl = canvas.getContext('webgl2', {
     stencil: true
 });
 const renderer = new t3d.WebGLRenderer(gl);
-renderer.setClearColor(0.1, 0.1, 0.1, 1);
-const backRenderTarget = new t3d.RenderTargetBack(canvas);
+const screenRenderTarget = new t3d.ScreenRenderTarget(canvas);
+screenRenderTarget.setColorClearValue(0.1, 0.1, 0.1, 1);
 
 const effectComposer = new t3d.DefaultEffectComposer(width, height, {});
 
@@ -81,7 +81,7 @@ function loop(count) {
     scene.updateRenderStates(camera);
     scene.updateRenderQueue(camera);
 
-    effectComposer.render(renderer, scene, camera, backRenderTarget);
+    effectComposer.render(renderer, scene, camera, screenRenderTarget);
 }
 requestAnimationFrame(loop);
 
@@ -91,7 +91,7 @@ function onWindowResize() {
 
     camera.setPerspective(45 / 180 * Math.PI, width / height, 1, 1000);
 
-    backRenderTarget.resize(width, height);
+    screenRenderTarget.resize(width, height);
     effectComposer.resize(width, height);
 }
 window.addEventListener("resize", onWindowResize, false);

@@ -1,10 +1,10 @@
-import { RenderTarget3D, PIXEL_TYPE, PIXEL_FORMAT, TEXTURE_FILTER, Vector3, ShaderPostPass } from 't3d';
+import { OffscreenRenderTarget, PIXEL_TYPE, PIXEL_FORMAT, TEXTURE_FILTER, Vector3, ShaderPostPass } from 't3d';
 import { defaultVertexShader } from 't3d-effect-composer';
 
 class VolumeLightingGenerator {
 
 	constructor() {
-		const prelightRT = new RenderTarget3D(512, 512);
+		const prelightRT = OffscreenRenderTarget.create3D(512, 512, 512);
 		prelightRT.texture.type = PIXEL_TYPE.HALF_FLOAT;
 		prelightRT.texture.format = PIXEL_FORMAT.RED;
 		prelightRT.texture.magFilter = TEXTURE_FILTER.LINEAR;
@@ -50,9 +50,8 @@ class VolumeLightingGenerator {
 
 		const { width, height, depth } = inputTexture.image;
 
-		if (prelightRT.width !== width || prelightRT.height !== height || prelightRT.depth !== depth) {
-			prelightRT.resize(width, height, depth);
-		}
+		prelightRT.texture.resizeAsAttachment(width, height, depth);
+		prelightRT.resize(width, height);
 
 		this.lightDirection.toArray(prelightPass.uniforms.lightDirection);
 		prelightPass.uniforms.sampleDistance = this.sampleDistance;
@@ -64,13 +63,13 @@ class VolumeLightingGenerator {
 		}
 
 		for (let i = 0; i < depth; i++) {
-			prelightRT.activeLayer = i;
-			renderer.setRenderTarget(prelightRT);
-
 			prelightPass.uniforms.textureDepth = i / depth;
 			prelightPass.uniforms.volumeTexture = inputTexture;
 
-			prelightPass.render(renderer);
+			prelightRT.activeLayer = i;
+			prelightRT.setClear(false, false, false);
+
+			prelightPass.render(renderer, prelightRT);
 		}
 
 		return prelightRT.texture;

@@ -1,4 +1,4 @@
-import { RenderTarget2D, RenderBuffer, PIXEL_FORMAT, ATTACHMENT } from 't3d';
+import { OffscreenRenderTarget, RenderBuffer, PIXEL_FORMAT, ATTACHMENT } from 't3d';
 import { Buffer, getColorBufferFormat, RenderListMask, setupColorTexture } from 't3d-effect-composer';
 
 export class OverlayBuffer extends Buffer {
@@ -6,11 +6,11 @@ export class OverlayBuffer extends Buffer {
 	constructor(width, height, options) {
 		super(width, height, options);
 
-		this._rt = new RenderTarget2D(width, height);
+		this._rt = OffscreenRenderTarget.create2D(width, height);
 		setupColorTexture(this._rt.texture, options);
 
 		const colorBufferFormat = getColorBufferFormat(options);
-		this._mrt = new RenderTarget2D(width, height);
+		this._mrt = OffscreenRenderTarget.create2D(width, height);
 		this._mrt.attach(
 			new RenderBuffer(width, height, colorBufferFormat, options.samplerNumber),
 			ATTACHMENT.COLOR_ATTACHMENT0
@@ -49,16 +49,14 @@ export class OverlayBuffer extends Buffer {
 		const useMSAA = composer.$useMSAA;
 		const renderTarget = useMSAA ? this._mrt : this._rt;
 
-		renderer.setRenderTarget(renderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, true);
-
 		const renderStates = scene.getRenderStates(camera);
 		const renderQueue = scene.getRenderQueue(camera);
 
 		const renderOptions = this._renderOptions;
 
-		renderer.beginRender();
+		renderTarget.setColorClearValue(0, 0, 0, 0).setClear(true, true, true);
+
+		renderer.beginRender(renderTarget);
 
 		const renderLayers = this.renderLayers;
 		for (let i = 0, l = renderLayers.length; i < l; i++) {
@@ -77,12 +75,11 @@ export class OverlayBuffer extends Buffer {
 		renderer.endRender();
 
 		if (useMSAA) {
-			renderer.setRenderTarget(this._rt);
 			renderer.blitRenderTarget(this._mrt, this._rt, true, true, true);
 		}
 
 		// generate mipmaps for down sampler
-		renderer.updateRenderTargetMipmap(this._rt);
+		renderer.generateMipmaps(this._rt.texture);
 	}
 
 	output() {

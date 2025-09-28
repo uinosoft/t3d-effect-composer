@@ -53,9 +53,6 @@ export default class GlowEffect extends Effect {
 			const attachIndex = markBuffer.attachManager.getAttachIndex(this.name);
 			const channelIndex = markBuffer.attachManager.getChannelIndex(this.name);
 
-			renderer.setRenderTarget(tempRT2);
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, true, false);
 			this._maskPass.uniforms.colorTexture = sceneBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			this._maskPass.uniforms.maskTexture = markBuffer.output(attachIndex)._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			this._maskPass.uniforms.additiveTexture = colorBufferTexture;
@@ -63,40 +60,35 @@ export default class GlowEffect extends Effect {
 			for (let i = 0; i < 4; i++) {
 				this._maskPass.uniforms.channel[i] = (i === channelIndex) ? this.maskStrength : 0;
 			}
-			this._maskPass.render(renderer);
+			tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+			this._maskPass.render(renderer, tempRT2);
 		}
 
-		renderer.setRenderTarget(tempRT1);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._highlightPass.uniforms.tDiffuse = usedMarkBuffer ? tempRT2.texture : colorBufferTexture;
 		this._highlightPass.uniforms.diffuseStrength = usedMarkBuffer ? 1 : this.maskStrength;
 		this._highlightPass.uniforms.threshold = this.threshold;
 		this._highlightPass.uniforms.smoothWidth = this.smoothWidth;
-		this._highlightPass.render(renderer);
+		tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._highlightPass.render(renderer, tempRT1);
 
 		let inputRT = tempRT1;
 		for (let i = 0; i < kernelSizeArray.length; i++) {
-			const _tempRT1 = composer._renderTargetCache.allocate(i + 1);
-			renderer.setRenderTarget(_tempRT1);
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, true, false);
 			this._blurPass.uniforms.tDiffuse = inputRT.texture;
 			this._blurPass.uniforms.texSize[0] = inputRT.width;
 			this._blurPass.uniforms.texSize[1] = inputRT.height;
 			this._blurPass.uniforms.direction[0] = 1;
 			this._blurPass.uniforms.direction[1] = 0;
 			this._blurPass.uniforms.kernelRadius = kernelSizeArray[i];
-			this._blurPass.render(renderer);
+			const _tempRT1 = composer._renderTargetCache.allocate(i + 1);
+			_tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+			this._blurPass.render(renderer, _tempRT1);
 
-			const _tempRT2 = composer._renderTargetCache.allocate(i + 1);
-			renderer.setRenderTarget(_tempRT2);
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, true, false);
 			this._blurPass.uniforms.tDiffuse = _tempRT1.texture;
 			this._blurPass.uniforms.direction[0] = 0;
 			this._blurPass.uniforms.direction[1] = 1;
-			this._blurPass.render(renderer);
+			const _tempRT2 = composer._renderTargetCache.allocate(i + 1);
+			_tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+			this._blurPass.render(renderer, _tempRT2);
 
 			composer._renderTargetCache.release(_tempRT1, i + 1);
 			inputRT = _tempRT2;
@@ -104,9 +96,6 @@ export default class GlowEffect extends Effect {
 			this._tempRTList[i] = _tempRT2;
 		}
 
-		renderer.setRenderTarget(tempRT2);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._compositePass.uniforms.blurTexture1 = this._tempRTList[0].texture;
 		this._compositePass.uniforms.blurTexture2 = this._tempRTList[1].texture;
 		this._compositePass.uniforms.blurTexture3 = this._tempRTList[2].texture;
@@ -114,30 +103,17 @@ export default class GlowEffect extends Effect {
 		this._compositePass.uniforms.blurTexture5 = this._tempRTList[4].texture;
 		this._compositePass.uniforms.bloomRadius = this.radius;
 		this._compositePass.uniforms.bloomStrength = this.strength;
-		this._compositePass.render(renderer);
+		tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._compositePass.render(renderer, tempRT2);
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
 		this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 		this._blendPass.uniforms.texture2 = tempRT2.texture;
 		this._blendPass.uniforms.colorWeight1 = 1;
 		this._blendPass.uniforms.alphaWeight1 = 1;
 		this._blendPass.uniforms.colorWeight2 = 1;
 		this._blendPass.uniforms.alphaWeight2 = 0;
-		if (finish) {
-			this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		this._blendPass.render(renderer);
-		if (finish) {
-			this._blendPass.material.transparent = false;
-			this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, this._blendPass, finish);
+		this._blendPass.render(renderer, outputRenderTarget);
 
 		composer._renderTargetCache.release(tempRT1, 0);
 		composer._renderTargetCache.release(tempRT2, 1);

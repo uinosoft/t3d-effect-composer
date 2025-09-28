@@ -21,22 +21,8 @@ export default class VignettingEffect extends Effect {
 		this.color.toArray(vignettingPass.uniforms.vignettingColor);
 		vignettingPass.uniforms.vignettingOffset = this.offset;
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
-		if (finish) {
-			vignettingPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			vignettingPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		vignettingPass.render(renderer);
-		if (finish) {
-			vignettingPass.material.transparent = false;
-			vignettingPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, vignettingPass, finish);
+		vignettingPass.render(renderer, outputRenderTarget);
 	}
 
 	dispose() {

@@ -41,14 +41,11 @@ export default class TAAEffect extends Effect {
 		const accumBuffer = composer.getBuffer('AccumulationBuffer');
 
 		if (cameraJitter.accumulating()) {
-			renderer.setRenderTarget(accumBuffer.output());
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, false, false);
-
 			this._accumPass.uniforms.currTexture = inputRenderTarget.texture;
 			this._accumPass.uniforms.prevTexture = accumBuffer.accumRT().texture;
 			this._accumPass.uniforms.mixRatio = cameraJitter.frame() === 0 ? 0 : 0.9;
-			this._accumPass.render(renderer);
+			accumBuffer.output().setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+			this._accumPass.render(renderer, accumBuffer.output());
 
 			this._accumulating = true;
 		} else {
@@ -58,25 +55,10 @@ export default class TAAEffect extends Effect {
 			}
 		}
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
-
 		const copyPass = this._copyPass;
 		copyPass.uniforms.tDiffuse = accumBuffer.output().texture;
-		if (finish) {
-			copyPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			copyPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		copyPass.render(renderer);
-		if (finish) {
-			copyPass.material.transparent = false;
-			copyPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, copyPass, finish);
+		copyPass.render(renderer, outputRenderTarget);
 
 		accumBuffer.swap();
 	}

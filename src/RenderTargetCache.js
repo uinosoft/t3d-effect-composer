@@ -1,4 +1,4 @@
-import { RenderTarget2D, ATTACHMENT, TEXTURE_FILTER } from 't3d';
+import { OffscreenRenderTarget, ATTACHMENT, TEXTURE_FILTER } from 't3d';
 import { setupColorTexture } from './Utils.js';
 
 export default class RenderTargetCache {
@@ -26,7 +26,7 @@ export default class RenderTargetCache {
 			const width = Math.ceil(this._width / divisor);
 			const height = Math.ceil(this._height / divisor);
 
-			const renderTarget = new RenderTarget2D(width, height);
+			const renderTarget = OffscreenRenderTarget.create2D(width, height);
 
 			const texture = renderTarget._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			setupColorTexture(texture, this._options);

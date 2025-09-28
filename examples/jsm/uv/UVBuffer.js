@@ -1,4 +1,4 @@
-import { RenderTarget2D, TEXTURE_FILTER, ShaderMaterial } from 't3d';
+import { OffscreenRenderTarget, TEXTURE_FILTER, ShaderMaterial } from 't3d';
 import { Buffer } from 't3d-effect-composer';
 
 export class UVBuffer extends Buffer {
@@ -6,7 +6,7 @@ export class UVBuffer extends Buffer {
 	constructor(width, height, options) {
 		super(width, height, options);
 
-		this._rt = new RenderTarget2D(width, height);
+		this._rt = OffscreenRenderTarget.create2D(width, height);
 		this._rt.texture.minFilter = TEXTURE_FILTER.NEAREST;
 		this._rt.texture.magFilter = TEXTURE_FILTER.NEAREST;
 		this._rt.texture.generateMipmaps = false;
@@ -34,14 +34,12 @@ export class UVBuffer extends Buffer {
 	render(renderer, composer, scene, camera) {
 		if (!this.needRender()) return;
 
-		renderer.setRenderTarget(this._rt);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
-
 		const renderStates = scene.getRenderStates(camera);
 		const renderQueue = scene.getRenderQueue(camera);
 
-		renderer.beginRender();
+		this._rt.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+
+		renderer.beginRender(this._rt);
 
 		const layers = this.layers;
 		for (let i = 0, l = layers.length; i < l; i++) {

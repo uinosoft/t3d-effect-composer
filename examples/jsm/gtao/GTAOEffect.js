@@ -39,10 +39,6 @@ export default class GTAOEffect extends Effect {
 
 		// Step 1: gtao pass
 
-		renderer.setRenderTarget(inputRenderTarget ? tempRT1 : outputRenderTarget);
-		renderer.setClearColor(1, 1, 1, 1);
-		renderer.clear(true, true, false);
-
 		this._gtaoPass.uniforms.maxDistance = this.maxDistance;
 		this._gtaoPass.uniforms.maxPixel = this.maxPixel;
 		this._gtaoPass.uniforms.rayMarchSegment = this.rayMarchSegment;
@@ -65,31 +61,17 @@ export default class GTAOEffect extends Effect {
 			this._gtaoPass.material.defines.MULTI_BOUNCE = this.multiBounce;
 		}
 
-		this._gtaoPass.render(renderer);
+		const renderTarget = (inputRenderTarget ? tempRT1 : outputRenderTarget)
+			.setColorClearValue(1, 1, 1, 1).setClear(true, true, false);
+		this._gtaoPass.render(renderer, renderTarget);
 
 		// Step 2: blend pass
 
 		if (inputRenderTarget) {
-			renderer.setRenderTarget(outputRenderTarget);
-			renderer.setClearColor(0, 0, 0, 0);
-			if (finish) {
-				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-			} else {
-				renderer.clear(true, true, false);
-			}
-
 			this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 			this._blendPass.uniforms.texture2 = tempRT1.texture;
-
-			if (finish) {
-				this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-				this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-			}
-			this._blendPass.render(renderer);
-			if (finish) {
-				this._blendPass.material.transparent = false;
-				this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-			}
+			composer.$setEffectContextStates(outputRenderTarget, this._blendPass, finish);
+			this._blendPass.render(renderer, outputRenderTarget);
 		}
 
 		composer._renderTargetCache.release(tempRT1, this.downScaleLevel);

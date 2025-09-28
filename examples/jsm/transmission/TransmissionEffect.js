@@ -19,24 +19,10 @@ export class TransmissionEffect extends Effect {
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
 		const transmissionBuffer = composer.getBuffer('TransmissionBuffer');
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
 		this._blendPass.uniforms.srcTex = transmissionBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 		this._blendPass.uniforms.dstTex = inputRenderTarget.texture;
-		if (finish) {
-			this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		this._blendPass.render(renderer);
-		if (finish) {
-			this._blendPass.material.transparent = false;
-			this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, this._blendPass, finish);
+		this._blendPass.render(renderer, outputRenderTarget);
 	}
 
 	dispose() {

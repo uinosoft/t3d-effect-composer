@@ -1,4 +1,4 @@
-import { Vector2, Texture2D, RenderBuffer, PIXEL_FORMAT, ShaderPostPass, TEXTURE_FILTER } from 't3d';
+import { Vector2, Color4, Texture2D, RenderBuffer, PIXEL_FORMAT, ShaderPostPass, TEXTURE_FILTER } from 't3d';
 import GBuffer from './buffers/GBuffer.js';
 import NonDepthMarkBuffer from './buffers/NonDepthMarkBuffer.js';
 import MarkBuffer from './buffers/MarkBuffer.js';
@@ -116,8 +116,6 @@ export default class EffectComposer {
 
 		this._effectList = [];
 
-		this._tempClearColor = [0, 0, 0, 1];
-		this._tempViewport = [0, 0, 1, 1];
 		this._tempBufferNames = new Set();
 
 		this._stats = {
@@ -126,6 +124,31 @@ export default class EffectComposer {
 			colorMarkBuffers: 0,
 			currentBufferUsage: {}
 		};
+
+		// context states cache
+
+		// context states for render target
+		this._tempTargetStates = {
+			clearColor: true,
+			clearDepth: true,
+			clearStencil: true,
+			colorClearValue: new Color4(),
+			depthClearValue: 1,
+			stencilClearValue: 0,
+			occlusionQuerySet: null,
+			timestampWrites: {
+				querySet: null,
+				beginningOfPassWriteIndex: 0,
+				endOfPassWriteIndex: 1
+			}
+		};
+		// (legacy) context states for renderer global
+		this._clearColor = true;
+		this._clearDepth = true;
+		this._clearStencil = false;
+		this._tempClearColor = [0, 0, 0, 1];
+		// rect of camera
+		this._tempViewport = [0, 0, 1, 1];
 
 		// Public properties
 
@@ -145,32 +168,21 @@ export default class EffectComposer {
 		this.sceneMSAA = false;
 
 		/**
-		 * Whether to clear the color buffer before renderring.
-		 * @type {Boolean}
-		 * @default true
-		 */
-		this.clearColor = true;
-
-		/**
-		 * Whether to clear the depth buffer before renderring.
-		 * @type {Boolean}
-		 * @default true
-		 */
-		this.clearDepth = true;
-
-		/**
-		 * Whether to clear the stencil buffer before renderring.
-		 * @type {Boolean}
-		 * @default false
-		 */
-		this.clearStencil = false;
-
-		/**
 		 * The debugger for this effect composer
 		 * @type {Null|Debugger}
 		 * @default null
 		 */
 		this.debugger = null;
+
+		/**
+		 * Since t3d 0.5.x version recommends using the rendering state on RenderTarget, global states will be gradually deprecated.
+		 * We try to use the state of RenderTarget for rendering inside EffectComposer. But since external users may still be using
+		 * the old interface to set the rendering state on the Renderer, we need a transition period to be compatible with this usage.
+		 * Set to true to have EffectComposer get the rendering state from RenderTarget instead of the global state of Renderer.
+		 * @type {Boolean}
+		 * @default true
+		 */
+		this.useTargetStates = true;
 	}
 
 	/**
@@ -317,8 +329,8 @@ export default class EffectComposer {
 
 	render(renderer, scene, camera, target) {
 		const renderStates = scene.getRenderStates(camera);
-		renderer.getClearColor().toArray(this._tempClearColor); // save clear color
-		camera.rect.toArray(this._tempViewport);
+
+		this._saveContextStates(renderer, camera, target);
 		camera.rect.set(0, 0, 1, 1);
 		renderStates.camera.rect.set(0, 0, 1, 1);
 
@@ -339,7 +351,8 @@ export default class EffectComposer {
 
 			this.debugger.render(renderer, this, target);
 
-			renderer.setClearColor(...this._tempClearColor); // restore clear color
+			this._restoreContextStates(renderer, camera, target);
+			renderStates.camera.rect.fromArray(this._tempViewport);
 
 			return;
 		}
@@ -417,28 +430,20 @@ export default class EffectComposer {
 		) {
 			sceneBuffer.render(renderer, this, scene, camera);
 
-			renderer.setRenderTarget(target);
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(this.clearColor, this.clearDepth, this.clearStencil);
-
 			const copyPass = this._copyPass;
 			copyPass.uniforms.tDiffuse = sceneBuffer.output().texture;
-			copyPass.material.transparent = this._tempClearColor[3] < 1 || !this.clearColor;
-			copyPass.renderStates.camera.rect.fromArray(this._tempViewport);
-			copyPass.render(renderer);
+			this.$setFinalContextStates(target, copyPass);
+			copyPass.render(renderer, target);
 		} else {
-			renderer.setRenderTarget(target);
-			renderer.setClearColor(...this._tempClearColor);
-			renderer.clear(this.clearColor, this.clearDepth, this.clearStencil);
+			this.$setFinalContextStates(target);
 			renderStates.camera.rect.fromArray(this._tempViewport);
 
-			sceneBuffer.$renderScene(renderer, renderQueue, renderStates);
-			sceneBuffer.$renderPostTransmission(renderer, renderQueue, renderStates);
-			sceneBuffer.$renderOverlay(renderer, renderQueue, renderStates);
+			sceneBuffer.$renderScene(renderer, renderQueue, renderStates, target);
+			sceneBuffer.$renderPostTransmission(renderer, renderQueue, renderStates, target);
+			sceneBuffer.$renderOverlay(renderer, renderQueue, renderStates, target);
 		}
 
-		renderer.setClearColor(...this._tempClearColor); // restore clear color
-		camera.rect.fromArray(this._tempViewport);
+		this._restoreContextStates(renderer, camera, target);
 		renderStates.camera.rect.fromArray(this._tempViewport);
 	}
 
@@ -488,6 +493,77 @@ export default class EffectComposer {
 
 	get $cameraJitter() {
 		return this._cameraJitter;
+	}
+
+	$setFinalContextStates(target, postPass) {
+		if (this.useTargetStates) {
+			const targetStates = this._tempTargetStates;
+			target.clearColor = targetStates.clearColor;
+			target.clearDepth = targetStates.clearDepth;
+			target.clearStencil = targetStates.clearStencil;
+			target.colorClearValue.copy(targetStates.colorClearValue);
+		} else {
+			target.clearColor = this._clearColor;
+			target.clearDepth = this._clearDepth;
+			target.clearStencil = this._clearStencil;
+			target.colorClearValue.fromArray(this._tempClearColor);
+		}
+
+		if (postPass) {
+			target.setColorClearValue(0, 0, 0, 0);
+			postPass.material.transparent = target.colorClearValue.a < 1 || !target.clearColor;
+			postPass.renderStates.camera.rect.fromArray(this._tempViewport);
+		}
+	}
+
+	$setEffectContextStates(target, postPass, finish) {
+		if (finish) {
+			this.$setFinalContextStates(target, postPass);
+		} else {
+			target
+				.setColorClearValue(0, 0, 0, 0)
+				.setClear(true, true, false);
+			postPass.material.transparent = false;
+			postPass.renderStates.camera.rect.set(0, 0, 1, 1);
+		}
+	}
+
+	// Private methods
+
+	_saveContextStates(renderer, camera, target) {
+		const targetStates = this._tempTargetStates;
+		targetStates.clearColor = target.clearColor;
+		targetStates.clearDepth = target.clearDepth;
+		targetStates.clearStencil = target.clearStencil;
+		targetStates.colorClearValue.copy(target.colorClearValue);
+		targetStates.depthClearValue = target.depthClearValue;
+		targetStates.stencilClearValue = target.stencilClearValue;
+		targetStates.occlusionQuerySet = target.occlusionQuerySet;
+		targetStates.timestampWrites.querySet = target.timestampWrites.querySet;
+		targetStates.timestampWrites.beginningOfPassWriteIndex = target.timestampWrites.beginningOfPassWriteIndex;
+		targetStates.timestampWrites.endOfPassWriteIndex = target.timestampWrites.endOfPassWriteIndex;
+
+		renderer.getClearColor().toArray(this._tempClearColor); // legacy
+
+		camera.rect.toArray(this._tempViewport);
+	}
+
+	_restoreContextStates(renderer, camera, target) {
+		const targetStates = this._tempTargetStates;
+		target.clearColor = targetStates.clearColor;
+		target.clearDepth = targetStates.clearDepth;
+		target.clearStencil = targetStates.clearStencil;
+		target.colorClearValue.copy(targetStates.colorClearValue);
+		target.depthClearValue = targetStates.depthClearValue;
+		target.stencilClearValue = targetStates.stencilClearValue;
+		target.occlusionQuerySet = targetStates.occlusionQuerySet;
+		target.timestampWrites.querySet = targetStates.timestampWrites.querySet;
+		target.timestampWrites.beginningOfPassWriteIndex = targetStates.timestampWrites.beginningOfPassWriteIndex;
+		target.timestampWrites.endOfPassWriteIndex = targetStates.timestampWrites.endOfPassWriteIndex;
+
+		renderer.setClearColor(...this._tempClearColor); // legacy
+
+		camera.rect.fromArray(this._tempViewport);
 	}
 
 }

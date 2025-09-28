@@ -1,4 +1,4 @@
-import { RenderTarget2D, PIXEL_TYPE, TEXTURE_FILTER, ShaderMaterial, DRAW_SIDE, COMPARE_FUNC, PIXEL_FORMAT, ATTACHMENT, Texture2D } from 't3d';
+import { OffscreenRenderTarget, PIXEL_TYPE, TEXTURE_FILTER, ShaderMaterial, DRAW_SIDE, COMPARE_FUNC, PIXEL_FORMAT, ATTACHMENT, Texture2D } from 't3d';
 import { Buffer } from 't3d-effect-composer';
 
 export default class ThicknessBuffer extends Buffer {
@@ -17,7 +17,7 @@ export default class ThicknessBuffer extends Buffer {
 			depthTexture.generateMipmaps = false;
 			depthTexture.flipY = false;
 
-			const renderTarget = new RenderTarget2D(width, height);
+			const renderTarget = OffscreenRenderTarget.create2D(width, height);
 			renderTarget.texture.minFilter = TEXTURE_FILTER.NEAREST;
 			renderTarget.texture.magFilter = TEXTURE_FILTER.NEAREST;
 			renderTarget.texture.generateMipmaps = false;
@@ -84,13 +84,12 @@ export default class ThicknessBuffer extends Buffer {
 		const renderStates = scene.getRenderStates(camera);
 		const renderQueue = scene.getRenderQueue(camera);
 
-		renderer.setRenderTarget(this._frontDepthRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
+		this._frontDepthRenderTarget
+			.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
 
 		const layers = this.layers;
 
-		renderer.beginRender();
+		renderer.beginRender(this._frontDepthRenderTarget);
 
 		for (let i = 0, l = layers.length; i < l; i++) {
 			const renderQueueLayer = renderQueue.getLayer(layers[i]);
@@ -102,12 +101,11 @@ export default class ThicknessBuffer extends Buffer {
 
 		const reverseDepthCompare = this._backMaterial.depthFunc === COMPARE_FUNC.GEQUAL || this._backMaterial.depthFunc === COMPARE_FUNC.GREATER;
 
-		renderer.setRenderTarget(this._backDepthRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer._state.depthBuffer.setClear(reverseDepthCompare ? 0 : 1);
-		renderer.clear(true, true, false);
+		this._backDepthRenderTarget
+			.setColorClearValue(0, 0, 0, 0).setClear(true, true, false)
+			.setDepthClearValue(reverseDepthCompare ? 0 : 1);
 
-		renderer.beginRender();
+		renderer.beginRender(this._backDepthRenderTarget);
 
 		for (let i = 0, l = layers.length; i < l; i++) {
 			const renderQueueLayer = renderQueue.getLayer(layers[i]);
@@ -116,8 +114,6 @@ export default class ThicknessBuffer extends Buffer {
 		}
 
 		renderer.endRender();
-
-		renderer._state.depthBuffer.setClear(1);
 	}
 
 	output() {

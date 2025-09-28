@@ -400,14 +400,14 @@ export const fxaaShader = {
 	defines: {},
 	uniforms: {
 		tDiffuse: null,
-		resolution: [1 / 1024, 1 / 512]
+		resolution: [1 / 512, 1 / 512] // deprecated
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
         uniform sampler2D tDiffuse;
         varying vec2 v_Uv;
         
-        uniform vec2 resolution;  
+        uniform vec2 u_RenderTargetSize;
         
         // FXAA 3.11 implementation by NVIDIA, ported to WebGL by Agost Biro (biro@archilogic.com)
         
@@ -1464,7 +1464,7 @@ export const fxaaShader = {
             tDiffuse,
             tDiffuse,
             tDiffuse,
-            resolution,
+            1.0 / u_RenderTargetSize,
             vec4(0.0),
             vec4(0.0),
             vec4(0.0),

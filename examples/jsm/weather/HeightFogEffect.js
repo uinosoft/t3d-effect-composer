@@ -75,22 +75,8 @@ export class HeightFogEffect extends Effect {
 			this._fogPass.material.uniforms['flowStrength'] = this.flowStrength;
 		}
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
-		if (finish) {
-			this._fogPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._fogPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		this._fogPass.render(renderer);
-		if (finish) {
-			this._fogPass.material.transparent = false;
-			this._fogPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, this._fogPass, finish);
+		this._fogPass.render(renderer, outputRenderTarget);
 	}
 
 	dispose() {

@@ -11,35 +11,12 @@ export class KuwaharaEffect extends Effect {
 		this._mainPass = new ShaderPostPass(kuwaharaShader);
 	}
 
-	resize(width, height) {
-		this._mainPass.uniforms.resolution[0] = width;
-		this._mainPass.uniforms.resolution[1] = height;
-	}
-
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
-
 		const mainPass = this._mainPass;
-
 		mainPass.uniforms.radius = this.radius;
 		mainPass.uniforms.tDiffuse = inputRenderTarget.texture;
-
-		if (finish) {
-			mainPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			mainPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		mainPass.render(renderer);
-		if (finish) {
-			mainPass.material.transparent = false;
-			mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, mainPass, finish);
+		mainPass.render(renderer, outputRenderTarget);
 	}
 
 	dispose() {
@@ -53,19 +30,18 @@ const kuwaharaShader = {
 	name: 'ec_kuwahara',
 	uniforms: {
 		tDiffuse: null,
-		resolution: [512, 512],
 		radius: 2
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
         uniform sampler2D tDiffuse;
         uniform int radius;
-        uniform vec2 resolution;
+        uniform vec2 u_RenderTargetSize;
 
         varying vec2 v_Uv;
 
         vec4 kuwahara(vec2 uv, int radius) {
-            vec2 texel = 1.0 / resolution;
+            vec2 texel = 1.0 / u_RenderTargetSize;
             vec4 m[4];
             vec4 s[4];
             for (int k = 0; k < 4; ++k) {

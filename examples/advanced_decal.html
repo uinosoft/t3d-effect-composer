@@ -90,7 +90,7 @@
 	const contextParams = { antialias: true, alpha: false, stencil: true };
 	const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
 	const renderer = new t3d.WebGLRenderer(gl);
-	const backRenderTarget = new t3d.RenderTargetBack(canvas);
+	const screenRenderTarget = new t3d.ScreenRenderTarget(canvas);
 
 	const effectComposer = new DefaultEffectComposer(width, height, {
 		samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
@@ -353,14 +353,13 @@
 
 		// Render occlusion texture for decal
 
-		renderer.setRenderTarget(decal.$depthRenderTarget);
-		renderer.setClearColor(1, 1, 1, 1);
-		renderer.clear(true, true, true);
-
 		const renderStates = scene.updateRenderStates(decal.$camera, false);
 		const renderQueue = scene.updateRenderQueue(decal.$camera, false, false);
 
-		renderer.beginRender();
+		decal.$depthRenderTarget
+			.setColorClearValue(1, 1, 1, 1)
+			.setClear(true, true, true);
+		renderer.beginRender(decal.$depthRenderTarget);
 
 		const mainLayer = renderQueue.getLayer(0);
 		if (mainLayer.opaqueCount > 0) {
@@ -374,8 +373,7 @@
 
 		// Main render
 
-		renderer.setClearColor(0.2, 0.2, 0.2, 1);
-		effectComposer.render(renderer, scene, camera, backRenderTarget);
+		effectComposer.render(renderer, scene, camera, screenRenderTarget);
 
 		stats.end();
 	}
@@ -387,7 +385,7 @@
 
 		camera.setPerspective(45 / 180 * Math.PI, width / height, 1, 1000);
 
-		backRenderTarget.resize(width, height);
+		screenRenderTarget.resize(width, height);
 		effectComposer.resize(width, height);
 	}
 	window.addEventListener('resize', onWindowResize, false);

@@ -49,8 +49,7 @@
 	const contextParams = { antialias: false, alpha: false, stencil: false };
 	const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
 	const renderer = new t3d.WebGLRenderer(gl);
-	renderer.setClearColor(0, 0, 0, 1);
-	const backRenderTarget = new t3d.RenderTargetBack(canvas);
+	const screenRenderTarget = new t3d.ScreenRenderTarget(canvas);
 
 	const composerOptions = {
 		samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
@@ -107,7 +106,7 @@
 		scene.updateRenderStates(camera);
 		scene.updateRenderQueue(camera);
 
-		effectComposer.render(renderer, scene, camera, backRenderTarget);
+		effectComposer.render(renderer, scene, camera, screenRenderTarget);
 	}
 	requestAnimationFrame(loop);
 
@@ -120,7 +119,7 @@
 
 		camera.setPerspective(60 / 180 * Math.PI, width / height, 5000000, 160000000);
 
-		backRenderTarget.resize(width, height);
+		screenRenderTarget.resize(width, height);
 		effectComposer.resize(width, height);
 	}
 	window.addEventListener('resize', onWindowResize, false);

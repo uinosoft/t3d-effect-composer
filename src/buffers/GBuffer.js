@@ -1,4 +1,4 @@
-import { RenderTarget2D, Texture2D, ATTACHMENT, PIXEL_TYPE, TEXTURE_FILTER, SHADING_TYPE, ShaderMaterial, Vector3, Matrix4, Vector4, ShaderPostPass } from 't3d';
+import { OffscreenRenderTarget, Texture2D, ATTACHMENT, PIXEL_TYPE, TEXTURE_FILTER, SHADING_TYPE, ShaderMaterial, Vector3, Matrix4, Vector4, ShaderPostPass } from 't3d';
 import { unitVectorToOctahedronGLSL, setupDepthTexture, defaultVertexShader } from '../Utils.js';
 import Buffer from './Buffer.js';
 
@@ -9,7 +9,7 @@ export default class GBuffer extends Buffer {
 
 		this.enableCameraJitter = true;
 
-		this._rt = new RenderTarget2D(width, height);
+		this._rt = OffscreenRenderTarget.create2D(width, height);
 		this._rt.texture.minFilter = TEXTURE_FILTER.NEAREST;
 		this._rt.texture.magFilter = TEXTURE_FILTER.NEAREST;
 		this._rt.texture.generateMipmaps = false;
@@ -68,7 +68,7 @@ export default class GBuffer extends Buffer {
 		this._supportLogDepth = value;
 
 		if (!this._logDepthRenderTarget) {
-			this._logDepthRenderTarget = new RenderTarget2D(this._rt.width, this._rt.height);
+			this._logDepthRenderTarget = OffscreenRenderTarget.create2D(this._rt.width, this._rt.height);
 			this._logDepthRenderTarget.attach(this._rt.texture, ATTACHMENT.COLOR_ATTACHMENT0);
 
 			const depthTexture = new Texture2D();
@@ -118,10 +118,6 @@ export default class GBuffer extends Buffer {
 		const cameraJitter = composer.$cameraJitter;
 		const enableCameraJitter = this.enableCameraJitter && cameraJitter.accumulating();
 
-		renderer.setRenderTarget(this._rt);
-		renderer.setClearColor(-2.1, -2.1, 0.5, 0.5);
-		renderer.clear(true, true, false);
-
 		const renderOptions = this._renderOptions;
 
 		const renderStates = scene.getRenderStates(camera);
@@ -134,7 +130,9 @@ export default class GBuffer extends Buffer {
 
 		enableCameraJitter && cameraJitter.jitterProjectionMatrix(fixedRenderStates.camera, this._rt.width, this._rt.height);
 
-		renderer.beginRender();
+		this._rt.setColorClearValue(-2.1, -2.1, 0.5, 0.5).setClear(true, true, false);
+
+		renderer.beginRender(this._rt);
 
 		const layers = this.layers;
 		for (let i = 0, l = layers.length; i < l; i++) {
@@ -148,9 +146,6 @@ export default class GBuffer extends Buffer {
 		fixedRenderStates.scene.logarithmicDepthBuffer = oldLogDepthState; // restore
 
 		if (renderLogDepth) {
-			renderer.setRenderTarget(this._logDepthRenderTarget);
-			renderer.clear(false, true, true);
-
 			const { near, far, logDepthCameraNear, logDepthBufFC } = fixedRenderStates.camera;
 
 			this._logDepthPass.uniforms.depthTexture = this._rt._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
@@ -160,7 +155,8 @@ export default class GBuffer extends Buffer {
 			this._logDepthPass.uniforms.depthFactors[2] = far / (far - near); // a
 			this._logDepthPass.uniforms.depthFactors[3] = far * near / (near - far); // b
 
-			this._logDepthPass.render(renderer);
+			this._logDepthRenderTarget.setClear(false, true, true);
+			this._logDepthPass.render(renderer, this._logDepthRenderTarget);
 		}
 
 		this._renderLogDepth = renderLogDepth;
@@ -197,12 +193,8 @@ export default class GBuffer extends Buffer {
 		output.scene = renderStates.scene;
 
 		// copy lights
-		if (renderStates.lighting) { // for t3d v0.4.x or later
-			output.lighting = renderStates.lighting;
-			output.lights = renderStates.lighting.getGroup(0);
-		} else { // for t3d v0.3.x
-			output.lights = renderStates.lights;
-		}
+		output.lighting = renderStates.lighting;
+		output.lights = renderStates.lighting.getGroup(0);
 
 		output.gammaFactor = renderStates.gammaFactor;
 		output.outputEncoding = renderStates.outputEncoding;

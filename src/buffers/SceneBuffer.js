@@ -1,4 +1,4 @@
-import { RenderTarget2D, ATTACHMENT, TEXTURE_FILTER, MathUtils, ShaderPostPass } from 't3d';
+import { OffscreenRenderTarget, ATTACHMENT, TEXTURE_FILTER, MathUtils, ShaderPostPass } from 't3d';
 import { copyShader, isDepthStencilAttachment, RenderListMask, setupColorTexture } from '../Utils.js';
 import Buffer from './Buffer.js';
 
@@ -9,10 +9,10 @@ export default class SceneBuffer extends Buffer {
 
 		this.enableCameraJitter = true;
 
-		this._rt = new RenderTarget2D(width, height);
+		this._rt = OffscreenRenderTarget.create2D(width, height);
 		this._rt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 
-		this._mrt = new RenderTarget2D(width, height);
+		this._mrt = OffscreenRenderTarget.create2D(width, height);
 		this._mrt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 
 		this.clearColor = true;
@@ -29,7 +29,7 @@ export default class SceneBuffer extends Buffer {
 
 		// transmission render target is power-of-two size
 		// to avoid artifacts in mipmap generation
-		this._transmissionRT = new RenderTarget2D(
+		this._transmissionRT = OffscreenRenderTarget.create2D(
 			MathUtils.nearestPowerOfTwo(width),
 			MathUtils.nearestPowerOfTwo(height)
 		);
@@ -119,35 +119,27 @@ export default class SceneBuffer extends Buffer {
 		const cameraJitter = composer.$cameraJitter;
 		const enableCameraJitter = this.enableCameraJitter && cameraJitter.accumulating();
 
-		renderer.setRenderTarget(renderTarget);
-
-		if (composer.clearColor) {
-			renderer.setClearColor(...composer._tempClearColor);
-		} else {
-			renderer.setClearColor(0, 0, 0, 0);
-		}
-
-		renderer.clear(this.clearColor, this.clearDepth, this.clearStencil && hasStencil);
-
 		const renderStates = scene.getRenderStates(camera);
 		const renderQueue = scene.getRenderQueue(camera);
 
 		enableCameraJitter && cameraJitter.jitterProjectionMatrix(renderStates.camera, this._rt.width, this._rt.height);
 
-		this.$renderScene(renderer, renderQueue, renderStates);
-		this.$renderTransmission(renderer, renderQueue, renderStates, composer);
-		this.$renderPostTransmission(renderer, renderQueue, renderStates);
-		this.$renderOverlay(renderer, renderQueue, renderStates);
+		composer.$setFinalContextStates(renderTarget);
+		renderTarget.setClear(this.clearColor, this.clearDepth, this.clearStencil && hasStencil);
+
+		this.$renderScene(renderer, renderQueue, renderStates, renderTarget);
+		this.$renderTransmission(renderer, renderQueue, renderStates, renderTarget, composer);
+		this.$renderPostTransmission(renderer, renderQueue, renderStates, renderTarget);
+		this.$renderOverlay(renderer, renderQueue, renderStates, renderTarget);
 
 		enableCameraJitter && cameraJitter.restoreProjectionMatrix(renderStates.camera);
 
 		if (useMSAA) {
-			renderer.setRenderTarget(this._rt);
 			renderer.blitRenderTarget(this._mrt, this._rt, true, true, hasStencil);
 		}
 
 		// generate mipmaps for down sampler
-		renderer.updateRenderTargetMipmap(this._rt);
+		renderer.generateMipmaps(this._rt.texture);
 	}
 
 	output() {
@@ -185,8 +177,8 @@ export default class SceneBuffer extends Buffer {
 		}
 	}
 
-	$renderScene(renderer, renderQueue, renderStates) {
-		renderer.beginRender();
+	$renderScene(renderer, renderQueue, renderStates, renderTarget) {
+		renderer.beginRender(renderTarget);
 
 		const renderLayers = this.renderLayers;
 		for (let i = 0, l = renderLayers.length; i < l; i++) {
@@ -196,61 +188,60 @@ export default class SceneBuffer extends Buffer {
 		renderer.endRender();
 	}
 
-	$renderTransmission(renderer, renderQueue, renderStates, composer) {
+	$renderTransmission(renderer, renderQueue, renderStates, renderTarget, composer) {
 		const renderLayer = this.postRenderLayers.transmission;
 
 		if (this.$isRenderLayerEmpty(renderQueue, renderLayer)) return;
 
-		const oldRenderTarget = renderer.getRenderTarget();
-		const oldColorBuffer = oldRenderTarget._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
-		const useMSAA = oldColorBuffer.isRenderBuffer && oldColorBuffer.multipleSampling > 0;
+		const colorAttachment = renderTarget._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
+		const useMSAA = colorAttachment.isRenderBuffer && colorAttachment.multipleSampling > 0;
 
-		let sceneRenderTarget = oldRenderTarget;
+		let sceneRenderTarget = renderTarget;
 
 		if (useMSAA) {
 			sceneRenderTarget = composer._renderTargetCache.allocate(0);
 
 			// blit to single-sampled render target
-			renderer.setRenderTarget(sceneRenderTarget);
-			renderer.blitRenderTarget(this._mrt, sceneRenderTarget, true, false, false);
+			renderer.blitRenderTarget(renderTarget, sceneRenderTarget, true, false, false);
 		}
 
 		// copy to power-of-two transmissionRT and generate mipmaps
-		renderer.setRenderTarget(this._transmissionRT);
 		this._transmissionCopyPass.uniforms.tDiffuse = sceneRenderTarget.texture;
-		this._transmissionCopyPass.render(renderer);
-		renderer.updateRenderTargetMipmap(this._transmissionRT);
+		this._transmissionRT.setClear(false, false, false);
+		this._transmissionCopyPass.render(renderer, this._transmissionRT);
+		renderer.generateMipmaps(this._transmissionRT.texture);
 
 		if (useMSAA) {
 			composer._renderTargetCache.release(sceneRenderTarget, 0);
 		}
 
-		renderer.setRenderTarget(oldRenderTarget);
+		renderTarget.setClear(false, false, false);
 
-		renderer.beginRender();
+		renderer.beginRender(renderTarget);
 		this._renderOneLayer(renderer, renderQueue, renderStates, renderLayer);
 		renderer.endRender();
 	}
 
-	$renderPostTransmission(renderer, renderQueue, renderStates) {
+	$renderPostTransmission(renderer, renderQueue, renderStates, renderTarget) {
 		const renderLayer = this.postRenderLayers.postTransmission;
 
 		if (this.$isRenderLayerEmpty(renderQueue, renderLayer)) return;
 
-		renderer.beginRender();
+		renderTarget.setClear(false, false, false);
+
+		renderer.beginRender(renderTarget);
 		this._renderOneLayer(renderer, renderQueue, renderStates, renderLayer);
 		renderer.endRender();
 	}
 
-	$renderOverlay(renderer, renderQueue, renderStates) {
+	$renderOverlay(renderer, renderQueue, renderStates, renderTarget) {
 		const renderLayer = this.postRenderLayers.overlay;
 
 		if (this.$isRenderLayerEmpty(renderQueue, renderLayer)) return;
 
-		// TODO Forcing clear depth may cause bugs
-		renderer.clear(false, true, false);
+		renderTarget.setClear(false, true, false);
 
-		renderer.beginRender();
+		renderer.beginRender(renderTarget);
 		this._renderOneLayer(renderer, renderQueue, renderStates, renderLayer);
 		renderer.endRender();
 	}

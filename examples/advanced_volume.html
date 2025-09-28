@@ -56,7 +56,7 @@
 	const contextParams = { antialias: true, alpha: false };
 	const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
 	const renderer = new t3d.WebGLRenderer(gl);
-	const backRenderTarget = new t3d.RenderTargetBack(canvas);
+	const screenRenderTarget = new t3d.ScreenRenderTarget(canvas);
 
 	const options = {
 		samplerNumber: Math.min(renderer.capabilities.maxSamples, 5),
@@ -218,8 +218,8 @@
 			volumeEffect.boxMatrix.premultiply(volumeMesh.worldMatrix);
 		}
 
-		renderer.setClearColor(0.2, 0.2, 0.2, 1);
-		effectComposer.render(renderer, scene, camera, backRenderTarget);
+		screenRenderTarget.setColorClearValue(0.2, 0.2, 0.2, 1);
+		effectComposer.render(renderer, scene, camera, screenRenderTarget);
 	}
 	requestAnimationFrame(loop);
 
@@ -229,7 +229,7 @@
 
 		camera.setPerspective(45 / 180 * Math.PI, width / height, 0.1, 1000);
 
-		backRenderTarget.resize(width, height);
+		screenRenderTarget.resize(width, height);
 		effectComposer.resize(width, height);
 	}
 	window.addEventListener('resize', onWindowResize, false);

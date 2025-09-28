@@ -1,5 +1,5 @@
 // t3d-effect-composer
-import { PIXEL_TYPE, PIXEL_FORMAT, TEXTURE_FILTER, RenderTarget2D, ATTACHMENT, ShaderPostPass, Matrix4, Texture2D, TEXTURE_WRAP, Vector3, TEXEL_ENCODING_TYPE, Color3, Vector2, Vector4, SHADING_TYPE, ShaderMaterial, RenderBuffer, DRAW_SIDE, BLEND_TYPE, MathUtils } from 't3d';
+import { PIXEL_TYPE, PIXEL_FORMAT, TEXTURE_FILTER, OffscreenRenderTarget, ATTACHMENT, ShaderPostPass, Matrix4, Texture2D, TEXTURE_WRAP, Vector3, TEXEL_ENCODING_TYPE, Color3, Vector2, Vector4, SHADING_TYPE, ShaderMaterial, RenderBuffer, DRAW_SIDE, BLEND_TYPE, MathUtils, Color4 } from 't3d';
 
 class Buffer {
 
@@ -442,14 +442,14 @@ const fxaaShader = {
 	defines: {},
 	uniforms: {
 		tDiffuse: null,
-		resolution: [1 / 1024, 1 / 512]
+		resolution: [1 / 512, 1 / 512] // deprecated
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
         uniform sampler2D tDiffuse;
         varying vec2 v_Uv;
         
-        uniform vec2 resolution;  
+        uniform vec2 u_RenderTargetSize;
         
         // FXAA 3.11 implementation by NVIDIA, ported to WebGL by Agost Biro (biro@archilogic.com)
         
@@ -1506,7 +1506,7 @@ const fxaaShader = {
             tDiffuse,
             tDiffuse,
             tDiffuse,
-            resolution,
+            1.0 / u_RenderTargetSize,
             vec4(0.0),
             vec4(0.0),
             vec4(0.0),
@@ -1589,7 +1589,7 @@ class AccumulationBuffer extends Buffer {
 		super(width, height, options);
 
 		function createSwapRenderTarget() {
-			const renderTarget = new RenderTarget2D(width, height);
+			const renderTarget = OffscreenRenderTarget.create2D(width, height);
 			setupColorTexture(renderTarget.texture, options);
 			renderTarget.texture.minFilter = TEXTURE_FILTER.NEAREST;
 			renderTarget.texture.magFilter = TEXTURE_FILTER.NEAREST;
@@ -1677,52 +1677,32 @@ class BloomEffect extends Effect {
 		const tempRT2 = composer._renderTargetCache.allocate(1);
 		const tempRT3 = composer._renderTargetCache.allocate(1);
 
-		renderer.setRenderTarget(tempRT1);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._highlightPass.uniforms.tDiffuse = inputRenderTarget.texture;
 		this._highlightPass.uniforms.threshold = this.threshold;
 		this._highlightPass.uniforms.smoothWidth = this.smoothWidth;
-		this._highlightPass.render(renderer);
+		tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._highlightPass.render(renderer, tempRT1);
 
-		renderer.setRenderTarget(tempRT2);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._blurPass.uniforms.tDiffuse = tempRT1.texture;
 		this._blurPass.uniforms.direction = 0;
 		this._blurPass.uniforms.blurSize = this.blurSize;
-		this._blurPass.render(renderer);
+		tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._blurPass.render(renderer, tempRT2);
 
-		renderer.setRenderTarget(tempRT3);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._blurPass.uniforms.tDiffuse = tempRT2.texture;
 		this._blurPass.uniforms.direction = 1;
 		this._blurPass.uniforms.blurSize = this.blurSize;
-		this._blurPass.render(renderer);
+		tempRT3.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._blurPass.render(renderer, tempRT3);
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
 		this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 		this._blendPass.uniforms.texture2 = tempRT3.texture;
 		this._blendPass.uniforms.colorWeight1 = 1;
 		this._blendPass.uniforms.alphaWeight1 = 1;
 		this._blendPass.uniforms.colorWeight2 = this.strength;
 		this._blendPass.uniforms.alphaWeight2 = this.strength;
-		if (finish) {
-			this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		this._blendPass.render(renderer);
-		if (finish) {
-			this._blendPass.material.transparent = false;
-			this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, this._blendPass, finish);
+		this._blendPass.render(renderer, outputRenderTarget);
 
 		composer._renderTargetCache.release(tempRT1, 0);
 		composer._renderTargetCache.release(tempRT2, 1);
@@ -1748,32 +1728,12 @@ class ChromaticAberrationEffect extends Effect {
 		this._mainPass.material.premultipliedAlpha = true;
 	}
 
-	resize(width, height) {
-		this._mainPass.uniforms.resolution[0] = 1 / width;
-		this._mainPass.uniforms.resolution[1] = 1 / height;
-	}
-
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
-
 		const mainPass = this._mainPass;
 		mainPass.uniforms.tDiffuse = inputRenderTarget.texture;
 		mainPass.uniforms.uChromaFactor = this.chromaFactor;
-		if (finish) {
-			mainPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			mainPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		mainPass.render(renderer);
-		if (finish) {
-			mainPass.material.transparent = false;
-			mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, mainPass, finish);
+		mainPass.render(renderer, outputRenderTarget);
 	}
 
 	dispose() {
@@ -1788,14 +1748,14 @@ const shader$4 = {
 	uniforms: {
 		tDiffuse: null,
 		uChromaFactor: 0.025,
-		uResolutionRatio: [1, 1],
-		resolution: [1 / 1024, 1 / 512]
+		uResolutionRatio: [1, 1]
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
+		uniform vec2 u_RenderTargetSize;
+
         uniform float uChromaFactor;
         uniform vec2 uResolutionRatio;
-        uniform vec2 resolution;
 
         uniform sampler2D tDiffuse;
         varying vec2 v_Uv;
@@ -1804,9 +1764,10 @@ const shader$4 = {
             vec2 uv = v_Uv;
             vec2 dist = uv - 0.5;
             vec2 offset = uChromaFactor * dist * length(dist);
-            vec4 col = texture2D(tDiffuse, min(uv, 1.0 - resolution) * uResolutionRatio);
-            col.r = texture2D(tDiffuse, min(uv - offset, 1.0 - resolution) * uResolutionRatio).r;
-            col.b = texture2D(tDiffuse, min(uv + offset, 1.0 - resolution) * uResolutionRatio).b;
+			vec2 texelSize = 1.0 / u_RenderTargetSize;
+            vec4 col = texture2D(tDiffuse, min(uv, 1.0 - texelSize) * uResolutionRatio);
+            col.r = texture2D(tDiffuse, min(uv - offset, 1.0 - texelSize) * uResolutionRatio).r;
+            col.b = texture2D(tDiffuse, min(uv + offset, 1.0 - texelSize) * uResolutionRatio).b;
             gl_FragColor = col;
         }
     `
@@ -1830,32 +1791,15 @@ class ColorCorrectionEffect extends Effect {
 	}
 
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
-
 		const mainPass = this._mainPass;
-
 		mainPass.uniforms.tDiffuse = inputRenderTarget.texture;
-
 		mainPass.uniforms.brightness = this.brightness;
 		mainPass.uniforms.contrast = this.contrast;
 		mainPass.uniforms.exposure = this.exposure;
 		mainPass.uniforms.gamma = this.gamma;
 		mainPass.uniforms.saturation = this.saturation;
-		if (finish) {
-			mainPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			mainPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		mainPass.render(renderer);
-		if (finish) {
-			mainPass.material.transparent = false;
-			mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, mainPass, finish);
+		mainPass.render(renderer, outputRenderTarget);
 	}
 
 	dispose() {
@@ -1928,20 +1872,7 @@ class DOFEffect extends Effect {
 		this._mainPass.material.premultipliedAlpha = true;
 	}
 
-	resize(width, height) {
-		this._mainPass.uniforms.resolution[0] = 1 / width;
-		this._mainPass.uniforms.resolution[1] = 1 / height;
-	}
-
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
-
 		const gBuffer = composer.getBuffer('GBuffer');
 		const gBufferRenderStates = gBuffer.getCurrentRenderStates();
 
@@ -1959,15 +1890,9 @@ class DOFEffect extends Effect {
 		this._mainPass.uniforms.gain = this.gain;
 		this._mainPass.uniforms.bias = this.bias;
 		this._mainPass.uniforms.dithering = this.dithering;
-		if (finish) {
-			this._mainPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._mainPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		this._mainPass.render(renderer);
-		if (finish) {
-			this._mainPass.material.transparent = false;
-			this._mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+
+		composer.$setEffectContextStates(outputRenderTarget, this._mainPass, finish);
+		this._mainPass.render(renderer, outputRenderTarget);
 	}
 
 	dispose() {
@@ -1985,7 +1910,6 @@ const bokehShader = {
 	uniforms: {
 		tColor: null,
 		tDepth: null,
-		resolution: [1 / 1024, 1 / 512],
 		znear: 0.1,
 		zfar: 100,
 
@@ -2002,12 +1926,12 @@ const bokehShader = {
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
+		uniform vec2 u_RenderTargetSize;  
+
         varying vec2 v_Uv;
 
         uniform sampler2D tColor;
         uniform sampler2D tDepth;
-        
-        uniform vec2 resolution;  
         
         uniform float znear;
         uniform float zfar;
@@ -2074,8 +1998,9 @@ const bokehShader = {
 
             // getting blur x and y step factor
 
-            float w = resolution.x * blur * maxblur + noise.x;
-            float h = resolution.y * blur * maxblur + noise.y;
+			vec2 texelSize = 1.0 / u_RenderTargetSize;
+            float w = texelSize.x * blur * maxblur + noise.x;
+            float h = texelSize.y * blur * maxblur + noise.y;
 
             // calculation of final color
 
@@ -2124,14 +2049,6 @@ class FilmEffect extends Effect {
 	}
 
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
-
 		const mainPass = this._mainPass;
 
 		mainPass.uniforms.tDiffuse = inputRenderTarget.texture;
@@ -2143,15 +2060,8 @@ class FilmEffect extends Effect {
 		this._time += 0.01667;
 		mainPass.uniforms.time = this._time;
 
-		if (finish) {
-			mainPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			mainPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		mainPass.render(renderer);
-		if (finish) {
-			mainPass.material.transparent = false;
-			mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, mainPass, finish);
+		mainPass.render(renderer, outputRenderTarget);
 	}
 
 	dispose() {
@@ -2213,30 +2123,10 @@ class FXAAEffect extends Effect {
 		this._mainPass.material.premultipliedAlpha = true;
 	}
 
-	resize(width, height) {
-		this._mainPass.uniforms.resolution[0] = 1 / width;
-		this._mainPass.uniforms.resolution[1] = 1 / height;
-	}
-
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
-
 		this._mainPass.uniforms.tDiffuse = inputRenderTarget.texture;
-		if (finish) {
-			this._mainPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._mainPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		this._mainPass.render(renderer);
-		if (finish) {
-			this._mainPass.material.transparent = false;
-			this._mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, this._mainPass, finish);
+		this._mainPass.render(renderer, outputRenderTarget);
 	}
 
 	dispose() {
@@ -2305,10 +2195,6 @@ class SSAOEffect extends Effect {
 
 		// Step 1: ssao pass
 
-		renderer.setRenderTarget(tempRT1);
-		renderer.setClearColor(1, 1, 1, 1);
-		renderer.clear(true, true, false);
-
 		this._ssaoPass.uniforms.normalTex = gBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 		this._ssaoPass.uniforms.depthTex = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
 		this._ssaoPass.uniforms.texSize[0] = gBuffer.output().width;
@@ -2330,13 +2216,10 @@ class SSAOEffect extends Effect {
 			this._ssaoPass.material.defines.AUTO_SAMPLE_WEIGHT = this.autoSampleWeight;
 		}
 
-		this._ssaoPass.render(renderer);
+		tempRT1.setColorClearValue(1, 1, 1, 1).setClear(true, true, false);
+		this._ssaoPass.render(renderer, tempRT1);
 
 		// Step 2: blurX pass
-
-		renderer.setRenderTarget(tempRT2);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 
 		this._blurPass.uniforms.normalTex = gBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 		this._blurPass.uniforms.depthTex = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
@@ -2352,41 +2235,24 @@ class SSAOEffect extends Effect {
 		this._blurPass.uniforms.direction = 0;
 		this._blurPass.uniforms.tDiffuse = tempRT1.texture;
 
-		this._blurPass.render(renderer);
+		tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._blurPass.render(renderer, tempRT2);
 
 		// Step 3: blurY pass
 
-		renderer.setRenderTarget(inputRenderTarget ? tempRT1 : outputRenderTarget);
-		renderer.clear(true, true, false);
-
 		this._blurPass.uniforms.direction = 1;
 		this._blurPass.uniforms.tDiffuse = tempRT2.texture;
-
-		this._blurPass.render(renderer);
+		const renderTarget = (inputRenderTarget ? tempRT1 : outputRenderTarget)
+			.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._blurPass.render(renderer, renderTarget);
 
 		// Step 4: blend pass
 
 		if (inputRenderTarget) {
-			renderer.setRenderTarget(outputRenderTarget);
-			renderer.setClearColor(0, 0, 0, 0);
-			if (finish) {
-				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-			} else {
-				renderer.clear(true, true, false);
-			}
-
 			this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 			this._blendPass.uniforms.texture2 = tempRT1.texture;
-
-			if (finish) {
-				this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-				this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-			}
-			this._blendPass.render(renderer);
-			if (finish) {
-				this._blendPass.material.transparent = false;
-				this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-			}
+			composer.$setEffectContextStates(outputRenderTarget, this._blendPass, finish);
+			this._blendPass.render(renderer, outputRenderTarget);
 		}
 
 		composer._renderTargetCache.release(tempRT1, this.downScaleLevel);
@@ -2762,13 +2628,12 @@ class SSREffect extends Effect {
 
 		// Step 1: ssr pass
 
-		renderer.setRenderTarget(tempRT1);
 		if (inputRenderTarget) {
 			this._copyRGBPass.uniforms.tDiffuse = sceneBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
-			this._copyRGBPass.render(renderer); // clear rgb channel to scene color and alpha channel to 0
+			tempRT1.setClear(false, false, false);
+			this._copyRGBPass.render(renderer, tempRT1); // clear rgb channel to scene color and alpha channel to 0
 		} else {
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, true, false);
+			tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
 		}
 
 		this._ssrPass.uniforms.colorTex = sceneBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
@@ -2807,13 +2672,9 @@ class SSREffect extends Effect {
 			this._ssrPass.material.defines.IMPORTANCE_SAMPLING = importanceSampling;
 		}
 
-		this._ssrPass.render(renderer);
+		this._ssrPass.render(renderer, tempRT1);
 
 		// Step 2: blurX pass
-
-		renderer.setRenderTarget(tempRT2);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 
 		this._blurPass.uniforms.normalTex = gBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 		this._blurPass.uniforms.depthTex = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
@@ -2829,43 +2690,27 @@ class SSREffect extends Effect {
 		this._blurPass.uniforms.direction = 0;
 		this._blurPass.uniforms.tDiffuse = tempRT1.texture;
 
-		this._blurPass.render(renderer);
+		tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._blurPass.render(renderer, tempRT2);
 
 		// Step 3: blurY pass
 
-		renderer.setRenderTarget(inputRenderTarget ? tempRT1 : outputRenderTarget);
-		renderer.clear(true, true, false);
-
 		this._blurPass.uniforms.direction = 1;
 		this._blurPass.uniforms.tDiffuse = tempRT2.texture;
-
-		this._blurPass.render(renderer);
+		const renderTarget = (inputRenderTarget ? tempRT1 : outputRenderTarget)
+			.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._blurPass.render(renderer, renderTarget);
 
 		// Step 4: blend pass
 
 		if (inputRenderTarget) {
-			renderer.setRenderTarget(outputRenderTarget);
-			renderer.setClearColor(0, 0, 0, 0);
-			if (finish) {
-				renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-			} else {
-				renderer.clear(true, true, false);
-			}
-
 			this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 			this._blendPass.uniforms.texture2 = tempRT1.texture;
 			this._blendPass.uniforms.strength = this.strength;
 			this._blendPass.uniforms.falloff = this.falloff;
 
-			if (finish) {
-				this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-				this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-			}
-			this._blendPass.render(renderer);
-			if (finish) {
-				this._blendPass.material.transparent = false;
-				this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-			}
+			composer.$setEffectContextStates(outputRenderTarget, this._blendPass, finish);
+			this._blendPass.render(renderer, outputRenderTarget);
 		}
 
 		composer._renderTargetCache.release(tempRT1, this.downScaleLevel);
@@ -3317,14 +3162,11 @@ class TAAEffect extends Effect {
 		const accumBuffer = composer.getBuffer('AccumulationBuffer');
 
 		if (cameraJitter.accumulating()) {
-			renderer.setRenderTarget(accumBuffer.output());
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, false, false);
-
 			this._accumPass.uniforms.currTexture = inputRenderTarget.texture;
 			this._accumPass.uniforms.prevTexture = accumBuffer.accumRT().texture;
 			this._accumPass.uniforms.mixRatio = cameraJitter.frame() === 0 ? 0 : 0.9;
-			this._accumPass.render(renderer);
+			accumBuffer.output().setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+			this._accumPass.render(renderer, accumBuffer.output());
 
 			this._accumulating = true;
 		} else {
@@ -3334,25 +3176,10 @@ class TAAEffect extends Effect {
 			}
 		}
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
-
 		const copyPass = this._copyPass;
 		copyPass.uniforms.tDiffuse = accumBuffer.output().texture;
-		if (finish) {
-			copyPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			copyPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		copyPass.render(renderer);
-		if (finish) {
-			copyPass.material.transparent = false;
-			copyPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, copyPass, finish);
+		copyPass.render(renderer, outputRenderTarget);
 
 		accumBuffer.swap();
 	}
@@ -3405,14 +3232,6 @@ class ToneMappingEffect extends Effect {
 	}
 
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
-
 		const mainPass = this._mainPass;
 		mainPass.uniforms.tDiffuse = inputRenderTarget.texture;
 		mainPass.uniforms.toneMappingExposure = this.toneMappingExposure;
@@ -3435,15 +3254,8 @@ class ToneMappingEffect extends Effect {
 			mainPass.material.needsUpdate = true;
 		}
 
-		if (finish) {
-			mainPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			mainPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		mainPass.render(renderer);
-		if (finish) {
-			mainPass.material.transparent = false;
-			mainPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, mainPass, finish);
+		mainPass.render(renderer, outputRenderTarget);
 	}
 
 	dispose() {
@@ -3668,22 +3480,8 @@ class VignettingEffect extends Effect {
 		this.color.toArray(vignettingPass.uniforms.vignettingColor);
 		vignettingPass.uniforms.vignettingOffset = this.offset;
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
-		if (finish) {
-			vignettingPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			vignettingPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		vignettingPass.render(renderer);
-		if (finish) {
-			vignettingPass.material.transparent = false;
-			vignettingPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, vignettingPass, finish);
+		vignettingPass.render(renderer, outputRenderTarget);
 	}
 
 	dispose() {
@@ -3742,38 +3540,19 @@ class BlurEdgeEffect extends Effect {
 		const blendPass = this._blendPass;
 
 		// Step 1: blur x
-		renderer.setRenderTarget(tempRT1);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._hBlurPass.uniforms.tDiffuse = inputRenderTarget.texture;
-		this._hBlurPass.render(renderer);
+		tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._hBlurPass.render(renderer, tempRT1);
 		// Step 2: blur y
-		renderer.setRenderTarget(tempRT2);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._vBlurPass.uniforms.tDiffuse = tempRT1.texture;
-		this._vBlurPass.render(renderer);
+		tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._vBlurPass.render(renderer, tempRT2);
 		// Step 3: blend
 		blendPass.uniforms.tDiffuse = inputRenderTarget.texture;
 		blendPass.uniforms.blurOffset = this.offset;
 		blendPass.uniforms.blurTexture = tempRT2.texture;
-
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
-		if (finish) {
-			blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		blendPass.render(renderer);
-		if (finish) {
-			blendPass.material.transparent = false;
-			blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, blendPass, finish);
+		blendPass.render(renderer, outputRenderTarget);
 
 		composer._renderTargetCache.release(tempRT1, 1);
 		composer._renderTargetCache.release(tempRT2, 1);
@@ -3845,15 +3624,10 @@ class OutlineEffect extends Effect {
 		const attachIndex = markBuffer.attachManager.getAttachIndex(this.name);
 		const channelIndex = markBuffer.attachManager.getChannelIndex(this.name);
 
-		renderer.setRenderTarget(tempRT1);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._downsamplerPass.uniforms.tDiffuse = markBuffer.output(attachIndex)._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
-		this._downsamplerPass.render(renderer);
+		tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._downsamplerPass.render(renderer, tempRT1);
 
-		renderer.setRenderTarget(tempRT2);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._edgeDetectionPass.uniforms.tDiffuse = tempRT1.texture;
 		this._edgeDetectionPass.uniforms.texSize[0] = tempRT1.width;
 		this._edgeDetectionPass.uniforms.texSize[1] = tempRT1.height;
@@ -3861,34 +3635,24 @@ class OutlineEffect extends Effect {
 			this._edgeDetectionPass.uniforms.channelMask[i] = (i === channelIndex) ? 1 : 0;
 		}
 		this.color.toArray(this._edgeDetectionPass.uniforms.edgeColor);
-		this._edgeDetectionPass.render(renderer);
+		tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._edgeDetectionPass.render(renderer, tempRT2);
 
-		renderer.setRenderTarget(tempRT1);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._blurPass.uniforms.tDiffuse = tempRT2.texture;
 		this._blurPass.uniforms.texSize[0] = tempRT2.width;
 		this._blurPass.uniforms.texSize[1] = tempRT2.height;
 		this._blurPass.uniforms.direction[0] = 1;
 		this._blurPass.uniforms.direction[1] = 0;
 		this._blurPass.uniforms.kernelRadius = this.thickness;
-		this._blurPass.render(renderer);
+		tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._blurPass.render(renderer, tempRT1);
 
-		renderer.setRenderTarget(tempRT2);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._blurPass.uniforms.tDiffuse = tempRT1.texture;
 		this._blurPass.uniforms.direction[0] = 0;
 		this._blurPass.uniforms.direction[1] = 1;
-		this._blurPass.render(renderer);
+		tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._blurPass.render(renderer, tempRT2);
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
 		this._blendPass.uniforms.colorTexture = inputRenderTarget.texture;
 		this._blendPass.uniforms.edgeTexture = tempRT2.texture;
 		this._blendPass.uniforms.maskTexture = markBuffer.output(attachIndex)._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
@@ -3896,15 +3660,8 @@ class OutlineEffect extends Effect {
 		for (let i = 0; i < 4; i++) {
 			this._blendPass.uniforms.channelMask[i] = (i === channelIndex) ? 1 : 0;
 		}
-		if (finish) {
-			this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		this._blendPass.render(renderer);
-		if (finish) {
-			this._blendPass.material.transparent = false;
-			this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, this._blendPass, finish);
+		this._blendPass.render(renderer, outputRenderTarget);
 
 		composer._renderTargetCache.release(tempRT1, 1);
 		composer._renderTargetCache.release(tempRT2, 1);
@@ -4012,14 +3769,6 @@ class InnerGlowEffect extends Effect {
 		this._blendPass.material.premultipliedAlpha = true;
 	}
 
-	resize(width, height) {
-		this._blurXPass.uniforms.texSize[0] = width;
-		this._blurXPass.uniforms.texSize[1] = height;
-
-		this._blurYPass.uniforms.texSize[0] = width;
-		this._blurYPass.uniforms.texSize[1] = height;
-	}
-
 	render(renderer, composer, inputRenderTarget, outputRenderTarget, finish) {
 		const tempRT1 = composer._renderTargetCache.allocate(0);
 		const tempRT2 = composer._renderTargetCache.allocate(0);
@@ -4030,54 +3779,34 @@ class InnerGlowEffect extends Effect {
 		const attachIndex = markBuffer.attachManager.getAttachIndex(this.name);
 		const channelIndex = markBuffer.attachManager.getChannelIndex(this.name);
 
-		renderer.setRenderTarget(tempRT1);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._channelPass.uniforms['tDiffuse'] = markBuffer.output(attachIndex)._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 		for (let i = 0; i < 4; i++) {
 			this._channelPass.uniforms.channelMask[i] = (i === channelIndex) ? 1 : 0;
 		}
-		this._channelPass.render(renderer);
+		tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._channelPass.render(renderer, tempRT1);
 
-		renderer.setRenderTarget(tempRT2);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._blurXPass.uniforms.tDiffuse = tempRT1.texture;
 		this._blurXPass.uniforms.stride = this.stride;
-		this._blurXPass.render(renderer);
+		tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._blurXPass.render(renderer, tempRT2);
 
-		renderer.setRenderTarget(tempRT3);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._blurYPass.uniforms.tDiffuse = tempRT1.texture;
 		this._blurYPass.uniforms.blurX = tempRT2.texture;
 		this._blurYPass.uniforms.stride = this.stride;
 		this._blurYPass.uniforms.glowness = this.strength;
 		this.color.toArray(this._blurYPass.uniforms.glowColor);
-		this._blurYPass.render(renderer);
+		tempRT3.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._blurYPass.render(renderer, tempRT3);
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
 		this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 		this._blendPass.uniforms.texture2 = tempRT3.texture;
 		// this._blendPass.uniforms.colorWeight1 = 1;
 		// this._blendPass.uniforms.alphaWeight1 = 1;
 		// this._blendPass.uniforms.colorWeight2 = 1;
 		// this._blendPass.uniforms.alphaWeight2 = 0;
-		if (finish) {
-			this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		this._blendPass.render(renderer);
-		if (finish) {
-			this._blendPass.material.transparent = false;
-			this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, this._blendPass, finish);
+		this._blendPass.render(renderer, outputRenderTarget);
 
 		composer._renderTargetCache.release(tempRT1, 0);
 		composer._renderTargetCache.release(tempRT2, 0);
@@ -4098,7 +3827,6 @@ const innerGlowXShader = {
 	defines: {},
 	uniforms: {
 		tDiffuse: null,
-		texSize: [1, 1],
 		stride: 10
 	},
 	vertexShader: defaultVertexShader,
@@ -4110,13 +3838,13 @@ const innerGlowXShader = {
 		#define WT9_4 0.2
 		#define WT9_NORMALIZE 5.2
 
+		uniform vec2 u_RenderTargetSize;
 		varying vec2 v_Uv;
 		uniform sampler2D tDiffuse;
-		uniform vec2 texSize;
 		uniform float stride;
 
 		void main() {
-			float texelIncrement = 0.25 * stride / texSize.x;
+			float texelIncrement = 0.25 * stride / u_RenderTargetSize.x;
 
 			float colour = texture2D(tDiffuse,vec2(v_Uv.x + texelIncrement, v_Uv.y)).x * (0.8 / WT9_NORMALIZE);
 			colour += texture2D(tDiffuse, vec2(v_Uv.x + 2.0 * texelIncrement, v_Uv.y)).x * (WT9_2 / WT9_NORMALIZE);
@@ -4128,7 +3856,7 @@ const innerGlowXShader = {
 			colour += texture2D(tDiffuse, vec2(v_Uv.x - 3.0 * texelIncrement, v_Uv.y)).x * (WT9_3 / WT9_NORMALIZE);
 			colour += texture2D(tDiffuse, vec2(v_Uv.x - 4.0 * texelIncrement, v_Uv.y)).x * (WT9_3 / WT9_NORMALIZE);
 
-			texelIncrement = 0.5 * stride / texSize.x;
+			texelIncrement = 0.5 * stride / u_RenderTargetSize.x;
 			colour += texture2D(tDiffuse,vec2(v_Uv.x + texelIncrement, v_Uv.y)).x * (0.8 / WT9_NORMALIZE);
 			colour += texture2D(tDiffuse, vec2(v_Uv.x + 2.0 * texelIncrement, v_Uv.y)).x * (WT9_2 / WT9_NORMALIZE);
 			colour += texture2D(tDiffuse, vec2(v_Uv.x + 3.0 * texelIncrement, v_Uv.y)).x * (WT9_3 / WT9_NORMALIZE);
@@ -4139,7 +3867,7 @@ const innerGlowXShader = {
 			colour += texture2D(tDiffuse, vec2(v_Uv.x - 3.0 * texelIncrement, v_Uv.y)).x * (WT9_3 / WT9_NORMALIZE);
 			colour += texture2D(tDiffuse, vec2(v_Uv.x - 4.0 * texelIncrement, v_Uv.y)).x * (WT9_3 / WT9_NORMALIZE);
 
-			texelIncrement = 0.75 * stride / texSize.x;
+			texelIncrement = 0.75 * stride / u_RenderTargetSize.x;
 			colour += texture2D(tDiffuse,vec2(v_Uv.x + texelIncrement, v_Uv.y)).x * (0.8 / WT9_NORMALIZE);
 			colour += texture2D(tDiffuse, vec2(v_Uv.x + 2.0 * texelIncrement, v_Uv.y)).x * (WT9_2 / WT9_NORMALIZE);
 			colour += texture2D(tDiffuse, vec2(v_Uv.x + 3.0 * texelIncrement, v_Uv.y)).x * (WT9_3 / WT9_NORMALIZE);
@@ -4150,7 +3878,7 @@ const innerGlowXShader = {
 			colour += texture2D(tDiffuse, vec2(v_Uv.x - 3.0 * texelIncrement, v_Uv.y)).x * (WT9_3 / WT9_NORMALIZE);
 			colour += texture2D(tDiffuse, vec2(v_Uv.x - 4.0 * texelIncrement, v_Uv.y)).x * (WT9_3 / WT9_NORMALIZE);
 
-			texelIncrement = stride / texSize.x;
+			texelIncrement = stride / u_RenderTargetSize.x;
 			colour += texture2D(tDiffuse,vec2(v_Uv.x + texelIncrement, v_Uv.y)).x * (0.8 / WT9_NORMALIZE);
 			colour += texture2D(tDiffuse, vec2(v_Uv.x + 2.0 * texelIncrement, v_Uv.y)).x * (WT9_2 / WT9_NORMALIZE);
 			colour += texture2D(tDiffuse, vec2(v_Uv.x + 3.0 * texelIncrement, v_Uv.y)).x * (WT9_3 / WT9_NORMALIZE);
@@ -4174,7 +3902,6 @@ const innerGlowYShader = {
 	uniforms: {
 		tDiffuse: null,
 		blurX: null,
-		texSize: [1, 1],
 		stride: 10,
 		glowness: 2,
 		glowColor: [1, 0, 0]
@@ -4188,8 +3915,8 @@ const innerGlowYShader = {
 		#define WT9_4 0.2
 		#define WT9_NORMALIZE 5.2
 
+		uniform vec2 u_RenderTargetSize;
 		varying vec2 v_Uv;
-		uniform vec2 texSize;
 		uniform float stride;
 		uniform float glowness;
 		uniform vec3 glowColor;
@@ -4197,7 +3924,7 @@ const innerGlowYShader = {
 		uniform sampler2D tDiffuse;
 
 		void main() {
-			float texelIncrement = 0.25 * stride / texSize.y;
+			float texelIncrement = 0.25 * stride / u_RenderTargetSize.y;
 
 			float colour = texture2D(blurX, vec2(v_Uv.x , v_Uv.y + texelIncrement)).x * (0.8 / WT9_NORMALIZE);
 			colour += texture2D(blurX, vec2(v_Uv.x, v_Uv.y + 2.0 * texelIncrement)).x* (WT9_2 / WT9_NORMALIZE);
@@ -4209,7 +3936,7 @@ const innerGlowYShader = {
 			colour += texture2D(blurX, vec2(v_Uv.x, v_Uv.y - 3.0 * texelIncrement)).x* (WT9_3 / WT9_NORMALIZE);
 			colour += texture2D(blurX, vec2(v_Uv.x , v_Uv.y- 4.0 * texelIncrement)).x * (WT9_3 / WT9_NORMALIZE);
 
-			texelIncrement = 0.5 * stride / texSize.y;
+			texelIncrement = 0.5 * stride / u_RenderTargetSize.y;
 			colour += texture2D(blurX, vec2(v_Uv.x , v_Uv.y + texelIncrement)).x * (0.8 / WT9_NORMALIZE);
 			colour += texture2D(blurX, vec2(v_Uv.x, v_Uv.y + 2.0 * texelIncrement)).x* (WT9_2 / WT9_NORMALIZE);
 			colour += texture2D(blurX, vec2(v_Uv.x , v_Uv.y + 3.0 * texelIncrement)).x * (WT9_3 / WT9_NORMALIZE);
@@ -4220,7 +3947,7 @@ const innerGlowYShader = {
 			colour += texture2D(blurX, vec2(v_Uv.x, v_Uv.y - 3.0 * texelIncrement)).x* (WT9_3 / WT9_NORMALIZE);
 			colour += texture2D(blurX, vec2(v_Uv.x , v_Uv.y- 4.0 * texelIncrement)).x * (WT9_3 / WT9_NORMALIZE);
 
-			texelIncrement = 0.75 * stride / texSize.y;
+			texelIncrement = 0.75 * stride / u_RenderTargetSize.y;
 			colour += texture2D(blurX, vec2(v_Uv.x , v_Uv.y + texelIncrement)).x * (0.8 / WT9_NORMALIZE);
 			colour += texture2D(blurX, vec2(v_Uv.x, v_Uv.y + 2.0 * texelIncrement)).x* (WT9_2 / WT9_NORMALIZE);
 			colour += texture2D(blurX, vec2(v_Uv.x , v_Uv.y + 3.0 * texelIncrement)).x * (WT9_3 / WT9_NORMALIZE);
@@ -4231,7 +3958,7 @@ const innerGlowYShader = {
 			colour += texture2D(blurX, vec2(v_Uv.x, v_Uv.y - 3.0 * texelIncrement)).x* (WT9_3 / WT9_NORMALIZE);
 			colour += texture2D(blurX, vec2(v_Uv.x , v_Uv.y- 4.0 * texelIncrement)).x * (WT9_3 / WT9_NORMALIZE);
 
-			texelIncrement = stride / texSize.y;
+			texelIncrement = stride / u_RenderTargetSize.y;
 			colour += texture2D(blurX, vec2(v_Uv.x , v_Uv.y + texelIncrement)).x * (0.8 / WT9_NORMALIZE);
 			colour += texture2D(blurX, vec2(v_Uv.x, v_Uv.y + 2.0 * texelIncrement)).x* (WT9_2 / WT9_NORMALIZE);
 			colour += texture2D(blurX, vec2(v_Uv.x , v_Uv.y + 3.0 * texelIncrement)).x * (WT9_3 / WT9_NORMALIZE);
@@ -4325,9 +4052,6 @@ class GlowEffect extends Effect {
 			const attachIndex = markBuffer.attachManager.getAttachIndex(this.name);
 			const channelIndex = markBuffer.attachManager.getChannelIndex(this.name);
 
-			renderer.setRenderTarget(tempRT2);
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, true, false);
 			this._maskPass.uniforms.colorTexture = sceneBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			this._maskPass.uniforms.maskTexture = markBuffer.output(attachIndex)._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			this._maskPass.uniforms.additiveTexture = colorBufferTexture;
@@ -4335,40 +4059,35 @@ class GlowEffect extends Effect {
 			for (let i = 0; i < 4; i++) {
 				this._maskPass.uniforms.channel[i] = (i === channelIndex) ? this.maskStrength : 0;
 			}
-			this._maskPass.render(renderer);
+			tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+			this._maskPass.render(renderer, tempRT2);
 		}
 
-		renderer.setRenderTarget(tempRT1);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._highlightPass.uniforms.tDiffuse = usedMarkBuffer ? tempRT2.texture : colorBufferTexture;
 		this._highlightPass.uniforms.diffuseStrength = usedMarkBuffer ? 1 : this.maskStrength;
 		this._highlightPass.uniforms.threshold = this.threshold;
 		this._highlightPass.uniforms.smoothWidth = this.smoothWidth;
-		this._highlightPass.render(renderer);
+		tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._highlightPass.render(renderer, tempRT1);
 
 		let inputRT = tempRT1;
 		for (let i = 0; i < kernelSizeArray.length; i++) {
-			const _tempRT1 = composer._renderTargetCache.allocate(i + 1);
-			renderer.setRenderTarget(_tempRT1);
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, true, false);
 			this._blurPass.uniforms.tDiffuse = inputRT.texture;
 			this._blurPass.uniforms.texSize[0] = inputRT.width;
 			this._blurPass.uniforms.texSize[1] = inputRT.height;
 			this._blurPass.uniforms.direction[0] = 1;
 			this._blurPass.uniforms.direction[1] = 0;
 			this._blurPass.uniforms.kernelRadius = kernelSizeArray[i];
-			this._blurPass.render(renderer);
+			const _tempRT1 = composer._renderTargetCache.allocate(i + 1);
+			_tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+			this._blurPass.render(renderer, _tempRT1);
 
-			const _tempRT2 = composer._renderTargetCache.allocate(i + 1);
-			renderer.setRenderTarget(_tempRT2);
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, true, false);
 			this._blurPass.uniforms.tDiffuse = _tempRT1.texture;
 			this._blurPass.uniforms.direction[0] = 0;
 			this._blurPass.uniforms.direction[1] = 1;
-			this._blurPass.render(renderer);
+			const _tempRT2 = composer._renderTargetCache.allocate(i + 1);
+			_tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+			this._blurPass.render(renderer, _tempRT2);
 
 			composer._renderTargetCache.release(_tempRT1, i + 1);
 			inputRT = _tempRT2;
@@ -4376,9 +4095,6 @@ class GlowEffect extends Effect {
 			this._tempRTList[i] = _tempRT2;
 		}
 
-		renderer.setRenderTarget(tempRT2);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._compositePass.uniforms.blurTexture1 = this._tempRTList[0].texture;
 		this._compositePass.uniforms.blurTexture2 = this._tempRTList[1].texture;
 		this._compositePass.uniforms.blurTexture3 = this._tempRTList[2].texture;
@@ -4386,30 +4102,17 @@ class GlowEffect extends Effect {
 		this._compositePass.uniforms.blurTexture5 = this._tempRTList[4].texture;
 		this._compositePass.uniforms.bloomRadius = this.radius;
 		this._compositePass.uniforms.bloomStrength = this.strength;
-		this._compositePass.render(renderer);
+		tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._compositePass.render(renderer, tempRT2);
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
 		this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 		this._blendPass.uniforms.texture2 = tempRT2.texture;
 		this._blendPass.uniforms.colorWeight1 = 1;
 		this._blendPass.uniforms.alphaWeight1 = 1;
 		this._blendPass.uniforms.colorWeight2 = 1;
 		this._blendPass.uniforms.alphaWeight2 = 0;
-		if (finish) {
-			this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		this._blendPass.render(renderer);
-		if (finish) {
-			this._blendPass.material.transparent = false;
-			this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, this._blendPass, finish);
+		this._blendPass.render(renderer, outputRenderTarget);
 
 		composer._renderTargetCache.release(tempRT1, 0);
 		composer._renderTargetCache.release(tempRT2, 1);
@@ -4524,10 +4227,6 @@ class SoftGlowEffect extends Effect {
 		if (usedMarkBuffer) {
 			const attachIndex = markBuffer.attachManager.getAttachIndex(this.name);
 			const channelIndex = markBuffer.attachManager.getChannelIndex(this.name);
-
-			renderer.setRenderTarget(this._tempRTList[0]);
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, true, false);
 			this._maskPass.uniforms.colorTexture = sceneBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			this._maskPass.uniforms.maskTexture = markBuffer.output(attachIndex)._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			this._maskPass.uniforms.additiveTexture = colorBufferTexture;
@@ -4535,87 +4234,63 @@ class SoftGlowEffect extends Effect {
 			for (let i = 0; i < 4; i++) {
 				this._maskPass.uniforms.channel[i] = (i === channelIndex) ? this.maskStrength : 0;
 			}
-			this._maskPass.render(renderer);
+			this._tempRTList[0].setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+			this._maskPass.render(renderer, this._tempRTList[0]);
 		}
 
-		renderer.setRenderTarget(this._tempRTList[1]);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._downSamplerPass.uniforms.tDiffuse = usedMarkBuffer ? this._tempRTList[0].texture : colorBufferTexture;
 		this._downSamplerPass.uniforms.bright = (usedMarkBuffer ? 1 : this.maskStrength) * 4; // make this brighter
 		this._downSamplerPass.uniforms.texSize[0] = this._tempRTList[0].width;
 		this._downSamplerPass.uniforms.texSize[1] = this._tempRTList[0].height;
-		this._downSamplerPass.render(renderer);
+		this._tempRTList[1].setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._downSamplerPass.render(renderer, this._tempRTList[1]);
 
 		// down sampler
 		for (let i = 2; i < 6; i++) {
-			renderer.setRenderTarget(this._tempRTList[i]);
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, true, false);
 			this._downSamplerPass.uniforms.tDiffuse = this._tempRTList[i - 1].texture;
 			this._downSamplerPass.uniforms.texSize[0] = this._tempRTList[i - 1].width;
 			this._downSamplerPass.uniforms.texSize[1] = this._tempRTList[i - 1].height;
 			this._downSamplerPass.uniforms.bright = 1;
-			this._downSamplerPass.render(renderer);
+			this._tempRTList[i].setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+			this._downSamplerPass.render(renderer, this._tempRTList[i]);
 		}
 
 		// up sampler and blur h
 		for (let i = 0; i < 5; i++) {
-			renderer.setRenderTarget(this._tempRTList[i]);
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, true, false);
 			this._hBlurPass.uniforms.tDiffuse = this._tempRTList[i + 1].texture;
 			this._hBlurPass.uniforms.h = 2 * this.blurSize / this._tempRTList[i].width;
-			this._hBlurPass.render(renderer);
+			this._tempRTList[i].setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+			this._hBlurPass.render(renderer, this._tempRTList[i]);
 		}
 
 		// blur v
 		for (let i = 0; i < 5; i++) {
-			renderer.setRenderTarget(this._tempRTList2[i]);
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, true, false);
 			this._vBlurPass.uniforms.tDiffuse = this._tempRTList[i].texture;
 			this._vBlurPass.uniforms.v = 2 * this.blurSize / this._tempRTList[i].height;
-			this._vBlurPass.render(renderer);
+			this._tempRTList2[i].setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+			this._vBlurPass.render(renderer, this._tempRTList2[i]);
 		}
 
 		// blend glow
 		for (let i = 3; i >= 0; i--) {
-			renderer.setRenderTarget(this._tempRTList[i]);
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, true, false);
 			this._blendPass.uniforms.texture1 = this._tempRTList2[i].texture;
 			this._blendPass.uniforms.texture2 = (i < 3) ? this._tempRTList[i + 1].texture : this._tempRTList2[i + 1].texture;
 			this._blendPass.uniforms.colorWeight1 = (1 - this.blendRate) * this.strength;
 			this._blendPass.uniforms.alphaWeight1 = (1 - this.blendRate) * this.strength;
 			this._blendPass.uniforms.colorWeight2 = this.blendRate * this.strength;
 			this._blendPass.uniforms.alphaWeight2 = this.blendRate * this.strength;
-
-			this._blendPass.render(renderer);
+			this._tempRTList[i].setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+			this._blendPass.render(renderer, this._tempRTList[i]);
 		}
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
 		this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 		this._blendPass.uniforms.texture2 = this._tempRTList[0].texture;
 		this._blendPass.uniforms.colorWeight1 = 1;
 		this._blendPass.uniforms.alphaWeight1 = 1;
 		this._blendPass.uniforms.colorWeight2 = 1;
 		this._blendPass.uniforms.alphaWeight2 = 0;
-		if (finish) {
-			this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		this._blendPass.render(renderer);
-		if (finish) {
-			this._blendPass.material.transparent = false;
-			this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, this._blendPass, finish);
+		this._blendPass.render(renderer, outputRenderTarget);
 
 		this._tempRTList.forEach((rt, i) => composer._renderTargetCache.release(rt, i));
 		this._tempRTList2.forEach((rt, i) => composer._renderTargetCache.release(rt, i));
@@ -4699,22 +4374,16 @@ class TailingEffect extends Effect {
 		if (usedMarkBuffer) {
 			const attachIndex = markBuffer.attachManager.getAttachIndex(this.name);
 			const channelIndex = markBuffer.attachManager.getChannelIndex(this.name);
-
-			renderer.setRenderTarget(tempRT1);
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, true, false);
 			this._maskPass.uniforms.colorTexture = sceneBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			this._maskPass.uniforms.maskTexture = markBuffer.output(attachIndex)._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			this._maskPass.uniforms.additiveTexture = colorBufferTexture;
 			for (let i = 0; i < 4; i++) {
 				this._maskPass.uniforms.channel[i] = (i === channelIndex) ? 1 : 0;
 			}
-			this._maskPass.render(renderer);
+			tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+			this._maskPass.render(renderer, tempRT1);
 		}
 
-		renderer.setRenderTarget(tempRT2);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._tailingPass.uniforms.blurMap = usedMarkBuffer ? tempRT1.texture : colorBufferTexture;
 		this._tailingPass.uniforms.center[0] = this.center.x;
 		this._tailingPass.uniforms.center[1] = this.center.y;
@@ -4723,30 +4392,17 @@ class TailingEffect extends Effect {
 		// this.center.toArray(this._tailingPass.uniforms.center);
 		// this.direction.toArray(this._tailingPass.uniforms.direction);
 		this._tailingPass.uniforms.intensity = 10 * this.strength;
-		this._tailingPass.render(renderer);
+		tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._tailingPass.render(renderer, tempRT2);
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
 		this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 		this._blendPass.uniforms.texture2 = tempRT2.texture;
 		this._blendPass.uniforms.colorWeight1 = 1;
 		this._blendPass.uniforms.alphaWeight1 = 1;
 		this._blendPass.uniforms.colorWeight2 = 1;
 		this._blendPass.uniforms.alphaWeight2 = 0;
-		if (finish) {
-			this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		this._blendPass.render(renderer);
-		if (finish) {
-			this._blendPass.material.transparent = false;
-			this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, this._blendPass, finish);
+		this._blendPass.render(renderer, outputRenderTarget);
 
 		composer._renderTargetCache.release(tempRT1, 0);
 		composer._renderTargetCache.release(tempRT2, 0);
@@ -4857,50 +4513,32 @@ class RadialTailingEffect extends Effect {
 			const attachIndex = markBuffer.attachManager.getAttachIndex(this.name);
 			const channelIndex = markBuffer.attachManager.getChannelIndex(this.name);
 
-			renderer.setRenderTarget(tempRT1);
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, true, false);
 			this._maskPass.uniforms.colorTexture = sceneBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			this._maskPass.uniforms.maskTexture = markBuffer.output(attachIndex)._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			this._maskPass.uniforms.additiveTexture = colorBufferTexture;
 			for (let i = 0; i < 4; i++) {
 				this._maskPass.uniforms.channel[i] = (i === channelIndex) ? 1 : 0;
 			}
-			this._maskPass.render(renderer);
+			tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+			this._maskPass.render(renderer, tempRT1);
 		}
 
-		renderer.setRenderTarget(tempRT2);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._radialTailingPass.uniforms.blurMap = usedMarkBuffer ? tempRT1.texture : colorBufferTexture;
 		this._radialTailingPass.uniforms.center[0] = this.center.x;
 		this._radialTailingPass.uniforms.center[1] = this.center.y;
 		// this.center.toArray(this._radialTailingPass.uniforms.center);
 		this._radialTailingPass.uniforms.intensity = 10 * this.strength;
-		this._radialTailingPass.render(renderer);
+		tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._radialTailingPass.render(renderer, tempRT2);
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
 		this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 		this._blendPass.uniforms.texture2 = tempRT2.texture;
 		this._blendPass.uniforms.colorWeight1 = 1;
 		this._blendPass.uniforms.alphaWeight1 = 1;
 		this._blendPass.uniforms.colorWeight2 = 1;
 		this._blendPass.uniforms.alphaWeight2 = 0;
-		if (finish) {
-			this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		this._blendPass.render(renderer);
-		if (finish) {
-			this._blendPass.material.transparent = false;
-			this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, this._blendPass, finish);
+		this._blendPass.render(renderer, outputRenderTarget);
 
 		composer._renderTargetCache.release(tempRT1, 0);
 		composer._renderTargetCache.release(tempRT2, 0);
@@ -5009,50 +4647,32 @@ class GhostingEffect extends Effect {
 			const attachIndex = markBuffer.attachManager.getAttachIndex(this.name);
 			const channelIndex = markBuffer.attachManager.getChannelIndex(this.name);
 
-			renderer.setRenderTarget(tempRT1);
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, true, false);
 			this._maskPass.uniforms.colorTexture = sceneBuffer.output()._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			this._maskPass.uniforms.maskTexture = markBuffer.output(attachIndex)._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			this._maskPass.uniforms.additiveTexture = colorBufferTexture;
 			for (let i = 0; i < 4; i++) {
 				this._maskPass.uniforms.channel[i] = (i === channelIndex) ? 1 : 0;
 			}
-			this._maskPass.render(renderer);
+			tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+			this._maskPass.render(renderer, tempRT1);
 		}
 
-		renderer.setRenderTarget(tempRT2);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
 		this._ghostingPass.uniforms.blurMap = usedMarkBuffer ? tempRT1.texture : colorBufferTexture;
 		this._ghostingPass.uniforms.center[0] = this.center.x;
 		this._ghostingPass.uniforms.center[1] = this.center.y;
 		// this.center.toArray(this._ghostingPass.uniforms.center);
 		this._ghostingPass.uniforms.intensity = 3 * this.strength;
-		this._ghostingPass.render(renderer);
+		tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._ghostingPass.render(renderer, tempRT2);
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
 		this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 		this._blendPass.uniforms.texture2 = tempRT2.texture;
 		this._blendPass.uniforms.colorWeight1 = 1;
 		this._blendPass.uniforms.alphaWeight1 = 1;
 		this._blendPass.uniforms.colorWeight2 = 1;
 		this._blendPass.uniforms.alphaWeight2 = 0;
-		if (finish) {
-			this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		this._blendPass.render(renderer);
-		if (finish) {
-			this._blendPass.material.transparent = false;
-			this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, this._blendPass, finish);
+		this._blendPass.render(renderer, outputRenderTarget);
 
 		composer._renderTargetCache.release(tempRT1, 0);
 		composer._renderTargetCache.release(tempRT2, 0);
@@ -5114,7 +4734,7 @@ class GBuffer extends Buffer {
 
 		this.enableCameraJitter = true;
 
-		this._rt = new RenderTarget2D(width, height);
+		this._rt = OffscreenRenderTarget.create2D(width, height);
 		this._rt.texture.minFilter = TEXTURE_FILTER.NEAREST;
 		this._rt.texture.magFilter = TEXTURE_FILTER.NEAREST;
 		this._rt.texture.generateMipmaps = false;
@@ -5173,7 +4793,7 @@ class GBuffer extends Buffer {
 		this._supportLogDepth = value;
 
 		if (!this._logDepthRenderTarget) {
-			this._logDepthRenderTarget = new RenderTarget2D(this._rt.width, this._rt.height);
+			this._logDepthRenderTarget = OffscreenRenderTarget.create2D(this._rt.width, this._rt.height);
 			this._logDepthRenderTarget.attach(this._rt.texture, ATTACHMENT.COLOR_ATTACHMENT0);
 
 			const depthTexture = new Texture2D();
@@ -5223,10 +4843,6 @@ class GBuffer extends Buffer {
 		const cameraJitter = composer.$cameraJitter;
 		const enableCameraJitter = this.enableCameraJitter && cameraJitter.accumulating();
 
-		renderer.setRenderTarget(this._rt);
-		renderer.setClearColor(-2.1, -2.1, 0.5, 0.5);
-		renderer.clear(true, true, false);
-
 		const renderOptions = this._renderOptions;
 
 		const renderStates = scene.getRenderStates(camera);
@@ -5239,7 +4855,9 @@ class GBuffer extends Buffer {
 
 		enableCameraJitter && cameraJitter.jitterProjectionMatrix(fixedRenderStates.camera, this._rt.width, this._rt.height);
 
-		renderer.beginRender();
+		this._rt.setColorClearValue(-2.1, -2.1, 0.5, 0.5).setClear(true, true, false);
+
+		renderer.beginRender(this._rt);
 
 		const layers = this.layers;
 		for (let i = 0, l = layers.length; i < l; i++) {
@@ -5253,9 +4871,6 @@ class GBuffer extends Buffer {
 		fixedRenderStates.scene.logarithmicDepthBuffer = oldLogDepthState; // restore
 
 		if (renderLogDepth) {
-			renderer.setRenderTarget(this._logDepthRenderTarget);
-			renderer.clear(false, true, true);
-
 			const { near, far, logDepthCameraNear, logDepthBufFC } = fixedRenderStates.camera;
 
 			this._logDepthPass.uniforms.depthTexture = this._rt._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
@@ -5265,7 +4880,8 @@ class GBuffer extends Buffer {
 			this._logDepthPass.uniforms.depthFactors[2] = far / (far - near); // a
 			this._logDepthPass.uniforms.depthFactors[3] = far * near / (near - far); // b
 
-			this._logDepthPass.render(renderer);
+			this._logDepthRenderTarget.setClear(false, true, true);
+			this._logDepthPass.render(renderer, this._logDepthRenderTarget);
 		}
 
 		this._renderLogDepth = renderLogDepth;
@@ -5302,12 +4918,8 @@ class GBuffer extends Buffer {
 		output.scene = renderStates.scene;
 
 		// copy lights
-		if (renderStates.lighting) { // for t3d v0.4.x or later
-			output.lighting = renderStates.lighting;
-			output.lights = renderStates.lighting.getGroup(0);
-		} else { // for t3d v0.3.x
-			output.lights = renderStates.lights;
-		}
+		output.lighting = renderStates.lighting;
+		output.lights = renderStates.lighting.getGroup(0);
 
 		output.gammaFactor = renderStates.gammaFactor;
 		output.outputEncoding = renderStates.outputEncoding;
@@ -5635,7 +5247,7 @@ class NonDepthMarkBuffer extends Buffer {
 		const bufferMipmaps = options.bufferMipmaps;
 		this._rts = [];
 		for (let i = 0; i < options.maxMarkAttachment; i++) {
-			const rt = new RenderTarget2D(width, height);
+			const rt = OffscreenRenderTarget.create2D(width, height);
 			rt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 			setupColorTexture(rt.texture, options);
 			if (!bufferMipmaps) {
@@ -5648,7 +5260,7 @@ class NonDepthMarkBuffer extends Buffer {
 		const colorBufferFormat = getColorBufferFormat(options);
 		this._mrts = [];
 		for (let i = 0; i < options.maxMarkAttachment; i++) {
-			const mrt = new RenderTarget2D(width, height);
+			const mrt = OffscreenRenderTarget.create2D(width, height);
 			mrt.attach(
 				new RenderBuffer(width, height, colorBufferFormat, options.samplerNumber),
 				ATTACHMENT.COLOR_ATTACHMENT0
@@ -5719,15 +5331,8 @@ class NonDepthMarkBuffer extends Buffer {
 			const rt = this._rts[attachIndex];
 			const mrt = this._mrts[attachIndex];
 
-			if (composer.$useMSAA) {
-				renderer.setRenderTarget(mrt);
-				renderer.setClearColor(0, 0, 0, 0);
-				renderer.clear(true, false, false);
-			} else {
-				renderer.setRenderTarget(rt);
-				renderer.setClearColor(0, 0, 0, 0);
-				renderer.clear(true, false, false);
-			}
+			const renderTarget = (composer.$useMSAA ? mrt : rt)
+				.setColorClearValue(0, 0, 0, 0).setClear(true, false, false);
 
 			const renderStates = scene.getRenderStates(camera);
 			const renderQueue = scene.getRenderQueue(camera);
@@ -5741,7 +5346,7 @@ class NonDepthMarkBuffer extends Buffer {
 				attachMask |= attachMasks[i];
 			}
 
-			renderer.beginRender();
+			renderer.beginRender(renderTarget);
 
 			const layers = this.layers;
 			for (let i = 0, l = layers.length; i < l; i++) {
@@ -5759,12 +5364,11 @@ class NonDepthMarkBuffer extends Buffer {
 			renderer.endRender();
 
 			if (composer.$useMSAA) {
-				renderer.setRenderTarget(rt);
 				renderer.blitRenderTarget(mrt, rt, true, false, false);
 			}
 
 			// generate mipmaps for down sampler
-			renderer.updateRenderTargetMipmap(rt);
+			renderer.generateMipmaps(rt.texture);
 		}
 	}
 
@@ -5954,7 +5558,7 @@ class ColorMarkBuffer extends Buffer {
 		const bufferMipmaps = options.bufferMipmaps;
 		this._rts = [];
 		for (let i = 0; i < options.maxColorAttachment; i++) {
-			const rt = new RenderTarget2D(width, height);
+			const rt = OffscreenRenderTarget.create2D(width, height);
 			rt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 			setupColorTexture(rt.texture, options);
 			if (!bufferMipmaps) {
@@ -5967,7 +5571,7 @@ class ColorMarkBuffer extends Buffer {
 		const colorBufferFormat = getColorBufferFormat(options);
 		this._mrts = [];
 		for (let i = 0; i < options.maxColorAttachment; i++) {
-			const mrt = new RenderTarget2D(width, height);
+			const mrt = OffscreenRenderTarget.create2D(width, height);
 			mrt.attach(
 				new RenderBuffer(width, height, colorBufferFormat, options.samplerNumber),
 				ATTACHMENT.COLOR_ATTACHMENT0
@@ -6059,15 +5663,8 @@ class ColorMarkBuffer extends Buffer {
 			const rt = this._rts[attachIndex];
 			const mrt = this._mrts[attachIndex];
 
-			if (composer.$useMSAA) {
-				renderer.setRenderTarget(mrt);
-				renderer.setClearColor(0, 0, 0, 0);
-				renderer.clear(true, false, false);
-			} else {
-				renderer.setRenderTarget(rt);
-				renderer.setClearColor(0, 0, 0, 0);
-				renderer.clear(true, false, false);
-			}
+			const renderTarget = (composer.$useMSAA ? mrt : rt)
+				.setColorClearValue(0, 0, 0, 0).setClear(true, false, false);
 
 			const renderOptions = this._renderOptions;
 			const attachManager = this.attachManager;
@@ -6078,7 +5675,7 @@ class ColorMarkBuffer extends Buffer {
 			this._state.key = attachManager.getKey(attachIndex, 0);
 			const mask = attachManager.getMask(attachIndex, 0);
 
-			renderer.beginRender();
+			renderer.beginRender(renderTarget);
 
 			const layers = this.layers;
 			for (let i = 0, l = layers.length; i < l; i++) {
@@ -6096,12 +5693,11 @@ class ColorMarkBuffer extends Buffer {
 			renderer.endRender();
 
 			if (composer.$useMSAA) {
-				renderer.setRenderTarget(rt);
 				renderer.blitRenderTarget(mrt, rt, true, false, false);
 			}
 
 			// generate mipmaps for down sampler
-			renderer.updateRenderTargetMipmap(rt);
+			renderer.generateMipmaps(rt.texture);
 		}
 	}
 
@@ -6249,10 +5845,10 @@ class SceneBuffer extends Buffer {
 
 		this.enableCameraJitter = true;
 
-		this._rt = new RenderTarget2D(width, height);
+		this._rt = OffscreenRenderTarget.create2D(width, height);
 		this._rt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 
-		this._mrt = new RenderTarget2D(width, height);
+		this._mrt = OffscreenRenderTarget.create2D(width, height);
 		this._mrt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 
 		this.clearColor = true;
@@ -6269,7 +5865,7 @@ class SceneBuffer extends Buffer {
 
 		// transmission render target is power-of-two size
 		// to avoid artifacts in mipmap generation
-		this._transmissionRT = new RenderTarget2D(
+		this._transmissionRT = OffscreenRenderTarget.create2D(
 			MathUtils.nearestPowerOfTwo(width),
 			MathUtils.nearestPowerOfTwo(height)
 		);
@@ -6359,35 +5955,27 @@ class SceneBuffer extends Buffer {
 		const cameraJitter = composer.$cameraJitter;
 		const enableCameraJitter = this.enableCameraJitter && cameraJitter.accumulating();
 
-		renderer.setRenderTarget(renderTarget);
-
-		if (composer.clearColor) {
-			renderer.setClearColor(...composer._tempClearColor);
-		} else {
-			renderer.setClearColor(0, 0, 0, 0);
-		}
-
-		renderer.clear(this.clearColor, this.clearDepth, this.clearStencil && hasStencil);
-
 		const renderStates = scene.getRenderStates(camera);
 		const renderQueue = scene.getRenderQueue(camera);
 
 		enableCameraJitter && cameraJitter.jitterProjectionMatrix(renderStates.camera, this._rt.width, this._rt.height);
 
-		this.$renderScene(renderer, renderQueue, renderStates);
-		this.$renderTransmission(renderer, renderQueue, renderStates, composer);
-		this.$renderPostTransmission(renderer, renderQueue, renderStates);
-		this.$renderOverlay(renderer, renderQueue, renderStates);
+		composer.$setFinalContextStates(renderTarget);
+		renderTarget.setClear(this.clearColor, this.clearDepth, this.clearStencil && hasStencil);
+
+		this.$renderScene(renderer, renderQueue, renderStates, renderTarget);
+		this.$renderTransmission(renderer, renderQueue, renderStates, renderTarget, composer);
+		this.$renderPostTransmission(renderer, renderQueue, renderStates, renderTarget);
+		this.$renderOverlay(renderer, renderQueue, renderStates, renderTarget);
 
 		enableCameraJitter && cameraJitter.restoreProjectionMatrix(renderStates.camera);
 
 		if (useMSAA) {
-			renderer.setRenderTarget(this._rt);
 			renderer.blitRenderTarget(this._mrt, this._rt, true, true, hasStencil);
 		}
 
 		// generate mipmaps for down sampler
-		renderer.updateRenderTargetMipmap(this._rt);
+		renderer.generateMipmaps(this._rt.texture);
 	}
 
 	output() {
@@ -6425,8 +6013,8 @@ class SceneBuffer extends Buffer {
 		}
 	}
 
-	$renderScene(renderer, renderQueue, renderStates) {
-		renderer.beginRender();
+	$renderScene(renderer, renderQueue, renderStates, renderTarget) {
+		renderer.beginRender(renderTarget);
 
 		const renderLayers = this.renderLayers;
 		for (let i = 0, l = renderLayers.length; i < l; i++) {
@@ -6436,61 +6024,60 @@ class SceneBuffer extends Buffer {
 		renderer.endRender();
 	}
 
-	$renderTransmission(renderer, renderQueue, renderStates, composer) {
+	$renderTransmission(renderer, renderQueue, renderStates, renderTarget, composer) {
 		const renderLayer = this.postRenderLayers.transmission;
 
 		if (this.$isRenderLayerEmpty(renderQueue, renderLayer)) return;
 
-		const oldRenderTarget = renderer.getRenderTarget();
-		const oldColorBuffer = oldRenderTarget._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
-		const useMSAA = oldColorBuffer.isRenderBuffer && oldColorBuffer.multipleSampling > 0;
+		const colorAttachment = renderTarget._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
+		const useMSAA = colorAttachment.isRenderBuffer && colorAttachment.multipleSampling > 0;
 
-		let sceneRenderTarget = oldRenderTarget;
+		let sceneRenderTarget = renderTarget;
 
 		if (useMSAA) {
 			sceneRenderTarget = composer._renderTargetCache.allocate(0);
 
 			// blit to single-sampled render target
-			renderer.setRenderTarget(sceneRenderTarget);
-			renderer.blitRenderTarget(this._mrt, sceneRenderTarget, true, false, false);
+			renderer.blitRenderTarget(renderTarget, sceneRenderTarget, true, false, false);
 		}
 
 		// copy to power-of-two transmissionRT and generate mipmaps
-		renderer.setRenderTarget(this._transmissionRT);
 		this._transmissionCopyPass.uniforms.tDiffuse = sceneRenderTarget.texture;
-		this._transmissionCopyPass.render(renderer);
-		renderer.updateRenderTargetMipmap(this._transmissionRT);
+		this._transmissionRT.setClear(false, false, false);
+		this._transmissionCopyPass.render(renderer, this._transmissionRT);
+		renderer.generateMipmaps(this._transmissionRT.texture);
 
 		if (useMSAA) {
 			composer._renderTargetCache.release(sceneRenderTarget, 0);
 		}
 
-		renderer.setRenderTarget(oldRenderTarget);
+		renderTarget.setClear(false, false, false);
 
-		renderer.beginRender();
+		renderer.beginRender(renderTarget);
 		this._renderOneLayer(renderer, renderQueue, renderStates, renderLayer);
 		renderer.endRender();
 	}
 
-	$renderPostTransmission(renderer, renderQueue, renderStates) {
+	$renderPostTransmission(renderer, renderQueue, renderStates, renderTarget) {
 		const renderLayer = this.postRenderLayers.postTransmission;
 
 		if (this.$isRenderLayerEmpty(renderQueue, renderLayer)) return;
 
-		renderer.beginRender();
+		renderTarget.setClear(false, false, false);
+
+		renderer.beginRender(renderTarget);
 		this._renderOneLayer(renderer, renderQueue, renderStates, renderLayer);
 		renderer.endRender();
 	}
 
-	$renderOverlay(renderer, renderQueue, renderStates) {
+	$renderOverlay(renderer, renderQueue, renderStates, renderTarget) {
 		const renderLayer = this.postRenderLayers.overlay;
 
 		if (this.$isRenderLayerEmpty(renderQueue, renderLayer)) return;
 
-		// TODO Forcing clear depth may cause bugs
-		renderer.clear(false, true, false);
+		renderTarget.setClear(false, true, false);
 
-		renderer.beginRender();
+		renderer.beginRender(renderTarget);
 		this._renderOneLayer(renderer, renderQueue, renderStates, renderLayer);
 		renderer.endRender();
 	}
@@ -6541,7 +6128,7 @@ class RenderTargetCache {
 			const width = Math.ceil(this._width / divisor);
 			const height = Math.ceil(this._height / divisor);
 
-			const renderTarget = new RenderTarget2D(width, height);
+			const renderTarget = OffscreenRenderTarget.create2D(width, height);
 
 			const texture = renderTarget._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
 			setupColorTexture(texture, this._options);
@@ -6834,8 +6421,6 @@ class EffectComposer {
 
 		this._effectList = [];
 
-		this._tempClearColor = [0, 0, 0, 1];
-		this._tempViewport = [0, 0, 1, 1];
 		this._tempBufferNames = new Set();
 
 		this._stats = {
@@ -6844,6 +6429,31 @@ class EffectComposer {
 			colorMarkBuffers: 0,
 			currentBufferUsage: {}
 		};
+
+		// context states cache
+
+		// context states for render target
+		this._tempTargetStates = {
+			clearColor: true,
+			clearDepth: true,
+			clearStencil: true,
+			colorClearValue: new Color4(),
+			depthClearValue: 1,
+			stencilClearValue: 0,
+			occlusionQuerySet: null,
+			timestampWrites: {
+				querySet: null,
+				beginningOfPassWriteIndex: 0,
+				endOfPassWriteIndex: 1
+			}
+		};
+		// (legacy) context states for renderer global
+		this._clearColor = true;
+		this._clearDepth = true;
+		this._clearStencil = false;
+		this._tempClearColor = [0, 0, 0, 1];
+		// rect of camera
+		this._tempViewport = [0, 0, 1, 1];
 
 		// Public properties
 
@@ -6863,32 +6473,21 @@ class EffectComposer {
 		this.sceneMSAA = false;
 
 		/**
-		 * Whether to clear the color buffer before renderring.
-		 * @type {Boolean}
-		 * @default true
-		 */
-		this.clearColor = true;
-
-		/**
-		 * Whether to clear the depth buffer before renderring.
-		 * @type {Boolean}
-		 * @default true
-		 */
-		this.clearDepth = true;
-
-		/**
-		 * Whether to clear the stencil buffer before renderring.
-		 * @type {Boolean}
-		 * @default false
-		 */
-		this.clearStencil = false;
-
-		/**
 		 * The debugger for this effect composer
 		 * @type {Null|Debugger}
 		 * @default null
 		 */
 		this.debugger = null;
+
+		/**
+		 * Since t3d 0.5.x version recommends using the rendering state on RenderTarget, global states will be gradually deprecated.
+		 * We try to use the state of RenderTarget for rendering inside EffectComposer. But since external users may still be using
+		 * the old interface to set the rendering state on the Renderer, we need a transition period to be compatible with this usage.
+		 * Set to true to have EffectComposer get the rendering state from RenderTarget instead of the global state of Renderer.
+		 * @type {Boolean}
+		 * @default true
+		 */
+		this.useTargetStates = true;
 	}
 
 	/**
@@ -7035,8 +6634,8 @@ class EffectComposer {
 
 	render(renderer, scene, camera, target) {
 		const renderStates = scene.getRenderStates(camera);
-		renderer.getClearColor().toArray(this._tempClearColor); // save clear color
-		camera.rect.toArray(this._tempViewport);
+
+		this._saveContextStates(renderer, camera, target);
 		camera.rect.set(0, 0, 1, 1);
 		renderStates.camera.rect.set(0, 0, 1, 1);
 
@@ -7057,7 +6656,8 @@ class EffectComposer {
 
 			this.debugger.render(renderer, this, target);
 
-			renderer.setClearColor(...this._tempClearColor); // restore clear color
+			this._restoreContextStates(renderer, camera, target);
+			renderStates.camera.rect.fromArray(this._tempViewport);
 
 			return;
 		}
@@ -7135,28 +6735,20 @@ class EffectComposer {
 		) {
 			sceneBuffer.render(renderer, this, scene, camera);
 
-			renderer.setRenderTarget(target);
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(this.clearColor, this.clearDepth, this.clearStencil);
-
 			const copyPass = this._copyPass;
 			copyPass.uniforms.tDiffuse = sceneBuffer.output().texture;
-			copyPass.material.transparent = this._tempClearColor[3] < 1 || !this.clearColor;
-			copyPass.renderStates.camera.rect.fromArray(this._tempViewport);
-			copyPass.render(renderer);
+			this.$setFinalContextStates(target, copyPass);
+			copyPass.render(renderer, target);
 		} else {
-			renderer.setRenderTarget(target);
-			renderer.setClearColor(...this._tempClearColor);
-			renderer.clear(this.clearColor, this.clearDepth, this.clearStencil);
+			this.$setFinalContextStates(target);
 			renderStates.camera.rect.fromArray(this._tempViewport);
 
-			sceneBuffer.$renderScene(renderer, renderQueue, renderStates);
-			sceneBuffer.$renderPostTransmission(renderer, renderQueue, renderStates);
-			sceneBuffer.$renderOverlay(renderer, renderQueue, renderStates);
+			sceneBuffer.$renderScene(renderer, renderQueue, renderStates, target);
+			sceneBuffer.$renderPostTransmission(renderer, renderQueue, renderStates, target);
+			sceneBuffer.$renderOverlay(renderer, renderQueue, renderStates, target);
 		}
 
-		renderer.setClearColor(...this._tempClearColor); // restore clear color
-		camera.rect.fromArray(this._tempViewport);
+		this._restoreContextStates(renderer, camera, target);
 		renderStates.camera.rect.fromArray(this._tempViewport);
 	}
 
@@ -7206,6 +6798,77 @@ class EffectComposer {
 
 	get $cameraJitter() {
 		return this._cameraJitter;
+	}
+
+	$setFinalContextStates(target, postPass) {
+		if (this.useTargetStates) {
+			const targetStates = this._tempTargetStates;
+			target.clearColor = targetStates.clearColor;
+			target.clearDepth = targetStates.clearDepth;
+			target.clearStencil = targetStates.clearStencil;
+			target.colorClearValue.copy(targetStates.colorClearValue);
+		} else {
+			target.clearColor = this._clearColor;
+			target.clearDepth = this._clearDepth;
+			target.clearStencil = this._clearStencil;
+			target.colorClearValue.fromArray(this._tempClearColor);
+		}
+
+		if (postPass) {
+			target.setColorClearValue(0, 0, 0, 0);
+			postPass.material.transparent = target.colorClearValue.a < 1 || !target.clearColor;
+			postPass.renderStates.camera.rect.fromArray(this._tempViewport);
+		}
+	}
+
+	$setEffectContextStates(target, postPass, finish) {
+		if (finish) {
+			this.$setFinalContextStates(target, postPass);
+		} else {
+			target
+				.setColorClearValue(0, 0, 0, 0)
+				.setClear(true, true, false);
+			postPass.material.transparent = false;
+			postPass.renderStates.camera.rect.set(0, 0, 1, 1);
+		}
+	}
+
+	// Private methods
+
+	_saveContextStates(renderer, camera, target) {
+		const targetStates = this._tempTargetStates;
+		targetStates.clearColor = target.clearColor;
+		targetStates.clearDepth = target.clearDepth;
+		targetStates.clearStencil = target.clearStencil;
+		targetStates.colorClearValue.copy(target.colorClearValue);
+		targetStates.depthClearValue = target.depthClearValue;
+		targetStates.stencilClearValue = target.stencilClearValue;
+		targetStates.occlusionQuerySet = target.occlusionQuerySet;
+		targetStates.timestampWrites.querySet = target.timestampWrites.querySet;
+		targetStates.timestampWrites.beginningOfPassWriteIndex = target.timestampWrites.beginningOfPassWriteIndex;
+		targetStates.timestampWrites.endOfPassWriteIndex = target.timestampWrites.endOfPassWriteIndex;
+
+		renderer.getClearColor().toArray(this._tempClearColor); // legacy
+
+		camera.rect.toArray(this._tempViewport);
+	}
+
+	_restoreContextStates(renderer, camera, target) {
+		const targetStates = this._tempTargetStates;
+		target.clearColor = targetStates.clearColor;
+		target.clearDepth = targetStates.clearDepth;
+		target.clearStencil = targetStates.clearStencil;
+		target.colorClearValue.copy(targetStates.colorClearValue);
+		target.depthClearValue = targetStates.depthClearValue;
+		target.stencilClearValue = targetStates.stencilClearValue;
+		target.occlusionQuerySet = targetStates.occlusionQuerySet;
+		target.timestampWrites.querySet = targetStates.timestampWrites.querySet;
+		target.timestampWrites.beginningOfPassWriteIndex = targetStates.timestampWrites.beginningOfPassWriteIndex;
+		target.timestampWrites.endOfPassWriteIndex = targetStates.timestampWrites.endOfPassWriteIndex;
+
+		renderer.setClearColor(...this._tempClearColor); // legacy
+
+		camera.rect.fromArray(this._tempViewport);
 	}
 
 }
@@ -7282,16 +6945,14 @@ class ColorMarkBufferDebugger extends Debugger {
 	}
 
 	render(renderer, composer, outputRenderTarget) {
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 1);
-		renderer.clear(true, true, false);
-
 		const buffer = composer.getBuffer('ColorMarkBuffer');
 
 		const attachIndex = buffer.attachManager.getAttachIndex(this.channel);
 
 		this._mainPass.uniforms['tDiffuse'] = buffer.output(attachIndex)._attachments[ATTACHMENT.COLOR_ATTACHMENT0];
-		this._mainPass.render(renderer);
+
+		outputRenderTarget.setColorClearValue(0, 0, 0, 1).setClear(true, true, false);
+		this._mainPass.render(renderer, outputRenderTarget);
 	}
 
 }
@@ -7310,10 +6971,6 @@ class GBufferDebugger extends Debugger {
 	}
 
 	render(renderer, composer, outputRenderTarget) {
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 1);
-		renderer.clear(true, true, false);
-
 		const gBuffer = composer.getBuffer('GBuffer');
 		const gBufferRenderStates = gBuffer.getCurrentRenderStates();
 
@@ -7329,7 +6986,8 @@ class GBufferDebugger extends Debugger {
 			gBufferRenderStates.scene.anchorMatrix.toArray(this._mainPass.uniforms['anchorMatrix']);
 		}
 
-		this._mainPass.render(renderer);
+		outputRenderTarget.setColorClearValue(0, 0, 0, 1).setClear(true, true, false);
+		this._mainPass.render(renderer, outputRenderTarget);
 	}
 
 }
@@ -7419,10 +7077,6 @@ class MarkBufferDebugger extends Debugger {
 	}
 
 	render(renderer, composer, outputRenderTarget) {
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 1);
-		renderer.clear(true, true, false);
-
 		const buffer = composer.getBuffer('MarkBuffer');
 
 		const attachIndex = buffer.attachManager.getAttachIndex(this.channel);
@@ -7432,7 +7086,9 @@ class MarkBufferDebugger extends Debugger {
 		for (let i = 0; i < 4; i++) {
 			this._mainPass.uniforms.channelMask[i] = (i === channelIndex) ? 1 : 0;
 		}
-		this._mainPass.render(renderer);
+
+		outputRenderTarget.setColorClearValue(0, 0, 0, 1).setClear(true, true, false);
+		this._mainPass.render(renderer, outputRenderTarget);
 	}
 
 }
@@ -7450,10 +7106,6 @@ class NonDepthMarkBufferDebugger extends Debugger {
 	}
 
 	render(renderer, composer, outputRenderTarget) {
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 1);
-		renderer.clear(true, true, false);
-
 		const buffer = composer.getBuffer('NonDepthMarkBuffer');
 
 		const attachIndex = buffer.attachManager.getAttachIndex(this.channel);
@@ -7463,7 +7115,9 @@ class NonDepthMarkBufferDebugger extends Debugger {
 		for (let i = 0; i < 4; i++) {
 			this._mainPass.uniforms.channelMask[i] = (i === channelIndex) ? 1 : 0;
 		}
-		this._mainPass.render(renderer);
+
+		outputRenderTarget.setColorClearValue(0, 0, 0, 1).setClear(true, true, false);
+		this._mainPass.render(renderer, outputRenderTarget);
 	}
 
 }
@@ -7526,6 +7180,34 @@ Object.defineProperties(SSREffect.prototype, {
 		get: function() {
 			console.warn('SSREffect: mixType has been deprecated, use falloff instead.');
 			return this.falloff;
+		}
+	}
+});
+
+// deprecated since v0.4.0
+Object.defineProperties(EffectComposer.prototype, {
+	clearColor: {
+		set: function(value) {
+			this._clearColor = value;
+		},
+		get: function() {
+			return this._clearColor;
+		}
+	},
+	clearDepth: {
+		set: function(value) {
+			this._clearDepth = value;
+		},
+		get: function() {
+			return this._clearDepth;
+		}
+	},
+	clearStencil: {
+		set: function(value) {
+			this._clearStencil = value;
+		},
+		get: function() {
+			return this._clearStencil;
 		}
 	}
 });

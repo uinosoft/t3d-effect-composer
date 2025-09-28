@@ -55,7 +55,7 @@
     const contextParams = { antialias: true, alpha: false, stencil: true };
     const gl = canvas.getContext('webgl2', contextParams) || canvas.getContext('webgl', contextParams);
     const renderer = new t3d.WebGLRenderer(gl);
-    const backRenderTarget = new t3d.RenderTargetBack(canvas);
+    const screenRenderTarget = new t3d.ScreenRenderTarget(canvas);
 
     const shadowMapPass = new t3d.ShadowMapPass();
 
@@ -205,8 +205,7 @@
 
     	shadowMapPass.render(renderer, scene);
 
-    	renderer.setClearColor(0, 0, 0, 1);
-    	effectComposer.render(renderer, scene, camera, backRenderTarget);
+    	effectComposer.render(renderer, scene, camera, screenRenderTarget);
 
     	stats.end();
     }
@@ -218,7 +217,7 @@
 
     	camera.setPerspective(45 / 180 * Math.PI, width / height, 1, 1000);
 
-    	backRenderTarget.resize(width, height);
+    	screenRenderTarget.resize(width, height);
     	effectComposer.resize(width, height);
     }
     window.addEventListener('resize', onWindowResize, false);

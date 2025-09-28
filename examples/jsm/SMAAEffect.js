@@ -60,58 +60,25 @@ export class SMAAEffect extends Effect {
 
 		// Step 1: Edge Detection Pass
 
-		renderer.setRenderTarget(tempRT1);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
-
 		this._edgesPass.uniforms.tDiffuse = inputRenderTarget.texture;
-		this._edgesPass.render(renderer);
+		tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._edgesPass.render(renderer, tempRT1);
 
 		// Step 2: Weights Calculation Pass
 
-		renderer.setRenderTarget(tempRT2);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
-
 		this._weightsPass.uniforms.tDiffuse = tempRT1.texture;
-		this._weightsPass.render(renderer);
+		tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._weightsPass.render(renderer, tempRT2);
 
 		// Step 3: Blending Weights Application Pass
 
-		renderer.setRenderTarget(outputRenderTarget);
-
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
-
 		this._blendPass.uniforms.tDiffuse = tempRT2.texture;
 		this._blendPass.uniforms.tColor = inputRenderTarget.texture;
-
-		if (finish) {
-			this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-
-		this._blendPass.render(renderer);
-
-		if (finish) {
-			this._blendPass.material.transparent = false;
-			this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, this._blendPass, finish);
+		this._blendPass.render(renderer, outputRenderTarget);
 
 		composer._renderTargetCache.release(tempRT1, 0);
 		composer._renderTargetCache.release(tempRT2, 0);
-	}
-
-	resize(width, height) {
-		this._edgesPass.uniforms.resolution[0] = 1 / width;
-		this._edgesPass.uniforms.resolution[1] = 1 / height;
-		this._weightsPass.uniforms.resolution[0] = 1 / width;
-		this._weightsPass.uniforms.resolution[1] = 1 / height;
-		this._blendPass.uniforms.resolution[0] = 1 / width;
-		this._blendPass.uniforms.resolution[1] = 1 / height;
 	}
 
 	dispose() {
@@ -136,8 +103,7 @@ const smaaEdgesShader = {
 		SMAA_THRESHOLD: '0.1'
 	},
 	uniforms: {
-		tDiffuse: null,
-		resolution: [1 / 1024, 1 / 512]
+		tDiffuse: null
 	},
 	vertexShader: /* glsl */`
 		attribute vec3 a_Position;
@@ -146,15 +112,16 @@ const smaaEdgesShader = {
 		uniform mat4 u_ProjectionView;
 		uniform mat4 u_Model;
 
-		uniform vec2 resolution;
+		uniform vec2 u_RenderTargetSize;
 
 		varying vec2 vUv;
 		varying vec4 vOffset[3];
 
 		void SMAAEdgeDetectionVS(vec2 texcoord) {
-			vOffset[0] = texcoord.xyxy + resolution.xyxy * vec4(-1.0, 0.0, 0.0, 1.0); // WebGL port note: Changed sign in W component
-			vOffset[1] = texcoord.xyxy + resolution.xyxy * vec4(1.0, 0.0, 0.0, -1.0); // WebGL port note: Changed sign in W component
-			vOffset[2] = texcoord.xyxy + resolution.xyxy * vec4(-2.0, 0.0, 0.0, 2.0); // WebGL port note: Changed sign in W component
+			vec2 texelSize = 1.0 / u_RenderTargetSize;
+			vOffset[0] = texcoord.xyxy + texelSize.xyxy * vec4(-1.0, 0.0, 0.0, 1.0); // WebGL port note: Changed sign in W component
+			vOffset[1] = texcoord.xyxy + texelSize.xyxy * vec4(1.0, 0.0, 0.0, -1.0); // WebGL port note: Changed sign in W component
+			vOffset[2] = texcoord.xyxy + texelSize.xyxy * vec4(-2.0, 0.0, 0.0, 2.0); // WebGL port note: Changed sign in W component
 		}
 
 		void main() {
@@ -238,8 +205,7 @@ const smaaWeightsShader = {
 	uniforms: {
 		tDiffuse: null,
 		tArea: null,
-		tSearch: null,
-		resolution: [1 / 1024, 1 / 512]
+		tSearch: null
 	},
 	vertexShader: /* glsl */`
 		attribute vec3 a_Position;
@@ -248,21 +214,23 @@ const smaaWeightsShader = {
 		uniform mat4 u_ProjectionView;
 		uniform mat4 u_Model;
 
-		uniform vec2 resolution;
+		uniform vec2 u_RenderTargetSize;
 
 		varying vec2 vUv;
 		varying vec4 vOffset[3];
 		varying vec2 vPixcoord;
 
 		void SMAABlendingWeightCalculationVS(vec2 texcoord) {
-			vPixcoord = texcoord / resolution;
+			vec2 texelSize = 1.0 / u_RenderTargetSize;
+
+			vPixcoord = texcoord / texelSize;
 
 			// We will use these offsets for the searches later on (see @PSEUDO_GATHER4):
-			vOffset[0] = texcoord.xyxy + resolution.xyxy * vec4(-0.25, 0.125, 1.25, 0.125); // WebGL port note: Changed sign in Y and W components
-			vOffset[1] = texcoord.xyxy + resolution.xyxy * vec4(-0.125, 0.25, -0.125, -1.25); // WebGL port note: Changed sign in Y and W components
+			vOffset[0] = texcoord.xyxy + texelSize.xyxy * vec4(-0.25, 0.125, 1.25, 0.125); // WebGL port note: Changed sign in Y and W components
+			vOffset[1] = texcoord.xyxy + texelSize.xyxy * vec4(-0.125, 0.25, -0.125, -1.25); // WebGL port note: Changed sign in Y and W components
 
 			// And these for the searches, they indicate the ends of the loops:
-			vOffset[2] = vec4(vOffset[0].xz, vOffset[1].yw ) + vec4(-2.0, 2.0, -2.0, 2.0) * resolution.xxyy * float(SMAA_MAX_SEARCH_STEPS);
+			vOffset[2] = vec4(vOffset[0].xz, vOffset[1].yw ) + vec4(-2.0, 2.0, -2.0, 2.0) * texelSize.xxyy * float(SMAA_MAX_SEARCH_STEPS);
 		}
 
 		void main() {
@@ -272,12 +240,13 @@ const smaaWeightsShader = {
 		}
 	`,
 	fragmentShader: /* glsl */`
-		#define SMAASampleLevelZeroOffset(tex, coord, offset) texture2D(tex, coord + float(offset) * resolution, 0.0)
+		#define SMAASampleLevelZeroOffset(tex, coord, offset) texture2D(tex, coord + float(offset) * u_RenderTargetSize, 0.0)
 
 		uniform sampler2D tDiffuse;
 		uniform sampler2D tArea;
 		uniform sampler2D tSearch;
-		uniform vec2 resolution;
+
+		uniform vec2 u_RenderTargetSize;
 
 		varying vec2 vUv;
 		varying vec4 vOffset[3];
@@ -299,6 +268,8 @@ const smaaWeightsShader = {
 		}
 
 		float SMAASearchXLeft(sampler2D edgesTex, sampler2D searchTex, vec2 texcoord, float end) {
+			vec2 texelSize = 1.0 / u_RenderTargetSize;
+
 			/**
 			 * @PSEUDO_GATHER4
 			 * This texcoord has been offset by (-0.25, -0.125) in the vertex shader to
@@ -310,70 +281,76 @@ const smaaWeightsShader = {
 
 			for (int i = 0; i < SMAA_MAX_SEARCH_STEPS; i++) { // WebGL port note: Changed while to for
 				e = texture2D(edgesTex, texcoord, 0.0).rg;
-				texcoord -= vec2(2.0, 0.0) * resolution;
+				texcoord -= vec2(2.0, 0.0) * texelSize;
 				if (!(texcoord.x > end && e.g > 0.8281 && e.r == 0.0)) break;
 			}
 
 			// We correct the previous (-0.25, -0.125) offset we applied:
-			texcoord.x += 0.25 * resolution.x;
+			texcoord.x += 0.25 * texelSize.x;
 
 			// The searches are bias by 1, so adjust the coords accordingly:
-			texcoord.x += resolution.x;
+			texcoord.x += texelSize.x;
 
 			// Disambiguate the length added by the last step:
-			texcoord.x += 2.0 * resolution.x; // Undo last step
-			texcoord.x -= resolution.x * SMAASearchLength(searchTex, e, 0.0, 0.5);
+			texcoord.x += 2.0 * texelSize.x; // Undo last step
+			texcoord.x -= texelSize.x * SMAASearchLength(searchTex, e, 0.0, 0.5);
 
 			return texcoord.x;
 		}
 
 		float SMAASearchXRight(sampler2D edgesTex, sampler2D searchTex, vec2 texcoord, float end) {
+			vec2 texelSize = 1.0 / u_RenderTargetSize;
+
 			vec2 e = vec2(0.0, 1.0);
 
 			for (int i = 0; i < SMAA_MAX_SEARCH_STEPS; i++) { // WebGL port note: Changed while to for
 				e = texture2D(edgesTex, texcoord, 0.0).rg;
-				texcoord += vec2(2.0, 0.0) * resolution;
+				texcoord += vec2(2.0, 0.0) * texelSize;
 				if (!(texcoord.x < end && e.g > 0.8281 && e.r == 0.0)) break;
 			}
 
-			texcoord.x -= 0.25 * resolution.x;
-			texcoord.x -= resolution.x;
-			texcoord.x -= 2.0 * resolution.x;
-			texcoord.x += resolution.x * SMAASearchLength(searchTex, e, 0.5, 0.5);
+			texcoord.x -= 0.25 * texelSize.x;
+			texcoord.x -= texelSize.x;
+			texcoord.x -= 2.0 * texelSize.x;
+			texcoord.x += texelSize.x * SMAASearchLength(searchTex, e, 0.5, 0.5);
 
 			return texcoord.x;
 		}
 
 		float SMAASearchYUp(sampler2D edgesTex, sampler2D searchTex, vec2 texcoord, float end) {
+			vec2 texelSize = 1.0 / u_RenderTargetSize;
+
 			vec2 e = vec2(1.0, 0.0);
 
 			for (int i = 0; i < SMAA_MAX_SEARCH_STEPS; i++) { // WebGL port note: Changed while to for
 				e = texture2D(edgesTex, texcoord, 0.0).rg;
-				texcoord += vec2(0.0, 2.0) * resolution; // WebGL port note: Changed sign
+				texcoord += vec2(0.0, 2.0) * texelSize; // WebGL port note: Changed sign
 				if (!(texcoord.y > end && e.r > 0.8281 && e.g == 0.0)) break;
 			}
 
-			texcoord.y -= 0.25 * resolution.y; // WebGL port note: Changed sign
-			texcoord.y -= resolution.y; // WebGL port note: Changed sign
-			texcoord.y -= 2.0 * resolution.y; // WebGL port note: Changed sign
-			texcoord.y += resolution.y * SMAASearchLength(searchTex, e.gr, 0.0, 0.5); // WebGL port note: Changed sign
+			texcoord.y -= 0.25 * texelSize.y; // WebGL port note: Changed sign
+			texcoord.y -= texelSize.y; // WebGL port note: Changed sign
+			texcoord.y -= 2.0 * texelSize.y; // WebGL port note: Changed sign
+			texcoord.y += texelSize.y * SMAASearchLength(searchTex, e.gr, 0.0, 0.5); // WebGL port note: Changed sign
 
 			return texcoord.y;
 		}
 
 		float SMAASearchYDown(sampler2D edgesTex, sampler2D searchTex, vec2 texcoord, float end) {
+			vec2 texelSize = 1.0 / u_RenderTargetSize;
+			
 			vec2 e = vec2(1.0, 0.0);
 
 			for (int i = 0; i < SMAA_MAX_SEARCH_STEPS; i++) { // WebGL port note: Changed while to for
 				e = texture2D(edgesTex, texcoord, 0.0).rg;
-				texcoord -= vec2(0.0, 2.0) * resolution; // WebGL port note: Changed sign
+				texcoord -= vec2(0.0, 2.0) * texelSize; // WebGL port note: Changed sign
 				if (!(texcoord.y < end && e.r > 0.8281 && e.g == 0.0)) break;
 			}
 
-			texcoord.y += 0.25 * resolution.y; // WebGL port note: Changed sign
-			texcoord.y += resolution.y; // WebGL port note: Changed sign
-			texcoord.y += 2.0 * resolution.y; // WebGL port note: Changed sign
-			texcoord.y -= resolution.y * SMAASearchLength(searchTex, e.gr, 0.5, 0.5); // WebGL port note: Changed sign
+			texcoord.y += 0.25 * texelSize.y; // WebGL port note: Changed sign
+			texcoord.y += texelSize.y; // WebGL port note: Changed sign
+			texcoord.y += 2.0 * texelSize.y; // WebGL port note: Changed sign
+			texcoord.y -= texelSize.y * SMAASearchLength(searchTex, e.gr, 0.5, 0.5); // WebGL port note: Changed sign
 
 			return texcoord.y;
 		}
@@ -392,6 +369,8 @@ const smaaWeightsShader = {
 		}
 
 		vec4 SMAABlendingWeightCalculationPS(vec2 texcoord, vec2 pixcoord, vec4 offset[3], sampler2D edgesTex, sampler2D areaTex, sampler2D searchTex, ivec4 subsampleIndices) {
+			vec2 texelSize = 1.0 / u_RenderTargetSize;
+
 			vec4 weights = vec4(0.0, 0.0, 0.0, 0.0);
 
 			vec2 e = texture2D(edgesTex, texcoord).rg;
@@ -402,7 +381,7 @@ const smaaWeightsShader = {
 				// Find the distance to the left:
 				vec2 coords;
 				coords.x = SMAASearchXLeft(edgesTex, searchTex, offset[0].xy, offset[2].x);
-				coords.y = offset[1].y; // offset[1].y = texcoord.y - 0.25 * resolution.y (@CROSSING_OFFSET)
+				coords.y = offset[1].y; // offset[1].y = texcoord.y - 0.25 * texelSize.y (@CROSSING_OFFSET)
 				d.x = coords.x;
 
 				// Now fetch the left crossing edges, two at a time using bilinear
@@ -416,14 +395,14 @@ const smaaWeightsShader = {
 
 				// We want the distances to be in pixel units (doing this here allow to
 				// better interleave arithmetic and memory accesses):
-				d = d / resolution.x - pixcoord.x;
+				d = d / texelSize.x - pixcoord.x;
 
 				// SMAAArea below needs a sqrt, as the areas texture is compressed
 				// quadratically:
 				vec2 sqrt_d = sqrt(abs(d));
 
 				// Fetch the right crossing edges:
-				coords.y -= 1.0 * resolution.y; // WebGL port note: Added
+				coords.y -= 1.0 * texelSize.y; // WebGL port note: Added
 				float e2 = SMAASampleLevelZeroOffset(edgesTex, coords, ivec2(1, 0)).r;
 
 				// Ok, we know how this pattern looks like, now it is time for getting
@@ -438,7 +417,7 @@ const smaaWeightsShader = {
 				vec2 coords;
 
 				coords.y = SMAASearchYUp(edgesTex, searchTex, offset[1].xy, offset[2].z);
-				coords.x = offset[0].x; // offset[1].x = texcoord.x - 0.25 * resolution.x;
+				coords.x = offset[0].x; // offset[1].x = texcoord.x - 0.25 * texelSize.x;
 				d.x = coords.y;
 
 				// Fetch the top crossing edges:
@@ -449,14 +428,14 @@ const smaaWeightsShader = {
 				d.y = coords.y;
 
 				// We want the distances to be in pixel units:
-				d = d / resolution.y - pixcoord.y;
+				d = d / texelSize.y - pixcoord.y;
 
 				// SMAAArea below needs a sqrt, as the areas texture is compressed
 				// quadratically:
 				vec2 sqrt_d = sqrt(abs(d));
 
 				// Fetch the bottom crossing edges:
-				coords.y -= 1.0 * resolution.y; // WebGL port note: Added
+				coords.y -= 1.0 * texelSize.y; // WebGL port note: Added
 				float e2 = SMAASampleLevelZeroOffset(edgesTex, coords, ivec2(0, 1)).g;
 
 				// Get the area for this direction:
@@ -477,8 +456,7 @@ const smaaBlendShader = {
 	defines: {},
 	uniforms: {
 		tDiffuse: null,
-		tColor: null,
-		resolution: [1 / 1024, 1 / 512]
+		tColor: null
 	},
 	vertexShader: /* glsl */`
 		attribute vec3 a_Position;
@@ -487,14 +465,15 @@ const smaaBlendShader = {
 		uniform mat4 u_ProjectionView;
     	uniform mat4 u_Model;
 
-		uniform vec2 resolution;
+		uniform vec2 u_RenderTargetSize;
 
 		varying vec2 vUv;
 		varying vec4 vOffset[2];
 
 		void SMAANeighborhoodBlendingVS(vec2 texcoord) {
-			vOffset[0] = texcoord.xyxy + resolution.xyxy * vec4(-1.0, 0.0, 0.0, 1.0); // WebGL port note: Changed sign in W component
-			vOffset[1] = texcoord.xyxy + resolution.xyxy * vec4(1.0, 0.0, 0.0, -1.0); // WebGL port note: Changed sign in W component
+			vec2 texelSize = 1.0 / u_RenderTargetSize;
+			vOffset[0] = texcoord.xyxy + texelSize.xyxy * vec4(-1.0, 0.0, 0.0, 1.0); // WebGL port note: Changed sign in W component
+			vOffset[1] = texcoord.xyxy + texelSize.xyxy * vec4(1.0, 0.0, 0.0, -1.0); // WebGL port note: Changed sign in W component
 		}
 
 		void main() {
@@ -506,7 +485,7 @@ const smaaBlendShader = {
 	fragmentShader: /* glsl */`
 		uniform sampler2D tDiffuse;
 		uniform sampler2D tColor;
-		uniform vec2 resolution;
+		uniform vec2 u_RenderTargetSize;
 
 		varying vec2 vUv;
 		varying vec4 vOffset[2];
@@ -538,7 +517,7 @@ const smaaBlendShader = {
 
 				// Fetch the opposite color and lerp by hand:
 				vec4 C = texture2D(colorTex, texcoord, 0.0);
-				texcoord += sign(offset) * resolution;
+				texcoord += sign(offset) / u_RenderTargetSize;
 				vec4 Cop = texture2D(colorTex, texcoord, 0.0);
 				float s = abs(offset.x) > abs(offset.y) ? abs(offset.x) : abs(offset.y);
 

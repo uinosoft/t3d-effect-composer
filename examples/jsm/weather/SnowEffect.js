@@ -76,26 +76,19 @@ export default class SnowEffect extends Effect {
 
 		// Render snow pass
 
-		renderer.setRenderTarget(tempRT1);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, false);
-
 		const deltaTime = 0.0166666;
 		this._snowPass.uniforms.time += deltaTime * this.speed / 8.;
 		this._snowPass.uniforms.size = this.size;
 		this._snowPass.uniforms.angle = this.angle;
 		this._snowPass.uniforms.density = this.density;
 		this._snowPass.uniforms.strength = this.strength;
-		this._snowPass.uniforms.viewportSize[0] = inputRenderTarget.width;
-		this._snowPass.uniforms.viewportSize[1] = inputRenderTarget.height;
 
-		this._snowPass.render(renderer);
+		tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._snowPass.render(renderer, tempRT1);
 
 		// Render snow cover pass
 
-		renderer.setRenderTarget(tempRT2);
-		renderer.setClearColor(this._cover !== 0 ? 1 : 0, 1, 1, 1);
-		renderer.clear(true, true, false);
+		tempRT2.setColorClearValue(this._cover !== 0 ? 1 : 0, 1, 1, 1).setClear(true, true, false);
 
 		let useRT3 = false;
 
@@ -129,47 +122,30 @@ export default class SnowEffect extends Effect {
 				this._snowCoverPass.uniforms.depthTex = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
 			}
 
-			this._snowCoverPass.render(renderer);
+			this._snowCoverPass.render(renderer, tempRT2);
 
 			// (Optional) Render fxaa pass
 
-			if (this.fxaa) 		{
-				renderer.setRenderTarget(tempRT3);
-				renderer.setClearColor(0, 0, 0, 0);
-				renderer.clear(true, true, true);
-
-				this._fxaaPass.uniforms.resolution[0] = 1 / tempRT2.width;
-				this._fxaaPass.uniforms.resolution[1] = 1 / tempRT2.height;
+			if (this.fxaa) {
 				this._fxaaPass.uniforms.tDiffuse = tempRT2.texture;
-				this._fxaaPass.render(renderer);
+				tempRT3.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+				this._fxaaPass.render(renderer, tempRT3);
 
 				useRT3 = true;
 			}
+		} else {
+			renderer.beginRender(tempRT2);
+			renderer.endRender();
 		}
 
 		// Render snow mix pass
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
 		this._snowMixPass.uniforms.texture1 = inputRenderTarget.texture;
 		this._snowMixPass.uniforms.texture2 = useRT3 ? tempRT3.texture : tempRT2.texture;
 		this._snowMixPass.uniforms.texture3 = tempRT1.texture;
 		this.color.toArray(this._snowMixPass.uniforms.uColor);
-
-		if (finish) {
-			this._snowMixPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._snowMixPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		this._snowMixPass.render(renderer);
-		if (finish) {
-			this._snowMixPass.material.transparent = false;
-			this._snowMixPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, this._snowMixPass, finish);
+		this._snowMixPass.render(renderer, outputRenderTarget);
 
 		composer._renderTargetCache.release(tempRT1, 0);
 		composer._renderTargetCache.release(tempRT2, 0);
@@ -195,8 +171,7 @@ const snowShader = {
 		size: 2.0,
 		angle: 0,
 		density: 1.,
-		strength: 1.,
-		viewportSize: [512, 512]
+		strength: 1.
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
@@ -205,7 +180,8 @@ const snowShader = {
 		uniform float angle;
 		uniform float density;
 		uniform float strength;
-		uniform vec2 viewportSize;
+
+		uniform vec2 u_RenderTargetSize;
 
 		varying vec2 v_Uv;
 
@@ -229,8 +205,8 @@ const snowShader = {
 
 			vec2 uv = v_Uv;
 			uv = (uv - 0.5);
-			uv.x = uv.x * viewportSize.x / 1024.;
-			uv.y = uv.y * viewportSize.y / 1024.;
+			uv.x = uv.x * u_RenderTargetSize.x / 1024.;
+			uv.y = uv.y * u_RenderTargetSize.y / 1024.;
 			uv *= mat2(co, -si, si, co);
 			uv *= density;
 

@@ -1,4 +1,4 @@
-import { ShaderPostPass, BLEND_TYPE, RenderTarget2D, TEXTURE_FILTER } from 't3d';
+import { ShaderPostPass, BLEND_TYPE, OffscreenRenderTarget, TEXTURE_FILTER } from 't3d';
 import { Effect, additiveShader } from 't3d-effect-composer';
 
 export class LensflareEffect extends Effect {
@@ -19,7 +19,7 @@ export class LensflareEffect extends Effect {
 		this._blendPass = new ShaderPostPass(additiveShader);
 		this._blendPass.material.premultipliedAlpha = true;
 
-		this._clippedRT = new RenderTarget2D(64, 64);
+		this._clippedRT = OffscreenRenderTarget.create2D(64, 64);
 		this._clippedRT.texture.minFilter = TEXTURE_FILTER.NEAREST;
 		this._clippedRT.texture.magFilter = TEXTURE_FILTER.NEAREST;
 		this._clippedRT.texture.generateMipmaps = false;
@@ -31,24 +31,21 @@ export class LensflareEffect extends Effect {
 		const lensflareBuffer = composer.getBuffer('LensflareBuffer');
 		const lensflareInfos = lensflareBuffer.lensflareInfos;
 
-		renderer.setRenderTarget(tempRT1);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, true);
+		tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
 
-		lensflareInfos.forEach(({ screenX, screenY, scaleX, scaleY, elements }) => {
-			renderer.setRenderTarget(this._clippedRT);
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, true, true);
+		lensflareInfos.forEach(({ screenX, screenY, scaleX, scaleY, elements }, i) => {
 			this._clipPass.uniforms.tDiffuse = lensflareBuffer.output().texture;
 			this._clipPass.uniforms.clipRect[0] = ((screenX - scaleX) * 0.5 + 0.5);
 			this._clipPass.uniforms.clipRect[1] = ((screenY - scaleY) * 0.5 + 0.5);
 			this._clipPass.uniforms.clipRect[2] = scaleX;
 			this._clipPass.uniforms.clipRect[3] = scaleY;
-			this._clipPass.render(renderer);
+			this._clippedRT.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+			this._clipPass.render(renderer, this._clippedRT);
 
-			renderer.setRenderTarget(tempRT1);
+			const clear = (i === 0);
+			tempRT1.setClear(clear, clear, false);
 
-			renderer.beginRender();
+			renderer.beginRender(tempRT1);
 
 			elements.forEach(({ texture, color, scale, offset }) => {
 				const vecX = -screenX * 2;
@@ -69,28 +66,14 @@ export class LensflareEffect extends Effect {
 			renderer.endRender();
 		});
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, false);
-		}
 		this._blendPass.uniforms.texture1 = inputRenderTarget.texture;
 		this._blendPass.uniforms.texture2 = tempRT1.texture;
 		this._blendPass.uniforms.colorWeight1 = 1;
 		this._blendPass.uniforms.alphaWeight1 = 1;
 		this._blendPass.uniforms.colorWeight2 = 1;
 		this._blendPass.uniforms.alphaWeight2 = 1;
-		if (finish) {
-			this._blendPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._blendPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		this._blendPass.render(renderer);
-		if (finish) {
-			this._blendPass.material.transparent = false;
-			this._blendPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, this._blendPass, finish);
+		this._blendPass.render(renderer, outputRenderTarget);
 
 		composer._renderTargetCache.release(tempRT1, 0);
 	}

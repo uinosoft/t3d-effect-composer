@@ -126,55 +126,31 @@ export class GodRaysEffect extends Effect {
 		_helpMatrix.copy(gBufferRenderStates.camera.viewMatrix).inverse();
 		_helpMatrix.toArray(this._godrayPass.uniforms.cameraMatrixWorld);
 
-		renderer.setRenderTarget(tempRT1);
-		renderer.setClearColor(0, 0, 0, 0);
-		renderer.clear(true, true, true);
-		this._godrayPass.render(renderer);
+		tempRT1.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+		this._godrayPass.render(renderer, tempRT1);
 
 		// (Optional) Render blur pass
 
 		if (this.blur) {
-			renderer.setRenderTarget(tempRT2);
-			renderer.setClearColor(0, 0, 0, 0);
-			renderer.clear(true, true, true);
-
 			this._blurPass.uniforms.tInput = tempRT1.texture;
-			this._blurPass.uniforms.resolution[0] = tempRT1.texture.image.width;
-			this._blurPass.uniforms.resolution[1] = tempRT1.texture.image.height;
 			this._blurPass.uniforms.bSigma = this.blurVariance;
-			this._blurPass.render(renderer);
+			tempRT2.setColorClearValue(0, 0, 0, 0).setClear(true, true, false);
+			this._blurPass.render(renderer, tempRT2);
 		}
 
 		// Render compositor pass
 
-		renderer.setRenderTarget(outputRenderTarget);
-		renderer.setClearColor(0, 0, 0, 0);
-		if (finish) {
-			renderer.clear(composer.clearColor, composer.clearDepth, composer.clearStencil);
-		} else {
-			renderer.clear(true, true, true);
-		}
-
 		this._compositorPass.uniforms['godrays'] = this.blur ? tempRT2.texture : tempRT1.texture;
 		this._compositorPass.uniforms['sceneDiffuse'] = inputRenderTarget.texture;
 		this._compositorPass.uniforms['sceneDepth'] = gBuffer.output()._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT];
-		this._compositorPass.uniforms.resolution[0] = gBuffer.output().width;
-		this._compositorPass.uniforms.resolution[1] = gBuffer.output().height;
 		this._compositorPass.uniforms.near = gBufferRenderStates.camera.near;
 		this._compositorPass.uniforms.far = gBufferRenderStates.camera.far;
 		light.color.toArray(this._compositorPass.uniforms.color);
 		this._compositorPass.uniforms.edgeStrength = this.edgeStrength;
 		this._compositorPass.uniforms.edgeRadius = this.edgeRadius;
 
-		if (finish) {
-			this._compositorPass.material.transparent = composer._tempClearColor[3] < 1 || !composer.clearColor;
-			this._compositorPass.renderStates.camera.rect.fromArray(composer._tempViewport);
-		}
-		this._compositorPass.render(renderer);
-		if (finish) {
-			this._compositorPass.material.transparent = false;
-			this._compositorPass.renderStates.camera.rect.set(0, 0, 1, 1);
-		}
+		composer.$setEffectContextStates(outputRenderTarget, this._compositorPass, finish);
+		this._compositorPass.render(renderer, outputRenderTarget);
 
 		//
 
@@ -469,14 +445,14 @@ const blurShader = {
 	},
 	uniforms: {
 		tInput: null,
-		resolution: [1, 1],
 		bSigma: 0.1
 	},
 	vertexShader: defaultVertexShader,
 	fragmentShader: `
 		uniform sampler2D tInput;
-		uniform vec2 resolution;
 		uniform float bSigma;
+
+		uniform vec2 u_RenderTargetSize;
 
 		varying vec2 v_Uv;
 
@@ -516,7 +492,7 @@ const blurShader = {
 
 		void main() {
 			vec3 c = texture(tInput, v_Uv).rgb;
-			ivec2 fragCoord = ivec2(v_Uv * resolution);
+			ivec2 fragCoord = ivec2(v_Uv * u_RenderTargetSize);
 			vec3 finalColor = vec3(0.);
 
 			float bZ = 1.0 / normpdf(0.0, bSigma);
@@ -542,7 +518,6 @@ const compositorShader = {
 		godrays: null,
 		sceneDiffuse: null,
 		sceneDepth: null,
-		resolution: [1, 1],
 		near: 0.1,
 		far: 1000.0,
 		color: [1, 1, 1],
@@ -554,7 +529,7 @@ const compositorShader = {
 		uniform sampler2D godrays;
 		uniform sampler2D sceneDiffuse;
 		uniform sampler2D sceneDepth;
-		uniform vec2 resolution;
+		uniform vec2 u_RenderTargetSize;
 		uniform float near;
 		uniform float far;
 		uniform vec3 color;
@@ -579,10 +554,10 @@ const compositorShader = {
 			float count = 0.0;
 			for (float x = -edgeRadius; x <= edgeRadius; x++) {
 				for (float y = -edgeRadius; y <= edgeRadius; y++) {
-					vec2 sampleUv = (v_Uv * resolution + vec2(x, y)) / resolution;
+					vec2 sampleUv = (v_Uv * u_RenderTargetSize + vec2(x, y)) / u_RenderTargetSize;
 
 					// float sampleDepth = linearize_depth(texture2D(sceneDepth, sampleUv).x, near, far);
-					float sampleDepth = texelFetch(sceneDepth, ivec2(sampleUv * resolution), 0).x;
+					float sampleDepth = texelFetch(sceneDepth, ivec2(sampleUv * u_RenderTargetSize), 0).x;
 
 					sampleDepth = linearize_depth(sampleDepth, near, far);
 
@@ -599,7 +574,7 @@ const compositorShader = {
 
 			pushDir /= count;
 			pushDir = normalize(pushDir);
-			vec2 sampleUv = length(pushDir) > 0.0 ? v_Uv + edgeStrength * (pushDir / resolution) : v_Uv;
+			vec2 sampleUv = length(pushDir) > 0.0 ? v_Uv + edgeStrength * (pushDir / u_RenderTargetSize) : v_Uv;
 			float bestChoice = texture2D(godrays, sampleUv).x;
 
 			vec3 diffuse = texture2D(sceneDiffuse, v_Uv).rgb;

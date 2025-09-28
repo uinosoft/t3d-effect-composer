@@ -1,4 +1,4 @@
-import { Object3D, Camera, RenderTarget2D, ShaderMaterial, Matrix4, TEXTURE_FILTER } from 't3d';
+import { Object3D, Camera, OffscreenRenderTarget, ShaderMaterial, Matrix4, TEXTURE_FILTER } from 't3d';
 import { DecalShader } from './DecalShader.js';
 
 export class Decal extends Object3D {
@@ -9,7 +9,7 @@ export class Decal extends Object3D {
 		this.$camera = new Camera();
 		this.$camera.setPerspective(30 / 180 * Math.PI, 16 / 9, 1, 100);
 
-		this.$depthRenderTarget = new RenderTarget2D(512, 512);
+		this.$depthRenderTarget = OffscreenRenderTarget.create2D(512, 512);
 		this.$depthRenderTarget.texture.minFilter = TEXTURE_FILTER.NEAREST;
 		this.$depthRenderTarget.texture.magFilter = TEXTURE_FILTER.NEAREST;
 
