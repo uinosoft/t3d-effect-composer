@@ -1,7 +1,7 @@
 {
   "name": "t3d-effect-composer",
   "version": "0.3.4",
-  "description": "EffectComposer for t3d.js",
+  "description": "A high-performance, highly extensible post-processing effects library for t3d.js",
   "type": "module",
   "main": "./build/t3d.effectcomposer.js",
   "module": "./build/t3d.effectcomposer.module.js",
