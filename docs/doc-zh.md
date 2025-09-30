@@ -62,22 +62,22 @@ effectComposer.addEffect('Glow', new GlowEffect(), 2);
 
 `t3d-effect-composer`提供了一个默认的后期效果混合器，内置了常用的后期特效。按照执行顺序来说，包括：
 
-1. SSAOEffect
-2. SSREffect
-3. ColorCorrectionEffect
-4. DOFEffect
-5. BloomEffect
-6. InnerGlowEffect
-7. GlowEffect
-8. SoftGlowEffect
-9. TailingEffect
-10. RadialTailingEffect
-11. GhostingEffect
-12. FXAAEffect
-13. ChromaticAberrationEffect
-14. VignettingEffect
-15. BlurEdgeEffect
-16. FilmEffect
+1. SSAOEffect - 0
+2. SSREffect - 1
+3. ColorCorrectionEffect - 2
+4. DOFEffect - 3
+5. BloomEffect - 4
+6. InnerGlowEffect - 10
+7. GlowEffect - 11
+8. SoftGlowEffect - 12
+9. TailingEffect - 13
+10. RadialTailingEffect 14
+11. GhostingEffect - 15
+12. FXAAEffect - 101
+13. ChromaticAberrationEffect - 102
+14. VignettingEffect - 103
+15. BlurEdgeEffect - 104
+16. FilmEffect - 105
 
 ### 进阶使用
 

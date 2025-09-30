@@ -1,20 +1,19 @@
-t3d-effect-composer
-===================
+# t3d-effect-composer
 
 [![NPM Package][npm]][npm-url]
 
-Post Effects extension for [t3d.js](https://github.com/uinosoft/t3d.js).
+A high-performance, highly extensible post-processing effects library for [t3d.js](https://github.com/uinosoft/t3d.js).
 
 [Examples](https://uinosoft.github.io/t3d-effect-composer/examples/) &mdash;
-Documents<[English](./docs/doc-en.md)/[中文](./docs/doc-zh.md)>
+[Documents](./docs/doc-en.md)([文档](./docs/doc-zh.md))
 
-### Features
+## Features
 
-* Post-processing effect: SSAO, SSR, ColorCorrection, DOF, Bloom, FXAA, ChromaticAberration, Vignetting, BlurEdge, Film.
-* Mesh effects: InnerGlow, Glow, SoftGlow, Tailing, RadialTailing, Ghosting, Outline.
-* Extended rendering features: Decal, lensflare, lut, overlay, sketch, uv debug ...
+* **Post-processing Effects**: SSAO/GTAO, SSR, Color Correction, Depth of Field, Bloom, FXAA, Chromatic Aberration, Vignetting, Blur Edge, Film Grain, and more
+* **Mesh Effects**: Inner Glow, Glow, Soft Glow, Motion Tailing, Radial Tailing, Ghosting, Outline, and more  
+* **Extended Rendering**: Decal Projection, Lens Flare, LUT Color Grading, Overlay Compositing, Sketch Rendering, UV Debugging, Volume Rendering, and more
 
-### Running Examples
+## Running Examples
 
 To run the examples locally:
 
@@ -27,9 +26,7 @@ To run the examples locally:
 
 The examples demonstrate various effects and features of the t3d-effect-composer library.
 
-### Usage
-
-Getting started：
+## Quick Start
 
 ````javascript
 let width = window.innerWidth || 2;
