@@ -9,7 +9,8 @@
 		"effect_ssr",
 		"effect_transmission",
 		"effect_transmission_gltf",
-		"effect_transition"
+		"effect_transition",
+		"effect_stylized_outline"
 	],
 	"layer": [
 		"layer_all",
