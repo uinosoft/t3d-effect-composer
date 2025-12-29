@@ -1,4 +1,4 @@
-import { GBufferDebugger, NonDepthMarkBufferDebugger, MarkBufferDebugger, SSAODebugger, SSRDebugger, ColorMarkBufferDebugger, RenderListMask } from 't3d-effect-composer';
+import { GBufferDebugger, HiZDebugger, NonDepthMarkBufferDebugger, MarkBufferDebugger, SSAODebugger, SSRDebugger, ColorMarkBufferDebugger, RenderListMask } from 't3d-effect-composer';
 
 class Inspector {
 
@@ -118,12 +118,13 @@ class Inspector {
 		// Debuggers
 
 		const gBufferDebugger = new GBufferDebugger();
+		const hizDebugger = new HiZDebugger();
 		const ssaoDebugger = new SSAODebugger();
 		const ssrDebugger = new SSRDebugger();
 		const debuggerFolder = gui.addFolder('Debugger');
 		debuggerFolder.close();
 
-		const gBufferTypes = ['Normal', 'Depth', 'Position', 'Metalness', 'Roughness'], debugTypes = ['Null', 'GBuffer', 'SSAO', 'SSR'];
+		const gBufferTypes = ['Normal', 'Depth', 'Position', 'Metalness', 'Roughness'], debugTypes = ['Null', 'GBuffer', 'HiZ', 'SSAO', 'SSR'];
 		let debugDetailControl = null;
 		let debugMaskControl = null;
 		let nonDepthMarkBufferDebugger = null, markBufferDebugger = null, colorMarkBufferDebugger = null;
@@ -166,6 +167,30 @@ class Inspector {
 				debugDetailControl = debuggerFolder.add({ bufferInfo: gBufferTypes[gBufferDebugger.debugType] }, 'bufferInfo', gBufferTypes).onChange(value => {
 					gBufferDebugger.debugType = GBufferDebugger.DebugTypes[value];
 				});
+			} else if (value === 'HiZ') {
+				effectComposer.debugger = hizDebugger;
+
+				const gBuffer = effectComposer.getBuffer('GBuffer');
+
+				if (!gBuffer) return;
+
+				if (!gBuffer.supportHiz) gBuffer.supportHiz = true;
+
+				const hizTexture = gBuffer.hizTexture();
+
+				if (hizTexture) {
+					const hizFolder = debuggerFolder.addFolder('HiZ Debugger');
+					hizFolder.close();
+
+					const maxLevel = hizTexture.mipmaps ? hizTexture.mipmaps.length - 1 : 0;
+					hizFolder.add(hizDebugger, 'level', 0, maxLevel, 1);
+
+					hizFolder.add(hizDebugger, 'channel', { min: 0, max: 1 });
+
+					hizFolder.add(hizDebugger, 'linearize');
+
+					debugDetailControl = hizFolder;
+				}
 			} else if (value === 'NonDepthMarkBuffer') {
 				effectComposer.debugger = nonDepthMarkBufferDebugger;
 				debugDetailControl = debuggerFolder.add(nonDepthMarkBufferDebugger, 'channel', options.nonDepthMarkChannels);

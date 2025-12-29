@@ -1,4 +1,4 @@
-import { OffscreenRenderTarget, Texture2D, ATTACHMENT, PIXEL_TYPE, TEXTURE_FILTER, SHADING_TYPE, ShaderMaterial, Vector3, Matrix4, Vector4, ShaderPostPass } from 't3d';
+import { OffscreenRenderTarget, Texture2D, ATTACHMENT, PIXEL_TYPE, PIXEL_FORMAT, TEXTURE_FILTER, SHADING_TYPE, ShaderMaterial, Vector3, Matrix4, Vector4, ShaderPostPass } from 't3d';
 import { unitVectorToOctahedronGLSL, setupDepthTexture, defaultVertexShader } from '../Utils.js';
 import Buffer from './Buffer.js';
 
@@ -61,6 +61,9 @@ export default class GBuffer extends Buffer {
 		this._renderLogDepth = false;
 		this._logDepthRenderTarget = null;
 		this._logDepthPass = null;
+
+		this._supportHiz = false;
+		this._hizGenerator = null;
 	}
 
 	// only support webGL2
@@ -86,6 +89,17 @@ export default class GBuffer extends Buffer {
 
 	get supportLogDepth() {
 		return this._supportLogDepth;
+	}
+
+	set supportHiz(value) {
+		this._supportHiz = value;
+		if (this._supportHiz && !this._hizGenerator) {
+			this._hizGenerator = new HizGenerator(this._rt.width, this._rt.height);
+		}
+	}
+
+	get supportHiz() {
+		return this._supportHiz;
 	}
 
 	setIfRenderReplaceFunction(func) {
@@ -160,10 +174,20 @@ export default class GBuffer extends Buffer {
 		}
 
 		this._renderLogDepth = renderLogDepth;
+
+		if (this._supportHiz) {
+			this._hizGenerator.render(renderer, this._renderLogDepth
+				? this._logDepthRenderTarget._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT]
+				: this._rt._attachments[ATTACHMENT.DEPTH_STENCIL_ATTACHMENT]);
+		}
 	}
 
 	output() {
 		return this._renderLogDepth ? this._logDepthRenderTarget : this._rt;
+	}
+
+	hizTexture() {
+		return this._supportHiz && this._hizGenerator ? this._hizGenerator.texture() : null;
 	}
 
 	getCurrentRenderStates() {
@@ -175,6 +199,8 @@ export default class GBuffer extends Buffer {
 		this._rt.resize(width, height);
 
 		this._logDepthRenderTarget && this._logDepthRenderTarget.resize(width, height);
+
+		this._hizGenerator && this._hizGenerator.resize(width, height);
 	}
 
 	dispose() {
@@ -183,6 +209,8 @@ export default class GBuffer extends Buffer {
 
 		this._logDepthRenderTarget && this._logDepthRenderTarget.dispose();
 		this._logDepthPass && this._logDepthPass.dispose();
+
+		this._hizGenerator && this._hizGenerator.dispose();
 	}
 
 	_getFixedRenderStates(renderStates) {
@@ -442,6 +470,230 @@ const logDepthShader = {
 			gl_FragDepthEXT = reverseLogDepth(logDepth);
 
 			gl_FragColor = vec4(0.0);
+		}
+	`
+};
+
+function mipmapsCount(width, height) {
+	const maxDim = Math.max(width, height);
+	return Math.max(Math.floor(Math.log2(maxDim)), 0);
+}
+
+function createHizTexture() {
+	const texture = new Texture2D();
+	texture.type = PIXEL_TYPE.FLOAT;
+	texture.format = PIXEL_FORMAT.RG;
+	texture.magFilter = TEXTURE_FILTER.NEAREST;
+	texture.minFilter = TEXTURE_FILTER.NEAREST_MIPMAP_NEAREST;
+	texture.generateMipmaps = false;
+	return texture;
+}
+
+function generateMipmaps(texture, width, height, totalMips) {
+	texture.mipmaps = [];
+	let mipWidth = width;
+	let mipHeight = height;
+	for (let i = 0; i <= totalMips; i++) {
+		texture.mipmaps.push({ width: mipWidth, height: mipHeight, data: null });
+		mipWidth = Math.max(mipWidth >> 1, 1);
+		mipHeight = Math.max(mipHeight >> 1, 1);
+	}
+	texture.version++;
+	return texture;
+}
+
+class HizGenerator {
+
+	constructor(width, height) {
+		const totalMips = mipmapsCount(width, height);
+
+		const hizTexture = createHizTexture();
+		generateMipmaps(hizTexture, width, height, totalMips);
+		this._hizRenderTarget = OffscreenRenderTarget.create2D(width, height);
+		this._hizRenderTarget.attach(hizTexture, ATTACHMENT.COLOR_ATTACHMENT0);
+		this._hizRenderTarget.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+
+		const hizTempTexture = createHizTexture();
+		generateMipmaps(hizTempTexture, width, height, totalMips);
+		this._hizTempRenderTarget = OffscreenRenderTarget.create2D(width, height);
+		this._hizTempRenderTarget.attach(hizTempTexture, ATTACHMENT.COLOR_ATTACHMENT0);
+		this._hizTempRenderTarget.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
+
+		this._hizCopyPass = new ShaderPostPass(hizCopyShader);
+		this._hizMipPass = new ShaderPostPass(hizMipShader);
+		this._hizMipCopyPass = new ShaderPostPass(hizMipCopyShader);
+	}
+
+	resize(width, height) {
+		const totalMips = mipmapsCount(width, height);
+
+		this._hizRenderTarget.resize(width, height);
+		this._hizTempRenderTarget.resize(width, height);
+
+		generateMipmaps(this._hizRenderTarget.texture, width, height, totalMips);
+		generateMipmaps(this._hizTempRenderTarget.texture, width, height, totalMips);
+	}
+
+	render(renderer, srcDepthTexture) {
+		const maxSize = this._hizRenderTarget.texture.mipmaps.length;
+
+		let srcRT = this._hizRenderTarget;
+		let dstRT = this._hizTempRenderTarget;
+
+		// Step 1: Copy original depth to hiz level 0
+
+		this._hizCopyPass.uniforms.depthTexture = srcDepthTexture;
+		srcRT.activeMipmapLevel = 0;
+		this._hizCopyPass.render(renderer, srcRT);
+
+		// Step 2: Generate even levels to temp hiz texture
+
+		const hizMipPass = this._hizMipPass;
+		for (let i = 1; i < maxSize; i++) {
+			const dstWidth = dstRT.texture.mipmaps[i].width;
+			const dstHeight = dstRT.texture.mipmaps[i].height;
+
+			hizMipPass.uniforms.sourceTexture = srcRT.texture;
+			hizMipPass.uniforms.sourceLevel = i - 1;
+
+			hizMipPass.renderStates.camera.rect.z = dstWidth / dstRT.width;
+			hizMipPass.renderStates.camera.rect.w = dstHeight / dstRT.height;
+
+			dstRT.activeMipmapLevel = i;
+
+			hizMipPass.render(renderer, dstRT);
+
+			// swap
+			const temp = srcRT;
+			srcRT = dstRT;
+			dstRT = temp;
+		}
+
+		// Step 3: Copy odd levels to hiz render target
+
+		srcRT = this._hizTempRenderTarget;
+		dstRT = this._hizRenderTarget;
+
+		const hizMipCopyPass = this._hizMipCopyPass;
+		for (let i = 0; i < maxSize; i++) {
+			if (i % 2 === 0) continue;
+
+			hizMipCopyPass.uniforms.sourceTexture = srcRT.texture;
+			hizMipCopyPass.uniforms.sourceLevel = i;
+
+			hizMipCopyPass.renderStates.camera.rect.z = dstRT.texture.mipmaps[i].width / dstRT.width;
+			hizMipCopyPass.renderStates.camera.rect.w = dstRT.texture.mipmaps[i].height / dstRT.height;
+
+			dstRT.activeMipmapLevel = i;
+
+			hizMipCopyPass.render(renderer, dstRT);
+		}
+	}
+
+	dispose() {
+		this._hizRenderTarget.dispose();
+		this._hizTempRenderTarget.dispose();
+
+		this._hizCopyPass.dispose();
+		this._hizMipPass.dispose();
+		this._hizMipCopyPass.dispose();
+	}
+
+	texture() {
+		return this._hizRenderTarget.texture;
+	}
+
+}
+
+const hizCopyShader = {
+	name: 'ec_hiz_copy',
+	uniforms: {
+		depthTexture: null
+	},
+	vertexShader: defaultVertexShader,
+	fragmentShader: `
+		uniform sampler2D depthTexture;
+		varying vec2 v_Uv;
+		void main() {
+			float depth = texture2D(depthTexture, v_Uv).r;
+			gl_FragColor = vec4(depth, depth, .0 ,1.0);
+		}
+	`
+};
+
+// ref: https://sugulee.wordpress.com/2021/01/19/screen-space-reflections-implementation-and-optimization-part-2-hi-z-tracing-method/
+const hizMipShader = {
+	name: 'ec_hiz_mip',
+	uniforms: {
+		sourceTexture: null,
+		sourceLevel: 0
+	},
+	vertexShader: defaultVertexShader,
+	fragmentShader: `
+		uniform sampler2D sourceTexture;
+		uniform int sourceLevel;
+		varying vec2 v_Uv;
+		void main() {
+			ivec2 inSize = textureSize(sourceTexture, sourceLevel);
+			ivec2 outSize = max(inSize / 2, ivec2(1));
+			vec2 ratio = vec2(inSize) / vec2(outSize);
+
+			ivec2 outCoord = ivec2(gl_FragCoord.xy);
+
+			ivec2 base = outCoord * 2;
+			ivec2 maxCoord = inSize - ivec2(1);
+
+			vec2 d0 = texelFetch(sourceTexture, clamp(base + ivec2(0, 0), ivec2(0), maxCoord), sourceLevel).rg;
+			vec2 d1 = texelFetch(sourceTexture, clamp(base + ivec2(1, 0), ivec2(0), maxCoord), sourceLevel).rg;
+			vec2 d2 = texelFetch(sourceTexture, clamp(base + ivec2(0, 1), ivec2(0), maxCoord), sourceLevel).rg;
+			vec2 d3 = texelFetch(sourceTexture, clamp(base + ivec2(1, 1), ivec2(0), maxCoord), sourceLevel).rg;
+
+			float minDepth = min(min(d0.r, d1.r), min(d2.r, d3.r));
+			float maxDepth = max(max(d0.g, d1.g), max(d2.g, d3.g));
+
+			bool needExtraSampleX = ratio.x > 2.0;
+			bool needExtraSampleY = ratio.y > 2.0;
+
+			if (needExtraSampleX) {
+				vec2 d4 = texelFetch(sourceTexture, clamp(base + ivec2(2, 0), ivec2(0), maxCoord), sourceLevel).rg;
+				vec2 d5 = texelFetch(sourceTexture, clamp(base + ivec2(2, 1), ivec2(0), maxCoord), sourceLevel).rg;
+				minDepth = min(minDepth, min(d4.r, d5.r));
+				maxDepth = max(maxDepth, max(d4.g, d5.g));
+			}
+
+			if (needExtraSampleY) {
+				vec2 d6 = texelFetch(sourceTexture, clamp(base + ivec2(0, 2), ivec2(0), maxCoord), sourceLevel).rg;
+				vec2 d7 = texelFetch(sourceTexture, clamp(base + ivec2(1, 2), ivec2(0), maxCoord), sourceLevel).rg;
+				minDepth = min(minDepth, min(d6.r, d7.r));
+				maxDepth = max(maxDepth, max(d6.g, d7.g));
+			}
+
+			if (needExtraSampleX && needExtraSampleY) {
+				vec2 d8 = texelFetch(sourceTexture, clamp(base + ivec2(2, 2), ivec2(0), maxCoord), sourceLevel).rg;
+				minDepth = min(minDepth, d8.r);
+				maxDepth = max(maxDepth, d8.g);
+			}
+
+			gl_FragColor = vec4(minDepth, maxDepth, 0.0, 1.0);
+		}
+	`
+};
+
+const hizMipCopyShader = {
+	name: 'ec_hiz_mip_copy',
+	uniforms: {
+		sourceTexture: null,
+		sourceLevel: 0
+	},
+	vertexShader: defaultVertexShader,
+	fragmentShader: `
+		uniform sampler2D sourceTexture;
+		uniform int sourceLevel;
+		varying vec2 v_Uv;
+		void main() {
+			ivec2 texCoord = ivec2(gl_FragCoord.xy);
+			vec2 depth = texelFetch(sourceTexture, texCoord, sourceLevel).rg;
+			gl_FragColor = vec4(depth, 0.0, 1.0);
 		}
 	`
 };

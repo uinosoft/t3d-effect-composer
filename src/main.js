@@ -34,6 +34,7 @@ export { default as MarkBufferDebugger } from './debuggers/MarkBufferDebugger.js
 export { default as NonDepthMarkBufferDebugger } from './debuggers/NonDepthMarkBufferDebugger.js';
 export { default as SSAODebugger } from './debuggers/SSAODebugger.js';
 export { default as SSRDebugger } from './debuggers/SSRDebugger.js';
+export { default as HiZDebugger } from './debuggers/HierarchicalZDebugger.js';
 
 export * from './Utils.js';
 export * from './legacy.js';
