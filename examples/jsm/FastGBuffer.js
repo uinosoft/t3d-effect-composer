@@ -1,5 +1,5 @@
-import { OffscreenRenderTarget, ATTACHMENT, TEXTURE_FILTER, PIXEL_TYPE, ShaderPostPass, Matrix4 } from 't3d';
-import { unitVectorToOctahedronGLSL, defaultVertexShader, Buffer } from 't3d-effect-composer';
+import { OffscreenRenderTarget, Texture2D, ATTACHMENT, TEXTURE_FILTER, PIXEL_TYPE, ShaderPostPass, Matrix4 } from 't3d';
+import { unitVectorToOctahedronGLSL, setupDepthTexture, defaultVertexShader, Buffer } from 't3d-effect-composer';
 
 /**
  * FastGBuffer can replace GBuffer with higher performance.
@@ -30,7 +30,20 @@ export class FastGBuffer extends Buffer {
 
 		this._rt.detach(ATTACHMENT.DEPTH_STENCIL_ATTACHMENT);
 
+		const supportLogDepth = options.webgl2;
+
+		if (supportLogDepth) {
+			const depthTexture = new Texture2D();
+			setupDepthTexture(depthTexture, true);
+
+			this._rt.attach(
+				depthTexture,
+				ATTACHMENT.DEPTH_STENCIL_ATTACHMENT
+			);
+		}
+
 		this._fastGBufferPass = new ShaderPostPass(fastGBufferShader);
+		this._fastGBufferPass.material.defines.SUPPORT_LOGDEPTH = supportLogDepth;
 
 		// don't use this render target for rendering,
 		// it's just used to store the result of the fast gbuffer textures
@@ -63,6 +76,20 @@ export class FastGBuffer extends Buffer {
 		this._fastGBufferPass.uniforms.roughness = this.globalRoughness;
 		this._fastGBufferPass.uniforms.metalness = this.globalMetalness;
 
+		const renderLogDepth = this._fastGBufferPass.material.defines.SUPPORT_LOGDEPTH &&
+			renderStates.scene.logarithmicDepthBuffer &&
+			isPerspectiveMatrix(renderStates.camera.projectionMatrix);
+		this._fastGBufferPass.uniforms.renderLogDepth = renderLogDepth;
+
+		if (renderLogDepth) {
+			const { near, far, logDepthCameraNear, logDepthBufFC } = renderStates.camera;
+			const depthFactors = this._fastGBufferPass.uniforms.depthFactors;
+			depthFactors[0] = logDepthCameraNear;
+			depthFactors[1] = logDepthBufFC;
+			depthFactors[2] = far / (far - near);
+			depthFactors[3] = far * near / (near - far);
+		}
+
 		this._rt.setColorClearValue(-2.1, -2.1, 0.5, 0.5).setClear(true, true, false);
 		this._fastGBufferPass.render(renderer, this._rt);
 
@@ -71,7 +98,8 @@ export class FastGBuffer extends Buffer {
 	}
 
 	output() {
-		return this._fakeRenderTarget;
+		return this._fastGBufferPass.material.defines.SUPPORT_LOGDEPTH ?
+			this._rt : this._fakeRenderTarget;
 	}
 
 	getCurrentRenderStates() {
@@ -91,15 +119,23 @@ export class FastGBuffer extends Buffer {
 
 const projectionViewInv = new Matrix4();
 
+function isPerspectiveMatrix(m) {
+	return m.elements[11] === -1.0;
+}
+
 // https://wickedengine.net/2019/09/improved-normal-reconstruction-from-depth/
 const fastGBufferShader = {
 	name: 'ec_fast_gbuffer',
-	defines: {},
+	defines: {
+		SUPPORT_LOGDEPTH: false
+	},
 	uniforms: {
 		depthTexture: null,
 		projectionViewInv: new Float32Array(16),
 		roughness: 0.5,
-		metalness: 0.5
+		metalness: 0.5,
+		renderLogDepth: false,
+		depthFactors: [0, 0, 0, 0]
 	},
 
 	vertexShader: defaultVertexShader,
@@ -114,6 +150,27 @@ const fastGBufferShader = {
         uniform float metalness;
 
         varying vec2 v_Uv;
+
+		#ifdef SUPPORT_LOGDEPTH
+			uniform bool renderLogDepth;
+			uniform vec4 depthFactors;
+
+			float reverseLogDepth(const float logDepth) {
+				float depth = pow(2.0, logDepth * 2.0 / depthFactors.y) + depthFactors.x - 1.0;
+				depth = depthFactors.z + depthFactors.w / depth;
+				return depth;
+			}
+		#endif
+
+		float sampleDepth(vec2 uv) {
+			float depth = texture2D(depthTexture, uv).r;
+			#ifdef SUPPORT_LOGDEPTH
+			if (renderLogDepth) {
+				depth = reverseLogDepth(depth);
+			}
+			#endif
+			return depth;
+		}
 
         vec3 reconstructPosition(vec2 uv, float z) {
             vec2 xy = uv * 2.0 - 1.0;                              
@@ -157,11 +214,18 @@ const fastGBufferShader = {
         ${unitVectorToOctahedronGLSL}
 
         void main() {
-            vec2 uv0 = v_Uv;                           // center
+            vec2 uv0 = v_Uv;
 
-            float depth0 = texture2D(depthTexture, uv0).r;
+            float depth0 = sampleDepth(uv0);
 
-			if (depth0 > 0.999) discard;
+			#ifdef SUPPORT_LOGDEPTH
+				gl_FragDepthEXT = depth0;
+            #endif
+
+			if (depth0 > 0.999) {
+				gl_FragColor = vec4(-2.1, -2.1, 0.5, 0.5);
+				return;
+			}
 
 			vec2 texelSize = 1.0 / u_RenderTargetSize;
 
@@ -170,10 +234,10 @@ const fastGBufferShader = {
             vec2 uvT = v_Uv + vec2(0.0, -texelSize.y); // top
             vec2 uvB = v_Uv + vec2(0.0, texelSize.y);  // bottom
 
-            float depthL = texture2D(depthTexture, uvL).r;
-            float depthR = texture2D(depthTexture, uvR).r;
-            float depthT = texture2D(depthTexture, uvT).r;
-            float depthB = texture2D(depthTexture, uvB).r;
+            float depthL = sampleDepth(uvL);
+            float depthR = sampleDepth(uvR);
+            float depthT = sampleDepth(uvT);
+            float depthB = sampleDepth(uvB);
 
             vec3 pos0 = reconstructPosition(uv0, depth0);
             vec3 posL = reconstructPosition(uvL, depthL);
