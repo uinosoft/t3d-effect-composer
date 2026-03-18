@@ -2,14 +2,33 @@ import { ShaderPostPass } from 't3d';
 import Effect from './Effect.js';
 import { blurShader, additiveShader, highlightShader } from '../Utils.js';
 
+/**
+ * Bloom effect.
+ */
 export default class BloomEffect extends Effect {
 
 	constructor() {
 		super();
 
+		/**
+		 * Highlight extraction threshold.
+		 * @type {number}
+		 */
 		this.threshold = 0.7;
+		/**
+		 * Smooth transition width for highlight extraction.
+		 * @type {number}
+		 */
 		this.smoothWidth = 0.01;
+		/**
+		 * Bloom blur radius.
+		 * @type {number}
+		 */
 		this.blurSize = 2;
+		/**
+		 * Bloom blend strength.
+		 * @type {number}
+		 */
 		this.strength = 1;
 
 		this._highlightPass = new ShaderPostPass(highlightShader);

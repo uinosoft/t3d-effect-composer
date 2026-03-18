@@ -2,6 +2,9 @@ import { ShaderPostPass, ATTACHMENT } from 't3d';
 import Effect from './Effect.js';
 import { maskShader, additiveShader, highlightShader, seperableBlurShader, defaultVertexShader, RenderListMask } from '../Utils.js';
 
+/**
+ * Outer glow effect.
+ */
 export default class GlowEffect extends Effect {
 
 	constructor() {
@@ -18,10 +21,30 @@ export default class GlowEffect extends Effect {
 			{ key: 'ColorMarkBuffer', mask: RenderListMask.TRANSPARENT }
 		];
 
+		/**
+		 * Glow strength.
+		 * @type {number}
+		 */
 		this.strength = 1;
+		/**
+		 * Glow radius.
+		 * @type {number}
+		 */
 		this.radius = 0.4;
+		/**
+		 * Highlight extraction threshold.
+		 * @type {number}
+		 */
 		this.threshold = 0.01;
+		/**
+		 * Smooth transition width for highlight extraction.
+		 * @type {number}
+		 */
 		this.smoothWidth = 0.1;
+		/**
+		 * Mask contribution strength.
+		 * @type {number}
+		 */
 		this.maskStrength = 1;
 
 		this._maskPass = new ShaderPostPass(maskShader);

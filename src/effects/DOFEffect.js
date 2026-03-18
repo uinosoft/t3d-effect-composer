@@ -2,6 +2,9 @@ import { ShaderPostPass, ATTACHMENT } from 't3d';
 import Effect from './Effect.js';
 import { defaultVertexShader } from '../Utils.js';
 
+/**
+ * Depth of field effect.
+ */
 export default class DOFEffect extends Effect {
 
 	constructor() {
@@ -11,13 +14,45 @@ export default class DOFEffect extends Effect {
 			{ key: 'GBuffer' }
 		];
 
+		/**
+		 * Focal plane depth.
+		 * @type {number}
+		 */
 		this.focalDepth = 1;
+		/**
+		 * Focal length parameter.
+		 * @type {number}
+		 */
 		this.focalLength = 24;
+		/**
+		 * Aperture value.
+		 * @type {number}
+		 */
 		this.fstop = 0.9;
+		/**
+		 * Maximum blur strength.
+		 * @type {number}
+		 */
 		this.maxblur = 1.0;
+		/**
+		 * Highlight threshold.
+		 * @type {number}
+		 */
 		this.threshold = 0.9;
+		/**
+		 * Highlight gain.
+		 * @type {number}
+		 */
 		this.gain = 1.0;
+		/**
+		 * Bokeh edge bias.
+		 * @type {number}
+		 */
 		this.bias = 0.5;
+		/**
+		 * Dithering strength.
+		 * @type {number}
+		 */
 		this.dithering = 0.0001;
 
 		this._mainPass = new ShaderPostPass(bokehShader);

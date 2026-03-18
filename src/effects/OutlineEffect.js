@@ -2,6 +2,9 @@ import { ShaderPostPass, Color3, ATTACHMENT } from 't3d';
 import Effect from './Effect.js';
 import { defaultVertexShader, copyShader, seperableBlurShader } from '../Utils.js';
 
+/**
+ * Outline effect.
+ */
 export default class OutlineEffect extends Effect {
 
 	constructor() {
@@ -11,8 +14,20 @@ export default class OutlineEffect extends Effect {
 			{ key: 'NonDepthMarkBuffer' }
 		];
 
+		/**
+		 * Outline color.
+		 * @type {Color3}
+		 */
 		this.color = new Color3(1, 1, 1);
+		/**
+		 * Outline thickness.
+		 * @type {number}
+		 */
 		this.thickness = 1.0;
+		/**
+		 * Outline strength.
+		 * @type {number}
+		 */
 		this.strength = 1.5;
 
 		this._downsamplerPass = new ShaderPostPass(copyShader);

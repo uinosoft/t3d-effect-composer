@@ -2,14 +2,29 @@ import { ShaderPostPass, TEXEL_ENCODING_TYPE } from 't3d';
 import Effect from './Effect.js';
 import { defaultVertexShader, ToneMappingType } from '../Utils.js';
 
-// Tone Mapping normally deals with the conversion of HDR to LDR.
+/**
+ * Tone mapping effect.
+ * Tone mapping normally deals with the conversion of HDR to LDR.
+ */
 export default class ToneMappingEffect extends Effect {
 
 	constructor() {
 		super();
 
+		/**
+		 * Tone mapping mode. See {@link ToneMappingType}.
+		 * @type {number}
+		 */
 		this.toneMapping = ToneMappingType.Reinhard;
+		/**
+		 * Tone mapping exposure value.
+		 * @type {number}
+		 */
 		this.toneMappingExposure = 1;
+		/**
+		 * Output color space. See {@link TEXEL_ENCODING_TYPE}.
+		 * @type {number}
+		 */
 		this.outputColorSpace = TEXEL_ENCODING_TYPE.SRGB;
 
 		this._mainPass = new ShaderPostPass(shader);

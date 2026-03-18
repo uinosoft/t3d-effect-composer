@@ -2,14 +2,33 @@ import { ShaderPostPass } from 't3d';
 import Effect from './Effect.js';
 import { defaultVertexShader } from '../Utils.js';
 
+/**
+ * Film grain and scanline effect.
+ */
 export default class FilmEffect extends Effect {
 
 	constructor() {
 		super();
 
+		/**
+		 * Noise strength.
+		 * @type {number}
+		 */
 		this.noiseIntensity = 0.35;
+		/**
+		 * Scanline strength.
+		 * @type {number}
+		 */
 		this.scanlinesIntensity = 0.5;
+		/**
+		 * Scanline density.
+		 * @type {number}
+		 */
 		this.scanlinesCount = 2048;
+		/**
+		 * Whether to output grayscale.
+		 * @type {boolean}
+		 */
 		this.grayscale = true;
 
 		this._time = 0;

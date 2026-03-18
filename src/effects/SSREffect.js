@@ -2,6 +2,9 @@ import { ShaderPostPass, ATTACHMENT, Matrix4 } from 't3d';
 import Effect from './Effect.js';
 import { defaultVertexShader, octahedronToUnitVectorGLSL, blurShader } from '../Utils.js';
 
+/**
+ * Screen-space reflection effect.
+ */
 export default class SSREffect extends Effect {
 
 	constructor() {
@@ -12,53 +15,110 @@ export default class SSREffect extends Effect {
 			{ key: 'GBuffer' }
 		];
 
-		// Single step distance, unit is pixel
+		/**
+		 * Pixel distance for each ray step.
+		 * @type {number}
+		 */
 		this.pixelStride = 8;
-		// Dichotomy search depends on precise collision point, maximum number of iterations
+		/**
+		 * Maximum iterations for binary search refinement.
+		 * @type {number}
+		 */
 		this.maxIteration = 5;
-		// Number of steps
+		/**
+		 * Maximum number of ray-marching steps.
+		 * @type {number}
+		 */
 		this.maxSteps = 50;
 
-		// The farthest reflection distance limit, in meters
+		/**
+		 * Maximum reflection distance in meters.
+		 * @type {number}
+		 */
 		this.maxRayDistance = 200;
 
-		// Adjust the step pixel distance according to the depth,
-		// the step in and out becomes larger,
-		// and the step in the distance becomes smaller.
+		/**
+		 * Whether to adjust pixel stride by depth so near rays step farther and distant rays
+		 * step more finely.
+		 * @type {boolean}
+		 */
 		this.enablePixelStrideZCutoff = true;
-		// ray origin Z at this distance will have a pixel stride of 1.0
+		/**
+		 * Reference ray-origin depth where pixel stride becomes `1.0`.
+		 * @type {number}
+		 */
 		this.pixelStrideZCutoff = 50;
 
-		// distance to screen edge that ray hits will start to fade (0.0 -> 1.0)
+		/**
+		 * Distance-to-screen-edge threshold where reflection fading starts, in the `0.0` to `1.0` range.
+		 * @type {number}
+		 */
 		this.screenEdgeFadeStart = 0.9;
 
-		// ray direction's Z that ray hits will start to fade (0.0 -> 1.0)
+		/**
+		 * View-direction Z threshold where reflection fading starts, in the `0.0` to `1.0` range.
+		 * @type {number}
+		 */
 		this.eyeFadeStart = 0.99;
-		// ray direction's Z that ray hits will be cut (0.0 -> 1.0)
+		/**
+		 * View-direction Z threshold where reflections are fully cut off, in the `0.0` to `1.0` range.
+		 * @type {number}
+		 */
 		this.eyeFadeEnd = 1;
 
-		// Object larger than minGlossiness will have ssr effect
+		/**
+		 * Minimum glossiness required to enable SSR.
+		 * @type {number}
+		 */
 		this.minGlossiness = 0.2;
 
-		// the strength of ssr effect
+		/**
+		 * SSR blend strength.
+		 * @type {number}
+		 */
 		this.strength = 0.2;
 
-		// the falloff of base color when mix with ssr color
+		/**
+		 * Falloff factor applied when mixing SSR with the base color.
+		 * @type {number}
+		 */
 		this.falloff = 0;
 
-		// the threshold of z thickness
+		/**
+		 * Depth thickness threshold used for ray intersection tests.
+		 * @type {number}
+		 */
 		this.zThicknessThreshold = 0.5;
 
-		// When turned on, the reflection effect will become more blurred as the Roughness increases,
-		// but it will also cause more noise.
-		// Noise can be reduced by turning on TAA.
+		/**
+		 * Whether to enable importance sampling.
+		 * This makes reflections blur more as roughness increases, but can introduce more noise.
+		 * Noise is typically reduced by enabling TAA.
+		 * @type {boolean}
+		 */
 		this.importanceSampling = false;
 
+		/**
+		 * SSR blur radius.
+		 * @type {number}
+		 */
 		this.blurSize = 2;
+		/**
+		 * Depth influence range for the blur stage.
+		 * @type {number}
+		 */
 		this.depthRange = 1;
 
+		/**
+		 * Downsample level used for SSR rendering.
+		 * @type {number}
+		 */
 		this.downScaleLevel = 0;
 
+		/**
+		 * Whether to enable jitter during sampling.
+		 * @type {boolean}
+		 */
 		this.jitter = true;
 
 		this._copyRGBPass = new ShaderPostPass(copyRGBShader);

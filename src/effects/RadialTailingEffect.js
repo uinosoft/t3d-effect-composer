@@ -2,6 +2,9 @@ import { ShaderPostPass, Vector2, ATTACHMENT } from 't3d';
 import Effect from './Effect.js';
 import { maskShader, additiveShader, defaultVertexShader, RenderListMask } from '../Utils.js';
 
+/**
+ * Radial tailing effect.
+ */
 export default class RadialTailingEffect extends Effect {
 
 	constructor() {
@@ -18,7 +21,15 @@ export default class RadialTailingEffect extends Effect {
 			{ key: 'ColorMarkBuffer', mask: RenderListMask.TRANSPARENT }
 		];
 
+		/**
+		 * Radial tailing center position.
+		 * @type {Vector2}
+		 */
 		this.center = new Vector2(0.5, 0.5);
+		/**
+		 * Radial tailing strength.
+		 * @type {number}
+		 */
 		this.strength = 1;
 
 		this._maskPass = new ShaderPostPass(maskShader);

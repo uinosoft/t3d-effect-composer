@@ -2,15 +2,38 @@ import { ShaderPostPass } from 't3d';
 import Effect from './Effect.js';
 import { defaultVertexShader } from '../Utils.js';
 
+/**
+ * Color correction effect.
+ */
 export default class ColorCorrectionEffect extends Effect {
 
 	constructor() {
 		super();
 
+		/**
+		 * Brightness offset.
+		 * @type {number}
+		 */
 		this.brightness = 0;
+		/**
+		 * Contrast factor.
+		 * @type {number}
+		 */
 		this.contrast = 1.02;
+		/**
+		 * Exposure compensation.
+		 * @type {number}
+		 */
 		this.exposure = 0;
+		/**
+		 * Gamma correction factor.
+		 * @type {number}
+		 */
 		this.gamma = 1;
+		/**
+		 * Saturation factor.
+		 * @type {number}
+		 */
 		this.saturation = 1.02;
 
 		this._mainPass = new ShaderPostPass(shader);

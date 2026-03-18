@@ -2,6 +2,9 @@ import { ShaderPostPass } from 't3d';
 import Effect from './Effect.js';
 import { fxaaShader } from '../Utils.js';
 
+/**
+ * FXAA anti-aliasing effect.
+ */
 export default class FXAAEffect extends Effect {
 
 	constructor() {

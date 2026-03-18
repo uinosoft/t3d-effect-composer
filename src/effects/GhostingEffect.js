@@ -2,6 +2,9 @@ import { ShaderPostPass, Vector2, ATTACHMENT } from 't3d';
 import Effect from './Effect.js';
 import { maskShader, additiveShader, defaultVertexShader, RenderListMask } from '../Utils.js';
 
+/**
+ * Ghosting effect.
+ */
 export default class GhostingEffect extends Effect {
 
 	constructor() {
@@ -18,7 +21,15 @@ export default class GhostingEffect extends Effect {
 			{ key: 'ColorMarkBuffer', mask: RenderListMask.TRANSPARENT }
 		];
 
+		/**
+		 * Ghosting center position.
+		 * @type {Vector2}
+		 */
 		this.center = new Vector2(0.5, 0.5);
+		/**
+		 * Ghosting strength.
+		 * @type {number}
+		 */
 		this.strength = 1;
 
 		this._maskPass = new ShaderPostPass(maskShader);

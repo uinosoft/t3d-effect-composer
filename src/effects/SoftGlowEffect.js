@@ -2,6 +2,9 @@ import { ShaderPostPass, ATTACHMENT } from 't3d';
 import Effect from './Effect.js';
 import { defaultVertexShader, maskShader, horizontalBlurShader, verticalBlurShader, additiveShader, RenderListMask } from '../Utils.js';
 
+/**
+ * Soft glow effect.
+ */
 export default class SoftGlowEffect extends Effect {
 
 	constructor() {
@@ -18,9 +21,25 @@ export default class SoftGlowEffect extends Effect {
 			{ key: 'ColorMarkBuffer', mask: RenderListMask.TRANSPARENT }
 		];
 
+		/**
+		 * Soft glow strength.
+		 * @type {number}
+		 */
 		this.strength = 0.5;
+		/**
+		 * Multi-level blur blend rate.
+		 * @type {number}
+		 */
 		this.blendRate = 0.4;
+		/**
+		 * Soft glow blur radius.
+		 * @type {number}
+		 */
 		this.blurSize = 1;
+		/**
+		 * Mask contribution strength.
+		 * @type {number}
+		 */
 		this.maskStrength = 1;
 
 		this._maskPass = new ShaderPostPass(maskShader);

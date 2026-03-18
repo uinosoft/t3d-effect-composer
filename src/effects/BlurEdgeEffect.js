@@ -2,11 +2,18 @@ import { ShaderPostPass } from 't3d';
 import Effect from './Effect.js';
 import { defaultVertexShader, horizontalBlurShader, verticalBlurShader } from '../Utils.js';
 
+/**
+ * Edge blur effect.
+ */
 export default class BlurEdgeEffect extends Effect {
 
 	constructor() {
 		super();
 
+		/**
+		 * Blur range factor from the screen center to the edges.
+		 * @type {number}
+		 */
 		this.offset = 1.0;
 
 		this._hBlurPass = new ShaderPostPass(horizontalBlurShader);

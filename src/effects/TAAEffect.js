@@ -2,6 +2,9 @@ import { ShaderPostPass } from 't3d';
 import Effect from './Effect.js';
 import { copyShader, defaultVertexShader } from '../Utils.js';
 
+/**
+ * Temporal anti-aliasing effect.
+ */
 export default class TAAEffect extends Effect {
 
 	constructor() {
@@ -19,6 +22,10 @@ export default class TAAEffect extends Effect {
 		this._reset = true;
 		this._accumulating = true;
 
+		/**
+		 * Callback invoked when accumulation finishes.
+		 * @type {?Function}
+		 */
 		this.onFinish = null;
 	}
 

@@ -2,6 +2,9 @@ import { ShaderPostPass, ATTACHMENT, Matrix4, Texture2D, Vector3, PIXEL_TYPE, TE
 import Effect from './Effect.js';
 import { defaultVertexShader, octahedronToUnitVectorGLSL, blurShader, multiplyShader } from '../Utils.js';
 
+/**
+ * Screen-space ambient occlusion effect.
+ */
 export default class SSAOEffect extends Effect {
 
 	constructor() {
@@ -13,20 +16,42 @@ export default class SSAOEffect extends Effect {
 
 		this._ssaoPass = new ShaderPostPass(ssaoShader);
 
-		// Sampling radius in work space.
-		// Larger will produce more soft concat shadow.
-		// But also needs higher quality or it will have more obvious artifacts
+		/**
+		 * SSAO sampling radius in world space.
+		 * Larger values produce softer contact shadows, but usually need higher quality
+		 * settings to avoid obvious artifacts.
+		 * @type {number}
+		 */
 		this.radius = 0.5;
 
+		/**
+		 * Occlusion power.
+		 * @type {number}
+		 */
 		this.power = 1;
 
+		/**
+		 * Depth bias.
+		 * @type {number}
+		 */
 		this.bias = 0.1;
 
+		/**
+		 * Occlusion intensity.
+		 * @type {number}
+		 */
 		this.intensity = 1;
 
+		/**
+		 * Whether to automatically weight samples by distance.
+		 * @type {boolean}
+		 */
 		this.autoSampleWeight = false;
 
-		// Quality of SSAO. 'Low'|'Medium'|'High'|'Ultra'
+		/**
+		 * SSAO quality level.
+		 * @type {'Low'|'Medium'|'High'|'Ultra'}
+		 */
 		this.quality = 'Medium';
 
 		this._kernelCode = '';
@@ -39,10 +64,26 @@ export default class SSAOEffect extends Effect {
 		this._blurPass.material.defines.NORMALTEX_ENABLED = 1;
 		this._blurPass.material.defines.DEPTHTEX_ENABLED = 1;
 
+		/**
+		 * Bilateral blur radius.
+		 * @type {number}
+		 */
 		this.blurSize = 1;
+		/**
+		 * Depth influence range for bilateral blur.
+		 * @type {number}
+		 */
 		this.depthRange = 1;
+		/**
+		 * Whether to enable jitter during sampling.
+		 * @type {boolean}
+		 */
 		this.jitter = true;
 
+		/**
+		 * Downsample level used for SSAO rendering.
+		 * @type {number}
+		 */
 		this.downScaleLevel = 0;
 
 		this._blendPass = new ShaderPostPass(multiplyShader);

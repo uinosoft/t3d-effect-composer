@@ -2,12 +2,23 @@ import { ShaderPostPass, Color3 } from 't3d';
 import Effect from './Effect.js';
 import { defaultVertexShader } from '../Utils.js';
 
+/**
+ * Vignetting effect.
+ */
 export default class VignettingEffect extends Effect {
 
 	constructor() {
 		super();
 
+		/**
+		 * Vignetting color.
+		 * @type {Color3}
+		 */
 		this.color = new Color3(0, 0, 0);
+		/**
+		 * Vignetting range offset factor.
+		 * @type {number}
+		 */
 		this.offset = 1.0;
 
 		this._vignettingPass = new ShaderPostPass(vignettingShader);

@@ -2,11 +2,18 @@ import { ShaderPostPass } from 't3d';
 import Effect from './Effect.js';
 import { defaultVertexShader } from '../Utils.js';
 
+/**
+ * Chromatic aberration effect.
+ */
 export default class ChromaticAberrationEffect extends Effect {
 
 	constructor() {
 		super();
 
+		/**
+		 * Chromatic offset strength.
+		 * @type {number}
+		 */
 		this.chromaFactor = 0.025;
 
 		this._mainPass = new ShaderPostPass(shader);

@@ -2,6 +2,9 @@ import { ShaderPostPass, Color3, ATTACHMENT } from 't3d';
 import Effect from './Effect.js';
 import { channelShader, defaultVertexShader } from '../Utils.js';
 
+/**
+ * Inner glow effect.
+ */
 export default class InnerGlowEffect extends Effect {
 
 	constructor() {
@@ -11,8 +14,20 @@ export default class InnerGlowEffect extends Effect {
 			{ key: 'MarkBuffer' }
 		];
 
+		/**
+		 * Inner glow color.
+		 * @type {Color3}
+		 */
 		this.color = new Color3(1, 1, 1);
+		/**
+		 * Inner glow strength.
+		 * @type {number}
+		 */
 		this.strength = 1.5;
+		/**
+		 * Inner glow sampling stride.
+		 * @type {number}
+		 */
 		this.stride = 5;
 
 		this._channelPass = new ShaderPostPass(channelShader);

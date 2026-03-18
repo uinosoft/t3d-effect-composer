@@ -2,6 +2,9 @@ import { ShaderPostPass, ATTACHMENT, Vector2 } from 't3d';
 import Effect from './Effect.js';
 import { maskShader, additiveShader, defaultVertexShader, RenderListMask } from '../Utils.js';
 
+/**
+ * Directional tailing effect.
+ */
 export default class TailingEffect extends Effect {
 
 	constructor() {
@@ -18,8 +21,20 @@ export default class TailingEffect extends Effect {
 			{ key: 'ColorMarkBuffer', mask: RenderListMask.TRANSPARENT }
 		];
 
+		/**
+		 * Tailing center position.
+		 * @type {Vector2}
+		 */
 		this.center = new Vector2(0.5, 0.5);
+		/**
+		 * Tailing direction.
+		 * @type {Vector2}
+		 */
 		this.direction = new Vector2(0.0, 1.0);
+		/**
+		 * Tailing strength.
+		 * @type {number}
+		 */
 		this.strength = 1;
 
 		this._maskPass = new ShaderPostPass(maskShader);
