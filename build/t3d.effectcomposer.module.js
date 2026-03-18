@@ -1630,14 +1630,35 @@ class AccumulationBuffer extends Buffer {
 
 }
 
+/**
+ * Base class for post-processing effects.
+ *
+ * @abstract
+ */
 class Effect {
 
 	constructor() {
+		/**
+		 * Effect name used when registering with the composer.
+		 * @type {string}
+		 */
 		this.name = '';
 
+		/**
+		 * Buffer dependency declarations required by this effect.
+		 * @type {Array<{key: string, mask?: number}>}
+		 */
 		this.bufferDependencies = [];
+		/**
+		 * Whether this effect is enabled.
+		 * @type {boolean}
+		 */
 		this.active = true;
 
+		/**
+		 * Whether this effect requires camera jitter support.
+		 * @type {boolean}
+		 */
 		this.needCameraJitter = false;
 	}
 
@@ -1651,14 +1672,33 @@ class Effect {
 
 }
 
+/**
+ * Bloom effect.
+ */
 class BloomEffect extends Effect {
 
 	constructor() {
 		super();
 
+		/**
+		 * Highlight extraction threshold.
+		 * @type {number}
+		 */
 		this.threshold = 0.7;
+		/**
+		 * Smooth transition width for highlight extraction.
+		 * @type {number}
+		 */
 		this.smoothWidth = 0.01;
+		/**
+		 * Bloom blur radius.
+		 * @type {number}
+		 */
 		this.blurSize = 2;
+		/**
+		 * Bloom blend strength.
+		 * @type {number}
+		 */
 		this.strength = 1;
 
 		this._highlightPass = new ShaderPostPass(highlightShader);
@@ -1717,11 +1757,18 @@ class BloomEffect extends Effect {
 
 }
 
+/**
+ * Chromatic aberration effect.
+ */
 class ChromaticAberrationEffect extends Effect {
 
 	constructor() {
 		super();
 
+		/**
+		 * Chromatic offset strength.
+		 * @type {number}
+		 */
 		this.chromaFactor = 0.025;
 
 		this._mainPass = new ShaderPostPass(shader$5);
@@ -1773,15 +1820,38 @@ const shader$5 = {
     `
 };
 
+/**
+ * Color correction effect.
+ */
 class ColorCorrectionEffect extends Effect {
 
 	constructor() {
 		super();
 
+		/**
+		 * Brightness offset.
+		 * @type {number}
+		 */
 		this.brightness = 0;
+		/**
+		 * Contrast factor.
+		 * @type {number}
+		 */
 		this.contrast = 1.02;
+		/**
+		 * Exposure compensation.
+		 * @type {number}
+		 */
 		this.exposure = 0;
+		/**
+		 * Gamma correction factor.
+		 * @type {number}
+		 */
 		this.gamma = 1;
+		/**
+		 * Saturation factor.
+		 * @type {number}
+		 */
 		this.saturation = 1.02;
 
 		this._mainPass = new ShaderPostPass(shader$4);
@@ -1850,6 +1920,9 @@ const shader$4 = {
     `
 };
 
+/**
+ * Depth of field effect.
+ */
 class DOFEffect extends Effect {
 
 	constructor() {
@@ -1859,13 +1932,45 @@ class DOFEffect extends Effect {
 			{ key: 'GBuffer' }
 		];
 
+		/**
+		 * Focal plane depth.
+		 * @type {number}
+		 */
 		this.focalDepth = 1;
+		/**
+		 * Focal length parameter.
+		 * @type {number}
+		 */
 		this.focalLength = 24;
+		/**
+		 * Aperture value.
+		 * @type {number}
+		 */
 		this.fstop = 0.9;
+		/**
+		 * Maximum blur strength.
+		 * @type {number}
+		 */
 		this.maxblur = 1.0;
+		/**
+		 * Highlight threshold.
+		 * @type {number}
+		 */
 		this.threshold = 0.9;
+		/**
+		 * Highlight gain.
+		 * @type {number}
+		 */
 		this.gain = 1.0;
+		/**
+		 * Bokeh edge bias.
+		 * @type {number}
+		 */
 		this.bias = 0.5;
+		/**
+		 * Dithering strength.
+		 * @type {number}
+		 */
 		this.dithering = 0.0001;
 
 		this._mainPass = new ShaderPostPass(bokehShader);
@@ -2032,14 +2137,33 @@ const bokehShader = {
     `
 };
 
+/**
+ * Film grain and scanline effect.
+ */
 class FilmEffect extends Effect {
 
 	constructor() {
 		super();
 
+		/**
+		 * Noise strength.
+		 * @type {number}
+		 */
 		this.noiseIntensity = 0.35;
+		/**
+		 * Scanline strength.
+		 * @type {number}
+		 */
 		this.scanlinesIntensity = 0.5;
+		/**
+		 * Scanline density.
+		 * @type {number}
+		 */
 		this.scanlinesCount = 2048;
+		/**
+		 * Whether to output grayscale.
+		 * @type {boolean}
+		 */
 		this.grayscale = true;
 
 		this._time = 0;
@@ -2114,6 +2238,9 @@ const shader$3 = {
     `
 };
 
+/**
+ * FXAA anti-aliasing effect.
+ */
 class FXAAEffect extends Effect {
 
 	constructor() {
@@ -2135,6 +2262,9 @@ class FXAAEffect extends Effect {
 
 }
 
+/**
+ * Screen-space ambient occlusion effect.
+ */
 class SSAOEffect extends Effect {
 
 	constructor() {
@@ -2146,20 +2276,42 @@ class SSAOEffect extends Effect {
 
 		this._ssaoPass = new ShaderPostPass(ssaoShader);
 
-		// Sampling radius in work space.
-		// Larger will produce more soft concat shadow.
-		// But also needs higher quality or it will have more obvious artifacts
+		/**
+		 * SSAO sampling radius in world space.
+		 * Larger values produce softer contact shadows, but usually need higher quality
+		 * settings to avoid obvious artifacts.
+		 * @type {number}
+		 */
 		this.radius = 0.5;
 
+		/**
+		 * Occlusion power.
+		 * @type {number}
+		 */
 		this.power = 1;
 
+		/**
+		 * Depth bias.
+		 * @type {number}
+		 */
 		this.bias = 0.1;
 
+		/**
+		 * Occlusion intensity.
+		 * @type {number}
+		 */
 		this.intensity = 1;
 
+		/**
+		 * Whether to automatically weight samples by distance.
+		 * @type {boolean}
+		 */
 		this.autoSampleWeight = false;
 
-		// Quality of SSAO. 'Low'|'Medium'|'High'|'Ultra'
+		/**
+		 * SSAO quality level.
+		 * @type {'Low'|'Medium'|'High'|'Ultra'}
+		 */
 		this.quality = 'Medium';
 
 		this._kernelCode = '';
@@ -2172,10 +2324,26 @@ class SSAOEffect extends Effect {
 		this._blurPass.material.defines.NORMALTEX_ENABLED = 1;
 		this._blurPass.material.defines.DEPTHTEX_ENABLED = 1;
 
+		/**
+		 * Bilateral blur radius.
+		 * @type {number}
+		 */
 		this.blurSize = 1;
+		/**
+		 * Depth influence range for bilateral blur.
+		 * @type {number}
+		 */
 		this.depthRange = 1;
+		/**
+		 * Whether to enable jitter during sampling.
+		 * @type {boolean}
+		 */
 		this.jitter = true;
 
+		/**
+		 * Downsample level used for SSAO rendering.
+		 * @type {number}
+		 */
 		this.downScaleLevel = 0;
 
 		this._blendPass = new ShaderPostPass(multiplyShader);
@@ -2542,6 +2710,9 @@ const ssaoShader = {
     `
 };
 
+/**
+ * Screen-space reflection effect.
+ */
 class SSREffect extends Effect {
 
 	constructor() {
@@ -2552,53 +2723,110 @@ class SSREffect extends Effect {
 			{ key: 'GBuffer' }
 		];
 
-		// Single step distance, unit is pixel
+		/**
+		 * Pixel distance for each ray step.
+		 * @type {number}
+		 */
 		this.pixelStride = 8;
-		// Dichotomy search depends on precise collision point, maximum number of iterations
+		/**
+		 * Maximum iterations for binary search refinement.
+		 * @type {number}
+		 */
 		this.maxIteration = 5;
-		// Number of steps
+		/**
+		 * Maximum number of ray-marching steps.
+		 * @type {number}
+		 */
 		this.maxSteps = 50;
 
-		// The farthest reflection distance limit, in meters
+		/**
+		 * Maximum reflection distance in meters.
+		 * @type {number}
+		 */
 		this.maxRayDistance = 200;
 
-		// Adjust the step pixel distance according to the depth,
-		// the step in and out becomes larger,
-		// and the step in the distance becomes smaller.
+		/**
+		 * Whether to adjust pixel stride by depth so near rays step farther and distant rays
+		 * step more finely.
+		 * @type {boolean}
+		 */
 		this.enablePixelStrideZCutoff = true;
-		// ray origin Z at this distance will have a pixel stride of 1.0
+		/**
+		 * Reference ray-origin depth where pixel stride becomes `1.0`.
+		 * @type {number}
+		 */
 		this.pixelStrideZCutoff = 50;
 
-		// distance to screen edge that ray hits will start to fade (0.0 -> 1.0)
+		/**
+		 * Distance-to-screen-edge threshold where reflection fading starts, in the `0.0` to `1.0` range.
+		 * @type {number}
+		 */
 		this.screenEdgeFadeStart = 0.9;
 
-		// ray direction's Z that ray hits will start to fade (0.0 -> 1.0)
+		/**
+		 * View-direction Z threshold where reflection fading starts, in the `0.0` to `1.0` range.
+		 * @type {number}
+		 */
 		this.eyeFadeStart = 0.99;
-		// ray direction's Z that ray hits will be cut (0.0 -> 1.0)
+		/**
+		 * View-direction Z threshold where reflections are fully cut off, in the `0.0` to `1.0` range.
+		 * @type {number}
+		 */
 		this.eyeFadeEnd = 1;
 
-		// Object larger than minGlossiness will have ssr effect
+		/**
+		 * Minimum glossiness required to enable SSR.
+		 * @type {number}
+		 */
 		this.minGlossiness = 0.2;
 
-		// the strength of ssr effect
+		/**
+		 * SSR blend strength.
+		 * @type {number}
+		 */
 		this.strength = 0.2;
 
-		// the falloff of base color when mix with ssr color
+		/**
+		 * Falloff factor applied when mixing SSR with the base color.
+		 * @type {number}
+		 */
 		this.falloff = 0;
 
-		// the threshold of z thickness
+		/**
+		 * Depth thickness threshold used for ray intersection tests.
+		 * @type {number}
+		 */
 		this.zThicknessThreshold = 0.5;
 
-		// When turned on, the reflection effect will become more blurred as the Roughness increases,
-		// but it will also cause more noise.
-		// Noise can be reduced by turning on TAA.
+		/**
+		 * Whether to enable importance sampling.
+		 * This makes reflections blur more as roughness increases, but can introduce more noise.
+		 * Noise is typically reduced by enabling TAA.
+		 * @type {boolean}
+		 */
 		this.importanceSampling = false;
 
+		/**
+		 * SSR blur radius.
+		 * @type {number}
+		 */
 		this.blurSize = 2;
+		/**
+		 * Depth influence range for the blur stage.
+		 * @type {number}
+		 */
 		this.depthRange = 1;
 
+		/**
+		 * Downsample level used for SSR rendering.
+		 * @type {number}
+		 */
 		this.downScaleLevel = 0;
 
+		/**
+		 * Whether to enable jitter during sampling.
+		 * @type {boolean}
+		 */
 		this.jitter = true;
 
 		this._copyRGBPass = new ShaderPostPass(copyRGBShader);
@@ -3123,6 +3351,9 @@ const mixSSRShader = {
     `
 };
 
+/**
+ * Temporal anti-aliasing effect.
+ */
 class TAAEffect extends Effect {
 
 	constructor() {
@@ -3140,6 +3371,10 @@ class TAAEffect extends Effect {
 		this._reset = true;
 		this._accumulating = true;
 
+		/**
+		 * Callback invoked when accumulation finishes.
+		 * @type {?Function}
+		 */
 		this.onFinish = null;
 	}
 
@@ -3215,14 +3450,29 @@ const accumulateShader = {
     `
 };
 
-// Tone Mapping normally deals with the conversion of HDR to LDR.
+/**
+ * Tone mapping effect.
+ * Tone mapping normally deals with the conversion of HDR to LDR.
+ */
 class ToneMappingEffect extends Effect {
 
 	constructor() {
 		super();
 
+		/**
+		 * Tone mapping mode. See {@link ToneMappingType}.
+		 * @type {number}
+		 */
 		this.toneMapping = ToneMappingType.Reinhard;
+		/**
+		 * Tone mapping exposure value.
+		 * @type {number}
+		 */
 		this.toneMappingExposure = 1;
+		/**
+		 * Output color space. See {@link TEXEL_ENCODING_TYPE}.
+		 * @type {number}
+		 */
 		this.outputColorSpace = TEXEL_ENCODING_TYPE.SRGB;
 
 		this._mainPass = new ShaderPostPass(shader$2);
@@ -3461,12 +3711,23 @@ const shader$2 = {
     `
 };
 
+/**
+ * Vignetting effect.
+ */
 class VignettingEffect extends Effect {
 
 	constructor() {
 		super();
 
+		/**
+		 * Vignetting color.
+		 * @type {Color3}
+		 */
 		this.color = new Color3(0, 0, 0);
+		/**
+		 * Vignetting range offset factor.
+		 * @type {number}
+		 */
 		this.offset = 1.0;
 
 		this._vignettingPass = new ShaderPostPass(vignettingShader);
@@ -3515,11 +3776,18 @@ const vignettingShader = {
     `
 };
 
+/**
+ * Edge blur effect.
+ */
 class BlurEdgeEffect extends Effect {
 
 	constructor() {
 		super();
 
+		/**
+		 * Blur range factor from the screen center to the edges.
+		 * @type {number}
+		 */
 		this.offset = 1.0;
 
 		this._hBlurPass = new ShaderPostPass(horizontalBlurShader);
@@ -3595,6 +3863,9 @@ const blurBlendShader = {
     `
 };
 
+/**
+ * Outline effect.
+ */
 class OutlineEffect extends Effect {
 
 	constructor() {
@@ -3604,8 +3875,20 @@ class OutlineEffect extends Effect {
 			{ key: 'NonDepthMarkBuffer' }
 		];
 
+		/**
+		 * Outline color.
+		 * @type {Color3}
+		 */
 		this.color = new Color3(1, 1, 1);
+		/**
+		 * Outline thickness.
+		 * @type {number}
+		 */
 		this.thickness = 1.0;
+		/**
+		 * Outline strength.
+		 * @type {number}
+		 */
 		this.strength = 1.5;
 
 		this._downsamplerPass = new ShaderPostPass(copyShader);
@@ -3748,6 +4031,9 @@ const blendShader = {
     `
 };
 
+/**
+ * Inner glow effect.
+ */
 class InnerGlowEffect extends Effect {
 
 	constructor() {
@@ -3757,8 +4043,20 @@ class InnerGlowEffect extends Effect {
 			{ key: 'MarkBuffer' }
 		];
 
+		/**
+		 * Inner glow color.
+		 * @type {Color3}
+		 */
 		this.color = new Color3(1, 1, 1);
+		/**
+		 * Inner glow strength.
+		 * @type {number}
+		 */
 		this.strength = 1.5;
+		/**
+		 * Inner glow sampling stride.
+		 * @type {number}
+		 */
 		this.stride = 5;
 
 		this._channelPass = new ShaderPostPass(channelShader);
@@ -4001,6 +4299,9 @@ const tintShader = {
     `
 };
 
+/**
+ * Outer glow effect.
+ */
 class GlowEffect extends Effect {
 
 	constructor() {
@@ -4017,10 +4318,30 @@ class GlowEffect extends Effect {
 			{ key: 'ColorMarkBuffer', mask: RenderListMask.TRANSPARENT }
 		];
 
+		/**
+		 * Glow strength.
+		 * @type {number}
+		 */
 		this.strength = 1;
+		/**
+		 * Glow radius.
+		 * @type {number}
+		 */
 		this.radius = 0.4;
+		/**
+		 * Highlight extraction threshold.
+		 * @type {number}
+		 */
 		this.threshold = 0.01;
+		/**
+		 * Smooth transition width for highlight extraction.
+		 * @type {number}
+		 */
 		this.smoothWidth = 0.1;
+		/**
+		 * Mask contribution strength.
+		 * @type {number}
+		 */
 		this.maskStrength = 1;
 
 		this._maskPass = new ShaderPostPass(maskShader);
@@ -4178,6 +4499,9 @@ const bloomCompositeShader = {
     `
 };
 
+/**
+ * Soft glow effect.
+ */
 class SoftGlowEffect extends Effect {
 
 	constructor() {
@@ -4194,9 +4518,25 @@ class SoftGlowEffect extends Effect {
 			{ key: 'ColorMarkBuffer', mask: RenderListMask.TRANSPARENT }
 		];
 
+		/**
+		 * Soft glow strength.
+		 * @type {number}
+		 */
 		this.strength = 0.5;
+		/**
+		 * Multi-level blur blend rate.
+		 * @type {number}
+		 */
 		this.blendRate = 0.4;
+		/**
+		 * Soft glow blur radius.
+		 * @type {number}
+		 */
 		this.blurSize = 1;
+		/**
+		 * Mask contribution strength.
+		 * @type {number}
+		 */
 		this.maskStrength = 1;
 
 		this._maskPass = new ShaderPostPass(maskShader);
@@ -4333,6 +4673,9 @@ const downSampleShader = {
 	`
 };
 
+/**
+ * Directional tailing effect.
+ */
 class TailingEffect extends Effect {
 
 	constructor() {
@@ -4349,8 +4692,20 @@ class TailingEffect extends Effect {
 			{ key: 'ColorMarkBuffer', mask: RenderListMask.TRANSPARENT }
 		];
 
+		/**
+		 * Tailing center position.
+		 * @type {Vector2}
+		 */
 		this.center = new Vector2(0.5, 0.5);
+		/**
+		 * Tailing direction.
+		 * @type {Vector2}
+		 */
 		this.direction = new Vector2(0.0, 1.0);
+		/**
+		 * Tailing strength.
+		 * @type {number}
+		 */
 		this.strength = 1;
 
 		this._maskPass = new ShaderPostPass(maskShader);
@@ -4472,6 +4827,9 @@ const tailingShader = {
     `
 };
 
+/**
+ * Radial tailing effect.
+ */
 class RadialTailingEffect extends Effect {
 
 	constructor() {
@@ -4488,7 +4846,15 @@ class RadialTailingEffect extends Effect {
 			{ key: 'ColorMarkBuffer', mask: RenderListMask.TRANSPARENT }
 		];
 
+		/**
+		 * Radial tailing center position.
+		 * @type {Vector2}
+		 */
 		this.center = new Vector2(0.5, 0.5);
+		/**
+		 * Radial tailing strength.
+		 * @type {number}
+		 */
 		this.strength = 1;
 
 		this._maskPass = new ShaderPostPass(maskShader);
@@ -4606,6 +4972,9 @@ const radialTailingShader = {
     `
 };
 
+/**
+ * Ghosting effect.
+ */
 class GhostingEffect extends Effect {
 
 	constructor() {
@@ -4622,7 +4991,15 @@ class GhostingEffect extends Effect {
 			{ key: 'ColorMarkBuffer', mask: RenderListMask.TRANSPARENT }
 		];
 
+		/**
+		 * Ghosting center position.
+		 * @type {Vector2}
+		 */
 		this.center = new Vector2(0.5, 0.5);
+		/**
+		 * Ghosting strength.
+		 * @type {number}
+		 */
 		this.strength = 1;
 
 		this._maskPass = new ShaderPostPass(maskShader);
